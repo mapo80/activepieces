@@ -151,8 +151,8 @@ export default function McpGatewaysPage() {
           pendingDelete ? deleteGateway(pendingDelete.id) : Promise.resolve()
         }
         isDanger
-        isOpen={pendingDelete !== null}
-        setIsOpen={(open) => {
+        open={pendingDelete !== null}
+        onOpenChange={(open: boolean) => {
           if (!open && !isDeleting) setPendingDelete(null);
         }}
       />

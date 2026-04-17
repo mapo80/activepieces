@@ -15,7 +15,7 @@ export const mcpGatewaysQueries = {
     useQuery<McpGatewayWithoutSensitiveData[]>({
       queryKey: [MCP_GATEWAYS_KEY],
       queryFn: () => mcpGatewaysApi.list(),
-      meta: { showErrorDialog: true },
+      meta: { showErrorDialog: true, loadSubsetOptions: {} },
     }),
 
   useTools: (gatewayId: string | null) =>
