@@ -4,13 +4,16 @@ import {
   CardListItem,
   CardListItemSkeleton,
 } from '@/components/custom/card-list';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { VirtualizedScrollArea } from '@/components/ui/virtualized-scroll-area';
 import {
   PieceIcon,
   piecesHooks,
   PieceSelectorTabType,
   usePieceSelectorTabs,
   PieceSelectorOperation,
+  StepMetadataWithSuggestions,
+  CategorizedStepMetadataWithSuggestions,
+  PIECE_SELECTOR_ELEMENTS_HEIGHTS,
 } from '@/features/pieces';
 
 import { PieceActionsOrTriggersList } from './piece-actions-or-triggers-list';
@@ -54,39 +57,87 @@ const ExploreTabContent = ({
     );
   }
 
-  return (
-    <ScrollArea className="h-full w-full">
-      <div className="flex  p-2  ">
-        {categories.map((category) => (
-          <div key={category.title} className="flex w-[50%] flex-col gap-0.5 ">
-            <div className="text-sm text-muted-foreground mb-1.5">
-              {category.title}
-            </div>
+  const virtualizedItems = flattenCategoriesToVirtualizedItems(categories);
 
-            {category.metadata.map((pieceMetadata) => (
-              <CardListItem
-                className="rounded-sm py-3"
-                key={pieceMetadata.displayName}
-                onClick={() => setSelectedPieceInExplore(pieceMetadata)}
-              >
-                <div className="flex gap-2 items-center h-full">
-                  <PieceIcon
-                    logoUrl={pieceMetadata.logoUrl}
-                    displayName={pieceMetadata.displayName}
-                    showTooltip={false}
-                    size={'sm'}
-                  />
-                  <div className="grow h-full flex items-center justify-left text-sm">
-                    {pieceMetadata.displayName}
-                  </div>
-                </div>{' '}
-              </CardListItem>
-            ))}
-          </div>
-        ))}
-      </div>
-    </ScrollArea>
+  return (
+    <div className="h-full w-full p-2">
+      <VirtualizedScrollArea
+        items={virtualizedItems}
+        estimateSize={(index) => virtualizedItems[index].height}
+        getItemKey={(index) => virtualizedItems[index].id}
+        renderItem={(item) => {
+          if (item.kind === 'category') {
+            return (
+              <div className="text-sm text-muted-foreground mb-1.5">
+                {item.title}
+              </div>
+            );
+          }
+          const { pieceMetadata } = item;
+          return (
+            <CardListItem
+              className="rounded-sm py-3"
+              onClick={() => setSelectedPieceInExplore(pieceMetadata)}
+            >
+              <div className="flex gap-2 items-center h-full">
+                <PieceIcon
+                  logoUrl={pieceMetadata.logoUrl}
+                  displayName={pieceMetadata.displayName}
+                  showTooltip={false}
+                  size={'sm'}
+                />
+                <div className="grow h-full flex items-center justify-left text-sm">
+                  {pieceMetadata.displayName}
+                </div>
+              </div>
+            </CardListItem>
+          );
+        }}
+      />
+    </div>
   );
 };
 
 export { ExploreTabContent };
+
+function flattenCategoriesToVirtualizedItems(
+  categories: CategorizedStepMetadataWithSuggestions[],
+): ExploreVirtualizedItem[] {
+  return categories.reduce<ExploreVirtualizedItem[]>((result, category) => {
+    result.push({
+      kind: 'category',
+      id: `category-${category.title}`,
+      title: category.title,
+      height: PIECE_SELECTOR_ELEMENTS_HEIGHTS.CATEGORY_ITEM_HEIGHT,
+    });
+    category.metadata.forEach((pieceMetadata, index) => {
+      result.push({
+        kind: 'piece',
+        id: `${category.title}-${getPieceKey(pieceMetadata)}-${index}`,
+        pieceMetadata,
+        height: PIECE_SELECTOR_ELEMENTS_HEIGHTS.PIECE_ITEM_HEIGHT,
+      });
+    });
+    return result;
+  }, []);
+}
+
+function getPieceKey(pieceMetadata: StepMetadataWithSuggestions): string {
+  return 'pieceName' in pieceMetadata
+    ? pieceMetadata.pieceName
+    : pieceMetadata.type;
+}
+
+type ExploreVirtualizedItem =
+  | {
+      kind: 'category';
+      id: string;
+      title: string;
+      height: number;
+    }
+  | {
+      kind: 'piece';
+      id: string;
+      pieceMetadata: StepMetadataWithSuggestions;
+      height: number;
+    };

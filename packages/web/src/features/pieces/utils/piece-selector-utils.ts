@@ -117,6 +117,9 @@ const isStepInitiallyValid = (
       }
       return false;
     }
+    case FlowActionType.INTERACTIVE_FLOW: {
+      return true;
+    }
   }
 };
 
@@ -224,6 +227,17 @@ const getDefaultStepValues = ({
             ],
           },
           children: [null, null],
+        },
+        common,
+      );
+    case FlowActionType.INTERACTIVE_FLOW:
+      return deepMergeAndCast<FlowAction>(
+        {
+          type: FlowActionType.INTERACTIVE_FLOW,
+          settings: overrideDefaultSettings ?? {
+            nodes: [],
+            stateFields: [],
+          },
         },
         common,
       );

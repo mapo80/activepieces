@@ -64,6 +64,7 @@ export const CORE_ACTIONS_METADATA = [
   CORE_STEP_METADATA[FlowActionType.CODE],
   CORE_STEP_METADATA[FlowActionType.LOOP_ON_ITEMS],
   CORE_STEP_METADATA[FlowActionType.ROUTER],
+  CORE_STEP_METADATA[FlowActionType.INTERACTIVE_FLOW],
 ] as const;
 
 export const stepUtils = {

@@ -441,13 +441,7 @@ const buildInteractiveFlowChildGraph = (
 ): ApGraph => {
   const interactiveNodes = step.settings.nodes;
   if (interactiveNodes.length === 0) {
-    const bigAddButton = createBigAddButtonGraph(step, {
-      parentStepName: step.name,
-      stepLocationRelativeToParent:
-        StepLocationRelativeToParent.INSIDE_INTERACTIVE_FLOW,
-      edgeId: `${step.name}-interactive-flow-start-edge`,
-    });
-    return bigAddButton;
+    return { nodes: [], edges: [] };
   }
 
   const stepHeight = flowCanvasConsts.AP_NODE_SIZE.STEP.height;

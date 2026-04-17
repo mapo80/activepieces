@@ -12,6 +12,7 @@ import {
   AppConnectionScope,
   AppConnectionType,
   CodeActionSchema,
+  InteractiveFlowActionSchema,
   LoopOnItemsActionSchema,
   Metadata,
   PieceActionSchema,
@@ -491,6 +492,8 @@ export const formUtils = {
         );
       case FlowActionType.CODE:
         return CodeActionSchema;
+      case FlowActionType.INTERACTIVE_FLOW:
+        return InteractiveFlowActionSchema;
       case FlowActionType.PIECE: {
         return PieceActionSchema.omit({ settings: true }).extend(
           z.object({

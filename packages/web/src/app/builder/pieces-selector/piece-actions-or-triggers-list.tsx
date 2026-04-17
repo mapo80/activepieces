@@ -54,7 +54,8 @@ export const convertStepMetadataToPieceSelectorItems = (
     }
     case FlowActionType.CODE:
     case FlowActionType.LOOP_ON_ITEMS:
-    case FlowActionType.ROUTER: {
+    case FlowActionType.ROUTER:
+    case FlowActionType.INTERACTIVE_FLOW: {
       return CORE_ACTIONS_METADATA.filter(
         (step) => step.type === stepMetadataWithSuggestions.type,
       );
