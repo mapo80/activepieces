@@ -47,6 +47,12 @@ export const CORE_STEP_METADATA: Record<
     description: t('Split your flow into branches depending on condition(s)'),
     type: FlowActionType.ROUTER as const,
   },
+  [FlowActionType.INTERACTIVE_FLOW]: {
+    displayName: t('Interactive Flow'),
+    logoUrl: 'https://cdn.activepieces.com/pieces/new-core/loop.svg',
+    description: t('Multi-turn interactive flow with dependency resolution'),
+    type: FlowActionType.INTERACTIVE_FLOW as const,
+  },
   [FlowTriggerType.EMPTY]: {
     displayName: t('Empty Trigger'),
     logoUrl: 'https://cdn.activepieces.com/pieces/new-core/empty-trigger.svg',
@@ -87,6 +93,7 @@ export const stepUtils = {
       case FlowActionType.ROUTER:
       case FlowActionType.LOOP_ON_ITEMS:
       case FlowActionType.CODE:
+      case FlowActionType.INTERACTIVE_FLOW:
       case FlowTriggerType.EMPTY:
         return {
           ...CORE_STEP_METADATA[step.type],

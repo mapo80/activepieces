@@ -3,6 +3,9 @@
 # Claude Code worktrees
 .claude/worktrees/
 
+# Local dev scripts
+dev-start.sh
+
 pieces-cache-db-*.sqlite
 
 # compiled output

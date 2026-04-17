@@ -72,6 +72,9 @@ export const flowVersionValidationUtil = (log: FastifyBaseLogger) => ({
                             clonedRequest.request.action.settings,
                         ).success
                         break
+                    case FlowActionType.INTERACTIVE_FLOW:
+                        clonedRequest.request.action.valid = true
+                        break
                 }
                 break
             case FlowOperationType.UPDATE_ACTION:
@@ -101,6 +104,9 @@ export const flowVersionValidationUtil = (log: FastifyBaseLogger) => ({
                         clonedRequest.request.valid = codeSettingsValidator.safeParse(
                             clonedRequest.request.settings,
                         ).success
+                        break
+                    case FlowActionType.INTERACTIVE_FLOW:
+                        clonedRequest.request.valid = true
                         break
                 }
                 break

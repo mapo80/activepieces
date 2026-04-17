@@ -7,6 +7,7 @@ import { BaseExecutor } from './base-executor'
 import { codeExecutor } from './code-executor'
 import { EngineConstants } from './context/engine-constants'
 import { FlowExecutorContext } from './context/flow-execution-context'
+import { interactiveFlowExecutor } from './interactive-flow-executor'
 import { loopExecutor } from './loop-executor'
 import { pieceExecutor } from './piece-executor'
 import { routerExecuter } from './router-executor'
@@ -18,6 +19,7 @@ function getExecuteFunction(): Record<FlowActionType, BaseExecutor<FlowAction>> 
         [FlowActionType.LOOP_ON_ITEMS]: loopExecutor,
         [FlowActionType.PIECE]: pieceExecutor,
         [FlowActionType.ROUTER]: routerExecuter,
+        [FlowActionType.INTERACTIVE_FLOW]: interactiveFlowExecutor,
     }
 }
 

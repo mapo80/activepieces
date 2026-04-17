@@ -37,6 +37,7 @@ export * from './lib/management/template'
 
 // automation
 export * from './lib/automation/flows/actions/action'
+export * from './lib/automation/flows/actions/interactive-flow-action'
 export * from './lib/automation/flows/operations'
 export * from './lib/automation/flows/operations/paste-operations'
 export * from './lib/automation/flows/triggers/trigger'

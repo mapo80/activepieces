@@ -16,6 +16,7 @@ import { ApRouterStartCanvasEdge } from '../edges/router-start-edge';
 import { ApStraightLineCanvasEdge } from '../edges/straight-line-edge';
 import { ApBigAddButtonCanvasNode } from '../nodes/big-add-button-node';
 import ApGraphEndWidgetNode from '../nodes/flow-end-widget-node';
+import ApInteractiveFlowReturnCanvasNode from '../nodes/interactive-flow-return-node';
 import ApLoopReturnCanvasNode from '../nodes/loop-return-node';
 import { ApNoteCanvasNode } from '../nodes/note-node';
 import { ApStepCanvasNode } from '../nodes/step-node';
@@ -47,7 +48,8 @@ const HORIZONTAL_SPACE_BETWEEN_NODES = FLOW_CANVAS_HSPACE;
 const AP_NODE_SIZE: Record<
   Exclude<ApNodeType, ApNodeType.GRAPH_START_WIDGET | ApNodeType.NOTE>,
   { height: number; width: number }
-> = {
+> &
+  Record<string, { height: number; width: number }> = {
   [ApNodeType.BIG_ADD_BUTTON]: {
     height: 50,
     width: 50,
@@ -64,6 +66,10 @@ const AP_NODE_SIZE: Record<
     height: FLOW_CANVAS_STEP_HEIGHT,
     width: FLOW_CANVAS_STEP_WIDTH,
   },
+  [ApNodeType.INTERACTIVE_FLOW_RETURN_NODE]: {
+    height: FLOW_CANVAS_STEP_HEIGHT,
+    width: FLOW_CANVAS_STEP_WIDTH,
+  },
   [ApNodeType.GRAPH_END_WIDGET]: {
     height: 0,
     width: 0,
@@ -75,10 +81,12 @@ const doesNodeAffectBoundingBoxWidth: (
 ) => type is
   | ApNodeType.BIG_ADD_BUTTON
   | ApNodeType.STEP
-  | ApNodeType.LOOP_RETURN_NODE = (type) =>
+  | ApNodeType.LOOP_RETURN_NODE
+  | ApNodeType.INTERACTIVE_FLOW_RETURN_NODE = (type) =>
   type === ApNodeType.BIG_ADD_BUTTON ||
   type === ApNodeType.STEP ||
-  type === ApNodeType.LOOP_RETURN_NODE;
+  type === ApNodeType.LOOP_RETURN_NODE ||
+  type === ApNodeType.INTERACTIVE_FLOW_RETURN_NODE;
 export const flowCanvasConsts = {
   ARC_LENGTH,
   ARC_LEFT,
@@ -107,6 +115,8 @@ export const flowCanvasConsts = {
   nodeTypes: {
     [ApNodeType.STEP]: ApStepCanvasNode,
     [ApNodeType.LOOP_RETURN_NODE]: ApLoopReturnCanvasNode,
+    [ApNodeType.INTERACTIVE_FLOW_RETURN_NODE]:
+      ApInteractiveFlowReturnCanvasNode,
     [ApNodeType.BIG_ADD_BUTTON]: ApBigAddButtonCanvasNode,
     [ApNodeType.GRAPH_END_WIDGET]: ApGraphEndWidgetNode,
     [ApNodeType.NOTE]: ApNoteCanvasNode,

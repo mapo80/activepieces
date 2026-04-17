@@ -11,6 +11,7 @@ import {
   StepLocationRelativeToParent,
   FlowTrigger,
   FlowTriggerType,
+  InteractiveFlowAction,
   Note,
 } from '@activepieces/shared';
 import { t } from 'i18next';
@@ -27,13 +28,14 @@ import {
   ApGraph,
   ApGraphEndNode,
   ApLoopReturnNode,
+  ApNode,
   ApNodeType,
   ApStepNode,
   ApStraightLineEdge,
 } from './types';
 
 const createBigAddButtonGraph: (
-  parentStep: LoopOnItemsAction | RouterAction,
+  parentStep: LoopOnItemsAction | RouterAction | InteractiveFlowAction,
   nodeData: ApBigAddButtonNode['data'],
 ) => ApGraph = (parentStep, nodeData) => {
   const bigAddButtonNode: ApBigAddButtonNode = {
@@ -145,6 +147,8 @@ const buildFlowGraph: (
       ? buildLoopChildGraph(step)
       : step.type === FlowActionType.ROUTER
       ? buildRouterChildGraph(step)
+      : step.type === FlowActionType.INTERACTIVE_FLOW
+      ? buildInteractiveFlowChildGraph(step)
       : null;
 
   const graphWithChild = childGraph ? mergeGraph(graph, childGraph) : graph;
@@ -430,6 +434,114 @@ const offsetRouterChildSteps = (childGraphs: ApGraph[]) => {
         flowCanvasConsts.VERTICAL_OFFSET_BETWEEN_ROUTER_AND_CHILD,
     });
   });
+};
+
+const buildInteractiveFlowChildGraph = (
+  step: InteractiveFlowAction,
+): ApGraph => {
+  const interactiveNodes = step.settings.nodes;
+  if (interactiveNodes.length === 0) {
+    const bigAddButton = createBigAddButtonGraph(step, {
+      parentStepName: step.name,
+      stepLocationRelativeToParent:
+        StepLocationRelativeToParent.INSIDE_INTERACTIVE_FLOW,
+      edgeId: `${step.name}-interactive-flow-start-edge`,
+    });
+    return bigAddButton;
+  }
+
+  const stepHeight = flowCanvasConsts.AP_NODE_SIZE.STEP.height;
+  const stepWidth = flowCanvasConsts.AP_NODE_SIZE.STEP.width;
+  const vSpace = flowCanvasConsts.VERTICAL_SPACE_BETWEEN_STEPS;
+  const startY =
+    stepHeight + flowCanvasConsts.VERTICAL_OFFSET_BETWEEN_LOOP_AND_CHILD;
+
+  const childNodes: ApNode[] = interactiveNodes.map((node, index) => ({
+    id: `${step.name}-iflow-${node.id}`,
+    type: ApNodeType.STEP as const,
+    position: {
+      x: stepWidth + flowCanvasConsts.HORIZONTAL_SPACE_BETWEEN_NODES,
+      y: startY + index * (stepHeight + vSpace),
+    },
+    data: {
+      step: {
+        name: `${step.name}_${node.name}`,
+        displayName: node.displayName,
+        type: FlowActionType.PIECE,
+        valid: true,
+        settings: {
+          input: {},
+          pieceName: node.tool ?? 'interactive-flow',
+          pieceVersion: '0.0.0',
+          actionName: node.nodeType,
+          propertySettings: {},
+        },
+      } as FlowAction,
+    },
+    selectable: false,
+  }));
+
+  const lastChildY =
+    startY + (interactiveNodes.length - 1) * (stepHeight + vSpace);
+  const returnNode: ApNode = {
+    id: `${step.name}-interactive-flow-return-node`,
+    type: ApNodeType.INTERACTIVE_FLOW_RETURN_NODE,
+    position: {
+      x: stepWidth + flowCanvasConsts.HORIZONTAL_SPACE_BETWEEN_NODES,
+      y: lastChildY + stepHeight + vSpace,
+    },
+    data: {},
+    selectable: false,
+  };
+
+  const subgraphEndSubNode: ApGraphEndNode = {
+    id: `${step.name}-interactive-flow-subgraph-end`,
+    type: ApNodeType.GRAPH_END_WIDGET,
+    position: {
+      x: 0,
+      y: lastChildY + stepHeight + vSpace + stepHeight,
+    },
+    data: {},
+    selectable: false,
+  };
+
+  const edges: ApEdge[] = [
+    {
+      id: `${step.name}-interactive-flow-start-edge`,
+      source: step.name,
+      target: childNodes[0].id,
+      type: ApEdgeType.LOOP_START_EDGE,
+      data: { isLoopEmpty: false },
+    },
+    {
+      id: `${step.name}-interactive-flow-return-edge`,
+      source: childNodes[childNodes.length - 1].id,
+      target: returnNode.id,
+      type: ApEdgeType.LOOP_RETURN_EDGE,
+      data: {
+        parentStepName: step.name,
+        isLoopEmpty: false,
+        drawArrowHeadAfterEnd: !isNil(step.nextAction),
+        verticalSpaceBetweenReturnNodeStartAndEnd: vSpace,
+      },
+    },
+  ];
+
+  const childEdges: ApEdge[] = childNodes.slice(0, -1).map((node, index) => ({
+    id: `${step.name}-iflow-edge-${index}`,
+    source: node.id,
+    target: childNodes[index + 1].id,
+    type: ApEdgeType.STRAIGHT_LINE,
+    data: {
+      drawArrowHead: true,
+      parentStepName: step.name,
+    },
+  }));
+
+  return {
+    nodes: [...childNodes, returnNode, subgraphEndSubNode],
+    edges: [...edges, ...childEdges],
+  };
 };
 
 const createAddOperationFromAddButtonData = (data: ApButtonData) => {

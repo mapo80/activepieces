@@ -71,6 +71,16 @@ function _updateAction(flowVersion: FlowVersion, request: UpdateActionRequest): 
                 }
                 break
             }
+            case FlowActionType.INTERACTIVE_FLOW: {
+                const existingSampleData = stepToUpdate.type === FlowActionType.INTERACTIVE_FLOW ? stepToUpdate.settings.sampleData : undefined
+                updatedAction = {
+                    ...baseProps,
+                    settings: { ...request.settings, sampleData: existingSampleData },
+                    type: FlowActionType.INTERACTIVE_FLOW,
+                    nextAction: stepToUpdate.nextAction,
+                }
+                break
+            }
         }
         const parseResult = SingleActionSchema.safeParse(updatedAction)
         const valid = (isNil(request.valid) ? true : request.valid) && parseResult.success

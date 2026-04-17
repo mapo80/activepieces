@@ -3,12 +3,14 @@ import { STEP_NAME_REGEX } from '../../../core/common'
 import { VersionType } from '../../pieces'
 import { PropertySettings } from '../properties'
 import { SampleDataSetting } from '../sample-data'
+import { InteractiveFlowActionSettings } from './interactive-flow-action'
 
 export enum FlowActionType {
     CODE = 'CODE',
     PIECE = 'PIECE',
     LOOP_ON_ITEMS = 'LOOP_ON_ITEMS',
     ROUTER = 'ROUTER',
+    INTERACTIVE_FLOW = 'INTERACTIVE_FLOW',
 }
 
 export enum RouterExecutionType {
@@ -300,6 +302,9 @@ export const FlowAction: z.ZodType<FlowAction> = z.lazy(() =>
             nextAction: FlowAction.optional(),
             children: z.array(z.union([FlowAction, z.null()])),
         }),
+        InteractiveFlowActionSchema.extend({
+            nextAction: FlowAction.optional(),
+        }),
     ]),
 )
 export const RouterActionSchema = z.object({
@@ -308,11 +313,18 @@ export const RouterActionSchema = z.object({
     settings: RouterActionSettings,
 })
 
+export const InteractiveFlowActionSchema = z.object({
+    ...commonActionProps,
+    type: z.literal(FlowActionType.INTERACTIVE_FLOW),
+    settings: InteractiveFlowActionSettings,
+})
+
 export const SingleActionSchema = z.union([
     CodeActionSchema,
     PieceActionSchema,
     LoopOnItemsActionSchema,
     RouterActionSchema,
+    InteractiveFlowActionSchema,
 ])
 
 // Manually defined to avoid z.infer in recursive types (causes TypeScript OOM)
@@ -329,6 +341,7 @@ export type FlowAction =
     | (BaseActionProps & { type: FlowActionType.PIECE, settings: PieceActionSettings, nextAction?: FlowAction })
     | (BaseActionProps & { type: FlowActionType.LOOP_ON_ITEMS, settings: LoopOnItemsActionSettings, nextAction?: FlowAction, firstLoopAction?: FlowAction })
     | (BaseActionProps & { type: FlowActionType.ROUTER, settings: RouterActionSettings, nextAction?: FlowAction, children: (FlowAction | null)[] })
+    | (BaseActionProps & { type: FlowActionType.INTERACTIVE_FLOW, settings: InteractiveFlowActionSettings, nextAction?: FlowAction })
 
 export type RouterAction = BaseActionProps & {
     type: FlowActionType.ROUTER
@@ -353,6 +366,12 @@ export type PieceAction = BaseActionProps & {
 export type CodeAction = BaseActionProps & {
     type: FlowActionType.CODE
     settings: CodeActionSettings
+    nextAction?: FlowAction
+}
+
+export type InteractiveFlowAction = BaseActionProps & {
+    type: FlowActionType.INTERACTIVE_FLOW
+    settings: InteractiveFlowActionSettings
     nextAction?: FlowAction
 }
 

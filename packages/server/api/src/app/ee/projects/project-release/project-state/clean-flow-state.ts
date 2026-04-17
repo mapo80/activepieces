@@ -81,6 +81,8 @@ function cleanAction(action: FlowAction): FlowAction {
                 ...commonProps, type: action.type, settings: action.settings, nextAction,
                 children: action.children.map((child) => isNil(child) ? null : cleanAction(child)),
             }
+        case FlowActionType.INTERACTIVE_FLOW:
+            return { ...commonProps, type: action.type, settings: action.settings, nextAction }
     }
 }
 

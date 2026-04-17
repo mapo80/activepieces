@@ -76,6 +76,7 @@ export const testExecutionContext = {
                 }
                 case FlowActionType.PIECE:
                 case FlowActionType.CODE:
+                case FlowActionType.INTERACTIVE_FLOW:
                 case FlowTriggerType.EMPTY:
                 case FlowTriggerType.PIECE:
                     flowExecutionContext = flowExecutionContext.upsertStep(step.name, GenericStepOutput.create({

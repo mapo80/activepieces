@@ -57,6 +57,13 @@ function createAction(request: UpdateActionRequest, {
                 settings: request.settings,
             }
             break
+        case FlowActionType.INTERACTIVE_FLOW:
+            action = {
+                ...baseProperties,
+                type: FlowActionType.INTERACTIVE_FLOW,
+                settings: request.settings,
+            }
+            break
     }
     const parseResult = SingleActionSchema.safeParse(action)
     const valid = (isNil(request.valid) ? true : request.valid) && parseResult.success

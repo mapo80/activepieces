@@ -1,4 +1,4 @@
-import { ActionErrorHandlingOptions, BeginExecuteFlowOperation, BranchCondition, BranchExecutionType, CodeAction, ExecutionType, FlowAction, FlowActionType, FlowVersionState, LoopOnItemsAction, PieceAction, StreamStepProgress, PropertyExecutionType, RouterExecutionType, RunEnvironment } from '@activepieces/shared'
+import { ActionErrorHandlingOptions, BeginExecuteFlowOperation, BranchCondition, BranchExecutionType, CodeAction, InteractiveFlowAction, InteractiveFlowActionSettings, InteractiveFlowNode, ExecutionType, FlowAction, FlowActionType, FlowVersionState, LoopOnItemsAction, PieceAction, StreamStepProgress, PropertyExecutionType, RouterExecutionType, RunEnvironment } from '@activepieces/shared'
 import { EngineConstants } from '../../src/lib/handler/context/engine-constants'
 
 export const generateMockEngineConstants = (params?: Partial<EngineConstants>): EngineConstants => {
@@ -143,5 +143,29 @@ export function buildMockBeginExecuteFlowOperation(
         triggerPayload: {},
         executeTrigger: false,
         ...params,
+    }
+}
+
+export function buildInteractiveFlowAction({ name, nodes, stateFields, nextAction, greeting, mcpServerUrl }: {
+    name: string
+    nodes: InteractiveFlowNode[]
+    stateFields?: InteractiveFlowActionSettings['stateFields']
+    nextAction?: FlowAction
+    greeting?: string
+    mcpServerUrl?: string
+}): InteractiveFlowAction {
+    return {
+        name,
+        displayName: 'Interactive Flow',
+        type: FlowActionType.INTERACTIVE_FLOW,
+        skip: false,
+        settings: {
+            nodes,
+            stateFields: stateFields ?? [],
+            greeting,
+            mcpServerUrl,
+        },
+        nextAction,
+        valid: true,
     }
 }

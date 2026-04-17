@@ -75,6 +75,7 @@ function _getImportOperationsForSteps(step: FlowAction | FlowTrigger | undefined
             }
             case FlowActionType.CODE:
             case FlowActionType.PIECE:
+            case FlowActionType.INTERACTIVE_FLOW:
             case FlowTriggerType.PIECE:
             case FlowTriggerType.EMPTY: {
                 break
@@ -123,6 +124,7 @@ function removeAnySubsequentAction(action: FlowAction): FlowAction {
         }
         case FlowActionType.PIECE:
         case FlowActionType.CODE:
+        case FlowActionType.INTERACTIVE_FLOW:
             break
     }
     delete clonedAction.nextAction

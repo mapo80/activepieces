@@ -14,6 +14,8 @@ export enum ApNodeType {
   GRAPH_START_WIDGET = 'GRAPH_START_WIDGET',
   /**Used for calculating the loop graph width */
   LOOP_RETURN_NODE = 'LOOP_RETURN_NODE',
+  /**Used for calculating the interactive flow graph width */
+  INTERACTIVE_FLOW_RETURN_NODE = 'INTERACTIVE_FLOW_RETURN_NODE',
   NOTE = 'NOTE',
 }
 export type ApBoundingBox = {
@@ -66,7 +68,8 @@ export type ApButtonData = {
       parentStepName: string;
       stepLocationRelativeToParent:
         | StepLocationRelativeToParent.AFTER
-        | StepLocationRelativeToParent.INSIDE_LOOP;
+        | StepLocationRelativeToParent.INSIDE_LOOP
+        | StepLocationRelativeToParent.INSIDE_INTERACTIVE_FLOW;
     }
   | {
       parentStepName: string;
@@ -100,11 +103,23 @@ export type ApGraphEndNode = {
   selectable?: boolean;
 };
 
+export type ApInteractiveFlowReturnNode = {
+  id: string;
+  type: ApNodeType.INTERACTIVE_FLOW_RETURN_NODE;
+  position: {
+    x: number;
+    y: number;
+  };
+  data: Record<string, never>;
+  selectable?: boolean;
+};
+
 export type ApNode =
   | ApStepNode
   | ApGraphEndNode
   | ApBigAddButtonNode
   | ApLoopReturnNode
+  | ApInteractiveFlowReturnNode
   | ApNoteNode;
 
 export enum ApEdgeType {

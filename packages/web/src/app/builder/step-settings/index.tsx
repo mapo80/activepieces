@@ -33,6 +33,7 @@ import { TestStepContainer } from '../test-step';
 import { AgentSettings } from './agent-settings';
 import { CodeSettings } from './code-settings';
 import EditableStepName from './editable-step-name';
+import { InteractiveFlowSettings } from './interactive-flow-settings';
 import { LoopsSettings } from './loops-settings';
 import { PieceSettings } from './piece-settings';
 import { useResizableVerticalPanelsContext } from './resizable-vertical-panels-context';
@@ -245,6 +246,11 @@ const StepSettingsContainer = () => {
                     modifiedStep && (
                       <RouterSettings readonly={readonly}></RouterSettings>
                     )}
+                  {modifiedStep.type === FlowActionType.INTERACTIVE_FLOW && (
+                    <InteractiveFlowSettings
+                      readonly={readonly}
+                    ></InteractiveFlowSettings>
+                  )}
                   {modifiedStep.type === FlowTriggerType.PIECE &&
                     modifiedStep && (
                       <PieceSettings

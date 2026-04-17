@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { Nullable } from '../../../core/common'
 import { Metadata } from '../../../core/common/metadata'
-import { BranchCondition, CodeActionSchema, CodeActionSettings, FlowActionType, LoopOnItemsActionSchema, LoopOnItemsActionSettings, PieceActionSchema, PieceActionSettings, RouterActionSchema, RouterActionSettings } from '../actions/action'
+import { BranchCondition, CodeActionSchema, CodeActionSettings, FlowActionType, InteractiveFlowActionSchema, LoopOnItemsActionSchema, LoopOnItemsActionSettings, PieceActionSchema, PieceActionSettings, RouterActionSchema, RouterActionSettings } from '../actions/action'
+import { InteractiveFlowActionSettings, InteractiveFlowNodeSchema } from '../actions/interactive-flow-action'
 import { FlowStatus } from '../flow'
 import { FlowVersion, FlowVersionState } from '../flow-version'
 import { Note } from '../note'
@@ -11,9 +12,11 @@ import { flowPieceUtil } from '../util/flow-piece-util'
 import { flowStructureUtil } from '../util/flow-structure-util'
 import { _addAction } from './add-action'
 import { _addBranch } from './add-branch'
+import { _addInteractiveFlowNode } from './add-interactive-flow-node'
 import { _getActionsForCopy } from './copy-action-operations'
 import { _deleteAction } from './delete-action'
 import { _deleteBranch } from './delete-branch'
+import { _deleteInteractiveFlowNode } from './delete-interactive-flow-node'
 import { _duplicateBranch, _duplicateStep } from './duplicate-step'
 import { _importFlow } from './import-flow'
 import { _moveAction } from './move-action'
@@ -22,6 +25,7 @@ import { notesOperations } from './notes-operations'
 import { _getOperationsForPaste } from './paste-operations'
 import { _skipAction } from './skip-action'
 import { _updateAction } from './update-action'
+import { _updateInteractiveFlowNode } from './update-interactive-flow-node'
 import { _updateSampleDataInfo } from './update-sample-data-info'
 import { _updateTrigger } from './update-trigger'
 
@@ -52,7 +56,28 @@ export enum FlowOperationType {
     DELETE_NOTE = 'DELETE_NOTE',
     ADD_NOTE = 'ADD_NOTE',
     UPDATE_SAMPLE_DATA_INFO = 'UPDATE_SAMPLE_DATA_INFO',
+    ADD_INTERACTIVE_FLOW_NODE = 'ADD_INTERACTIVE_FLOW_NODE',
+    UPDATE_INTERACTIVE_FLOW_NODE = 'UPDATE_INTERACTIVE_FLOW_NODE',
+    DELETE_INTERACTIVE_FLOW_NODE = 'DELETE_INTERACTIVE_FLOW_NODE',
 }
+
+export const AddInteractiveFlowNodeRequest = z.object({
+    stepName: z.string(),
+    node: InteractiveFlowNodeSchema,
+})
+export type AddInteractiveFlowNodeRequest = z.infer<typeof AddInteractiveFlowNodeRequest>
+
+export const UpdateInteractiveFlowNodeRequest = z.object({
+    stepName: z.string(),
+    node: InteractiveFlowNodeSchema,
+})
+export type UpdateInteractiveFlowNodeRequest = z.infer<typeof UpdateInteractiveFlowNodeRequest>
+
+export const DeleteInteractiveFlowNodeRequest = z.object({
+    stepName: z.string(),
+    nodeId: z.string(),
+})
+export type DeleteInteractiveFlowNodeRequest = z.infer<typeof DeleteInteractiveFlowNodeRequest>
 
 export const DeleteBranchRequest = z.object({
     branchIndex: z.number(),
@@ -107,6 +132,7 @@ export enum StepLocationRelativeToParent {
     AFTER = 'AFTER',
     INSIDE_LOOP = 'INSIDE_LOOP',
     INSIDE_BRANCH = 'INSIDE_BRANCH',
+    INSIDE_INTERACTIVE_FLOW = 'INSIDE_INTERACTIVE_FLOW',
 }
 
 export const UseAsDraftRequest = z.object({
@@ -151,6 +177,7 @@ export const UpdateActionRequest = z.union([
     LoopOnItemsActionSchema.omit({ lastUpdatedDate: true, settings: true }).and(z.object({ settings: LoopOnItemsActionSettings.omit({ sampleData: true }) })),
     PieceActionSchema.omit({ lastUpdatedDate: true, settings: true }).and(z.object({ settings: PieceActionSettings.omit({ sampleData: true }) })),
     RouterActionSchema.omit({ lastUpdatedDate: true, settings: true }).and(z.object({ settings: RouterActionSettings.omit({ sampleData: true }) })),
+    InteractiveFlowActionSchema.omit({ lastUpdatedDate: true, settings: true }).and(z.object({ settings: InteractiveFlowActionSettings.omit({ sampleData: true }) })),
 ])
 
 
@@ -317,6 +344,18 @@ export const FlowOperationRequest = z.union([
         type: z.literal(FlowOperationType.UPDATE_SAMPLE_DATA_INFO),
         request: UpdateSampleDataInfoRequest,
     }).describe('Update Sample Data Info'),
+    z.object({
+        type: z.literal(FlowOperationType.ADD_INTERACTIVE_FLOW_NODE),
+        request: AddInteractiveFlowNodeRequest,
+    }).describe('Add Interactive Flow Node'),
+    z.object({
+        type: z.literal(FlowOperationType.UPDATE_INTERACTIVE_FLOW_NODE),
+        request: UpdateInteractiveFlowNodeRequest,
+    }).describe('Update Interactive Flow Node'),
+    z.object({
+        type: z.literal(FlowOperationType.DELETE_INTERACTIVE_FLOW_NODE),
+        request: DeleteInteractiveFlowNodeRequest,
+    }).describe('Delete Interactive Flow Node'),
 ])
 
 
@@ -418,6 +457,18 @@ export const flowOperations = {
             }
             case FlowOperationType.UPDATE_SAMPLE_DATA_INFO: {
                 clonedVersion = _updateSampleDataInfo(clonedVersion, operation.request)
+                break
+            }
+            case FlowOperationType.ADD_INTERACTIVE_FLOW_NODE: {
+                clonedVersion = _addInteractiveFlowNode(clonedVersion, operation.request)
+                break
+            }
+            case FlowOperationType.UPDATE_INTERACTIVE_FLOW_NODE: {
+                clonedVersion = _updateInteractiveFlowNode(clonedVersion, operation.request)
+                break
+            }
+            case FlowOperationType.DELETE_INTERACTIVE_FLOW_NODE: {
+                clonedVersion = _deleteInteractiveFlowNode(clonedVersion, operation.request)
                 break
             }
             default:
