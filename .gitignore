@@ -6,6 +6,9 @@
 # Local dev scripts
 dev-start.sh
 
+# Local-only e2e tests (not committed)
+packages/tests-e2e/scenarios/**/*.local.spec.ts
+
 pieces-cache-db-*.sqlite
 
 # compiled output

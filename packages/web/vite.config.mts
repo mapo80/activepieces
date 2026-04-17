@@ -21,42 +21,42 @@ export default defineConfig(({ command, mode }) => {
       // allowedHosts: ['wozcsvaint.loclx.io'],
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:3000',
+          target: 'http://localhost:3000',
           secure: false,
           changeOrigin: true,
           headers: {
-            Host: '127.0.0.1:4200',
+            Host: 'localhost:4200',
           },
           ws: true,
         },
         '^/mcp$': {
-          target: 'http://127.0.0.1:3000',
+          target: 'http://localhost:3000',
           secure: false,
           changeOrigin: true,
           rewrite: (p: string) => p,
         },
         '/.well-known': {
-          target: 'http://127.0.0.1:3000',
+          target: 'http://localhost:3000',
           secure: false,
           changeOrigin: true,
         },
         '/register': {
-          target: 'http://127.0.0.1:3000',
+          target: 'http://localhost:3000',
           secure: false,
           changeOrigin: true,
         },
         '/authorize': {
-          target: 'http://127.0.0.1:3000',
+          target: 'http://localhost:3000',
           secure: false,
           changeOrigin: true,
         },
         '/token': {
-          target: 'http://127.0.0.1:3000',
+          target: 'http://localhost:3000',
           secure: false,
           changeOrigin: true,
         },
         '/revoke': {
-          target: 'http://127.0.0.1:3000',
+          target: 'http://localhost:3000',
           secure: false,
           changeOrigin: true,
         },
