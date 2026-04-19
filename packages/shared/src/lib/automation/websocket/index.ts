@@ -13,6 +13,7 @@ export enum WebsocketClientEvent {
     RESOURCE_LOCKED = 'RESOURCE_LOCKED',
     RESOURCE_UNLOCKED = 'RESOURCE_UNLOCKED',
     PRESENCE_UPDATED = 'PRESENCE_UPDATED',
+    INTERACTIVE_FLOW_NODE_STATE = 'INTERACTIVE_FLOW_NODE_STATE',
 }
 
 export enum WebsocketServerEvent {
@@ -75,6 +76,17 @@ export const PresenceUpdatedEvent = z.object({
     users: z.array(PresenceUser),
 })
 
+export const InteractiveFlowNodeStateEvent = z.object({
+    flowRunId: z.string(),
+    stepName: z.string(),
+    nodeId: z.string(),
+    kind: z.enum(['STARTED', 'COMPLETED', 'FAILED', 'SKIPPED', 'PAUSED', 'BRANCH_SELECTED']),
+    branchId: z.string().optional(),
+    error: z.string().optional(),
+    locale: z.string().optional(),
+    timestamp: z.string(),
+})
+
 export type BadgeAwarded = z.infer<typeof BadgeAwarded>
 export type LockResourceRequest = z.infer<typeof LockResourceRequest>
 export type LockResourceResponse = z.infer<typeof LockResourceResponse>
@@ -84,3 +96,4 @@ export type EmitTestStepProgressRequest = StepRunResponse & { projectId: string 
 export type PresenceRequest = z.infer<typeof PresenceRequest>
 export type PresenceUser = z.infer<typeof PresenceUser>
 export type PresenceUpdatedEvent = z.infer<typeof PresenceUpdatedEvent>
+export type InteractiveFlowNodeStateEvent = z.infer<typeof InteractiveFlowNodeStateEvent>

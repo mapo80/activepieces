@@ -3,6 +3,7 @@ import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { aiProviderWorkerController } from '../ai/ai-provider-worker.controller'
 import { interactiveFlowAiController } from '../ai/interactive-flow-ai.controller'
 import { runsMetadataQueue } from '../flows/flow-run/flow-runs-queue'
+import { interactiveFlowEventsController } from '../flows/flow-run/interactive-flow-events-controller'
 import { pubsub } from '../helper/pubsub'
 import { mcpGatewayWorkerController } from '../mcp-gateway/mcp-gateway-worker.controller'
 import { flowEngineWorker } from './engine-controller'
@@ -23,6 +24,9 @@ export const workerModule: FastifyPluginAsyncZod = async (app) => {
     })
     await app.register(interactiveFlowAiController, {
         prefix: '/v1/engine/interactive-flow-ai',
+    })
+    await app.register(interactiveFlowEventsController, {
+        prefix: '/v1/engine/interactive-flow-events',
     })
     await app.register(workerMachineController, {
         prefix: '/v1/worker-machines',

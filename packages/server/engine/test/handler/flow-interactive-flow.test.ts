@@ -1,10 +1,10 @@
-import { InteractiveFlowNodeType, FlowRunStatus, StepOutputStatus } from '@activepieces/shared'
+import { FlowRunStatus, InteractiveFlowNodeType, StepOutputStatus } from '@activepieces/shared'
 import { FlowExecutorContext } from '../../src/lib/handler/context/flow-execution-context'
 import { StepExecutionPath } from '../../src/lib/handler/context/step-execution-path'
 import { flowExecutor } from '../../src/lib/handler/flow-executor'
 import { buildCodeAction, buildInteractiveFlowAction, generateMockEngineConstants } from './test-helper'
 
-const mockFetchResponse = (data: unknown) => {
+const mockFetchResponse = (data: unknown): Promise<Response> => {
     return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({
@@ -15,28 +15,45 @@ const mockFetchResponse = (data: unknown) => {
     } as Response)
 }
 
-const mockResolveResponse = () => Promise.resolve({
+const mockResolveResponse = (): Promise<Response> => Promise.resolve({
     ok: true,
     status: 200,
     json: () => Promise.resolve({ url: 'http://mock-mcp:7860/mcp', headers: {} }),
 } as Response)
 
-const installMcpFetchMock = (impl: () => Promise<Response>) => {
+const installMcpFetchMock = (impl: () => Promise<Response>): ReturnType<typeof vi.spyOn<typeof global, 'fetch'>> => {
     return vi.spyOn(global, 'fetch').mockImplementation((input) => {
         const url = typeof input === 'string' ? input : (input as Request).url ?? String(input)
         if (url.includes('/v1/engine/mcp-gateways/')) {
             return mockResolveResponse()
         }
+        if (url.includes('/v1/engine/interactive-flow-events')) {
+            return Promise.resolve({ ok: true, status: 204, json: async () => null } as Response)
+        }
         return impl()
     })
 }
 
-const installMcpFetchSequence = (impls: Array<() => Promise<Response>>) => {
+function countMcpCalls(spy: ReturnType<typeof vi.spyOn<typeof global, 'fetch'>>): number {
+    return spy.mock.calls.filter(([input]) => {
+        const url = typeof input === 'string' ? input : (input as Request).url ?? String(input)
+        return !url.includes('/v1/engine/interactive-flow-events')
+    }).length
+}
+
+function hasAnyMcpCall(spy: ReturnType<typeof vi.spyOn<typeof global, 'fetch'>>): boolean {
+    return countMcpCalls(spy) > 0
+}
+
+const installMcpFetchSequence = (impls: Array<() => Promise<Response>>): ReturnType<typeof vi.spyOn<typeof global, 'fetch'>> => {
     let toolIdx = 0
     return vi.spyOn(global, 'fetch').mockImplementation((input) => {
         const url = typeof input === 'string' ? input : (input as Request).url ?? String(input)
         if (url.includes('/v1/engine/mcp-gateways/')) {
             return mockResolveResponse()
+        }
+        if (url.includes('/v1/engine/interactive-flow-events')) {
+            return Promise.resolve({ ok: true, status: 204, json: async () => null } as Response)
         }
         const impl = impls[Math.min(toolIdx, impls.length - 1)]
         toolIdx++
@@ -121,14 +138,14 @@ describe('interactive flow executor - dependency resolution', () => {
         const output = result.getStepOutput('interactive_flow')
         const convOutput = output?.output as Record<string, unknown>
         expect(convOutput.executedNodeIds).toEqual([])
-        expect(fetchSpy).not.toHaveBeenCalled()
+        expect(hasAnyMcpCall(fetchSpy)).toBe(false)
         fetchSpy.mockRestore()
     })
 
     it('should execute node after predecessor provides required stateOutput', async () => {
         const fetchSpy = installMcpFetchSequence([
-            () => mockFetchResponse([{ ndg: '123', name: 'Test' }]),
-            () => mockFetchResponse({ ndg: '123', fullName: 'Test User' }),
+            (): Promise<Response> => mockFetchResponse([{ ndg: '123', name: 'Test' }]),
+            (): Promise<Response> => mockFetchResponse({ ndg: '123', fullName: 'Test User' }),
         ])
 
         const action = buildInteractiveFlowAction({
@@ -259,7 +276,7 @@ describe('interactive flow executor - dependency resolution', () => {
         expect(resumeResult.verdict.status).toBe(FlowRunStatus.RUNNING)
         // tool_a should still be in executedNodeIds (not re-executed)
         // Total fetches: 1 resolve + 1 tool_a = 2
-        expect(fetchSpy).toHaveBeenCalledTimes(2)
+        expect(countMcpCalls(fetchSpy)).toBe(2)
         fetchSpy.mockRestore()
     })
 

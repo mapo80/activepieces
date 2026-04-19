@@ -25,6 +25,7 @@ import { BaseExecutor } from './base-executor'
 import { EngineConstants } from './context/engine-constants'
 import { FlowExecutorContext } from './context/flow-execution-context'
 import { fieldExtractor } from './field-extractor'
+import { interactiveFlowEvents } from './interactive-flow-events'
 import { questionGenerator } from './question-generator'
 
 type InteractiveFlowState = Record<string, unknown>
@@ -529,6 +530,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             changed = false
 
             for (const branchNode of findReadyBranchNodes({ nodes, state: flowState, executedNodeIds, skippedNodeIds })) {
+                const beforeSkipped = new Set(skippedNodeIds)
                 applyBranch({
                     node: branchNode,
                     state: flowState,
@@ -537,28 +539,75 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     skippedNodeIds,
                     selectedBranches,
                 })
+                await interactiveFlowEvents.emit({
+                    constants,
+                    event: {
+                        stepName: action.name,
+                        nodeId: branchNode.id,
+                        kind: 'BRANCH_SELECTED',
+                        branchId: selectedBranches[branchNode.id],
+                    },
+                })
+                for (const id of skippedNodeIds) {
+                    if (!beforeSkipped.has(id)) {
+                        await interactiveFlowEvents.emit({
+                            constants,
+                            event: { stepName: action.name, nodeId: id, kind: 'SKIPPED' },
+                        })
+                    }
+                }
                 changed = true
             }
 
             const readyTools = findReadyToolNodes({ nodes, state: flowState, executedNodeIds, skippedNodeIds })
             for (const node of readyTools) {
                 const policy = node.errorPolicy
+                await interactiveFlowEvents.emit({
+                    constants,
+                    event: { stepName: action.name, nodeId: node.id, kind: 'STARTED' },
+                })
                 try {
                     const params = buildToolParams({ node, state: flowState })
                     const resolvedGateway = await ensureGateway()
                     const result = await executeToolWithPolicy({ node, params, gateway: resolvedGateway, policy })
                     mapOutputsToState({ node, result, state: flowState, fields })
                     executedNodeIds.add(node.id)
+                    await interactiveFlowEvents.emit({
+                        constants,
+                        event: { stepName: action.name, nodeId: node.id, kind: 'COMPLETED' },
+                    })
                 }
                 catch (error) {
                     const onFailure = policy?.onFailure ?? 'FAIL'
                     if (onFailure === 'SKIP') {
+                        const beforeSkipped = new Set(skippedNodeIds)
                         propagateSkip({ fromNodeId: node.id, nodes, skippedNodeIds })
+                        for (const id of skippedNodeIds) {
+                            if (!beforeSkipped.has(id)) {
+                                await interactiveFlowEvents.emit({
+                                    constants,
+                                    event: { stepName: action.name, nodeId: id, kind: 'SKIPPED' },
+                                })
+                            }
+                        }
                     }
                     else if (onFailure === 'CONTINUE') {
                         executedNodeIds.add(node.id)
+                        await interactiveFlowEvents.emit({
+                            constants,
+                            event: { stepName: action.name, nodeId: node.id, kind: 'COMPLETED' },
+                        })
                     }
                     else {
+                        await interactiveFlowEvents.emit({
+                            constants,
+                            event: {
+                                stepName: action.name,
+                                nodeId: node.id,
+                                kind: 'FAILED',
+                                error: error instanceof Error ? error.message : 'Tool execution failed',
+                            },
+                        })
                         const stepOutput = GenericStepOutput.create({
                             type: FlowActionType.INTERACTIVE_FLOW,
                             status: StepOutputStatus.FAILED,
@@ -638,6 +687,10 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     currentNodeId: nextPauseNode.id,
                     selectedBranches,
                 },
+            })
+            await interactiveFlowEvents.emit({
+                constants,
+                event: { stepName: action.name, nodeId: nextPauseNode.id, kind: 'PAUSED', locale },
             })
             return executionState
                 .upsertStep(action.name, stepOutput)

@@ -4,7 +4,7 @@ import { StepExecutionPath } from '../../src/lib/handler/context/step-execution-
 import { flowExecutor } from '../../src/lib/handler/flow-executor'
 import { buildCodeAction, buildInteractiveFlowAction, generateMockEngineConstants } from './test-helper'
 
-const mockFetchResponse = (data: unknown) => {
+const mockFetchResponse = (data: unknown): Promise<Response> => {
     return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({
@@ -15,20 +15,30 @@ const mockFetchResponse = (data: unknown) => {
     } as Response)
 }
 
-const mockResolveResponse = () => Promise.resolve({
+const mockResolveResponse = (): Promise<Response> => Promise.resolve({
     ok: true,
     status: 200,
     json: () => Promise.resolve({ url: 'http://mock-mcp:7860/mcp', headers: {} }),
 } as Response)
 
-const installMcpFetchMock = (impl: () => Promise<Response>) => {
+const installMcpFetchMock = (impl: () => Promise<Response>): ReturnType<typeof vi.spyOn<typeof global, 'fetch'>> => {
     return vi.spyOn(global, 'fetch').mockImplementation((input) => {
         const url = typeof input === 'string' ? input : (input as Request).url ?? String(input)
         if (url.includes('/v1/engine/mcp-gateways/')) {
             return mockResolveResponse()
         }
+        if (url.includes('/v1/engine/interactive-flow-events')) {
+            return Promise.resolve({ ok: true, status: 204, json: async () => null } as Response)
+        }
         return impl()
     })
+}
+
+function countMcpCalls(spy: ReturnType<typeof vi.spyOn<typeof global, 'fetch'>>): number {
+    return spy.mock.calls.filter(([input]) => {
+        const url = typeof input === 'string' ? input : (input as Request).url ?? String(input)
+        return !url.includes('/v1/engine/interactive-flow-events')
+    }).length
 }
 
 describe('interactive flow - full lifecycle', () => {
@@ -163,7 +173,7 @@ describe('interactive flow - dependency skip', () => {
         const output = result.getStepOutput('interactive_flow')?.output as Record<string, unknown>
         expect((output.executedNodeIds as string[])).toContain('tool_a')
         // 1 gateway resolve + 1 tool call
-        expect(fetchSpy).toHaveBeenCalledTimes(2)
+        expect(countMcpCalls(fetchSpy)).toBe(2)
 
         fetchSpy.mockRestore()
     })
