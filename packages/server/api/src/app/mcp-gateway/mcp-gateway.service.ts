@@ -163,9 +163,14 @@ function notFound(id: string): ActivepiecesError {
     })
 }
 
-async function fetchToolsFromGateway({ url, auth, log }: { url: string, auth: McpGatewayAuth, log: FastifyBaseLogger }): Promise<ListMcpGatewayToolsResponse> {
+export function buildRequestHeaders(auth: McpGatewayAuth): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     applyAuthHeaders(headers, auth)
+    return headers
+}
+
+async function fetchToolsFromGateway({ url, auth, log }: { url: string, auth: McpGatewayAuth, log: FastifyBaseLogger }): Promise<ListMcpGatewayToolsResponse> {
+    const headers = buildRequestHeaders(auth)
 
     let response: Response
     try {

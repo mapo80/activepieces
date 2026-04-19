@@ -1495,5 +1495,8 @@
   "API_KEY": "API key",
   "HEADER": "Header",
   "Loading\u2026": "Loading\u2026",
-  "McpGateway.invalidUrl": "Please enter a valid URL"
+  "McpGateway.invalidUrl": "Please enter a valid URL",
+  "MCP Gateway": "MCP Gateway",
+  "Select an MCP gateway": "Select an MCP gateway",
+  "Create one": "Create one"
 }

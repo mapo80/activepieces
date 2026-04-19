@@ -42,13 +42,6 @@ export const InteractiveFlowStateFieldSchema = z.object({
     internal: z.boolean().optional(),
 })
 
-const McpAuthConfig = z.object({
-    type: z.enum(['none', 'access_token', 'api_key', 'headers']),
-    token: z.string().optional(),
-    header: z.string().optional(),
-    key: z.string().optional(),
-})
-
 const FieldExtractorConfig = z.object({
     enabled: z.boolean(),
     model: z.string(),
@@ -60,8 +53,7 @@ export const InteractiveFlowActionSettings = z.object({
     nodes: z.array(InteractiveFlowNodeSchema),
     stateFields: z.array(InteractiveFlowStateFieldSchema),
     greeting: z.string().optional(),
-    mcpServerUrl: z.string().optional(),
-    mcpAuth: McpAuthConfig.optional(),
+    mcpGatewayId: z.string().optional(),
     fieldExtractor: FieldExtractorConfig.optional(),
 })
 

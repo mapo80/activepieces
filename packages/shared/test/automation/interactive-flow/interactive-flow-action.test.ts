@@ -219,36 +219,26 @@ describe('InteractiveFlowActionSettings', () => {
         expect(result.success).toBe(true)
     })
 
-    it('should accept settings with mcpAuth configuration', () => {
+    it('should accept settings with mcpGatewayId', () => {
         const result = InteractiveFlowActionSettings.safeParse({
             ...validSettings,
-            mcpServerUrl: 'https://mcp-gateway:7860/mcp',
-            mcpAuth: {
-                type: 'access_token',
-                token: 'jwt-token-here',
-            },
+            mcpGatewayId: 'abc123DEF456ghi789JKL',
         })
         expect(result.success).toBe(true)
     })
 
-    it('should reject invalid mcpAuth type', () => {
+    it('should accept settings without mcpGatewayId (optional)', () => {
+        const result = InteractiveFlowActionSettings.safeParse(validSettings)
+        expect(result.success).toBe(true)
+        expect((result.data as { mcpGatewayId?: string }).mcpGatewayId).toBeUndefined()
+    })
+
+    it('should reject non-string mcpGatewayId', () => {
         const result = InteractiveFlowActionSettings.safeParse({
             ...validSettings,
-            mcpAuth: {
-                type: 'invalid_auth',
-            },
+            mcpGatewayId: 123,
         })
         expect(result.success).toBe(false)
-    })
-
-    it('should accept mcpAuth with type none', () => {
-        const result = InteractiveFlowActionSettings.safeParse({
-            ...validSettings,
-            mcpAuth: {
-                type: 'none',
-            },
-        })
-        expect(result.success).toBe(true)
     })
 
     it('should preserve immutability when parsing', () => {

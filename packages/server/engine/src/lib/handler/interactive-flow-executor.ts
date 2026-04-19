@@ -1,4 +1,4 @@
-import { EngineGenericError, FlowActionType, FlowRunStatus, GenericStepOutput, InteractiveFlowAction, InteractiveFlowActionSettings, InteractiveFlowNode, InteractiveFlowNodeType, isNil, PauseType, StepOutputStatus } from '@activepieces/shared'
+import { EngineGenericError, FlowActionType, FlowRunStatus, GenericStepOutput, InteractiveFlowAction, InteractiveFlowNode, InteractiveFlowNodeType, isNil, PauseType, ResolveMcpGatewayResponse, StepOutputStatus } from '@activepieces/shared'
 import { BaseExecutor } from './base-executor'
 import { EngineConstants } from './context/engine-constants'
 import { FlowExecutorContext } from './context/flow-execution-context'
@@ -66,23 +66,37 @@ function mapOutputsToState({ node, result, state }: {
     }
 }
 
-async function executeTool({ toolName, params, settings }: {
+async function resolveGateway({ gatewayId, constants }: {
+    gatewayId: string
+    constants: EngineConstants
+}): Promise<ResolveMcpGatewayResponse> {
+    const url = `${constants.internalApiUrl}v1/engine/mcp-gateways/${encodeURIComponent(gatewayId)}/resolve`
+    let response: Response
+    try {
+        response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${constants.engineToken}`,
+            },
+        })
+    }
+    catch (error) {
+        throw new EngineGenericError('McpGatewayResolveFailed', `Could not reach the MCP gateway resolver: ${(error as Error).message}`)
+    }
+    if (!response.ok) {
+        throw new EngineGenericError('McpGatewayResolveFailed', `MCP gateway resolver returned HTTP ${response.status}`)
+    }
+    return await response.json() as ResolveMcpGatewayResponse
+}
+
+async function executeTool({ toolName, params, gateway }: {
     toolName: string
     params: Record<string, unknown>
-    settings: InteractiveFlowActionSettings
+    gateway: ResolveMcpGatewayResponse
 }): Promise<unknown> {
-    if (isNil(settings.mcpServerUrl)) {
-        throw new EngineGenericError('McpServerNotConfigured', 'MCP server URL is not configured in interactive flow settings')
-    }
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-    }
-    if (settings.mcpAuth?.token) {
-        headers['Authorization'] = `Bearer ${settings.mcpAuth.token}`
-    }
-    const response = await fetch(settings.mcpServerUrl, {
+    const response = await fetch(gateway.url, {
         method: 'POST',
-        headers,
+        headers: gateway.headers,
         body: JSON.stringify({
             jsonrpc: '2.0',
             id: 1,
@@ -178,6 +192,18 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             Object.assign(flowState, constants.resumePayload.body)
         }
 
+        let gateway: ResolveMcpGatewayResponse | null = null
+        const ensureGateway = async (): Promise<ResolveMcpGatewayResponse> => {
+            if (!isNil(gateway)) {
+                return gateway
+            }
+            if (isNil(settings.mcpGatewayId)) {
+                throw new EngineGenericError('McpGatewayNotConfigured', 'No MCP gateway selected in the interactive flow settings')
+            }
+            gateway = await resolveGateway({ gatewayId: settings.mcpGatewayId, constants })
+            return gateway
+        }
+
         let changed = true
         while (changed) {
             changed = false
@@ -188,7 +214,8 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 }
                 try {
                     const params = buildToolParams({ node, state: flowState })
-                    const result = await executeTool({ toolName: node.tool, params, settings })
+                    const resolvedGateway = await ensureGateway()
+                    const result = await executeTool({ toolName: node.tool, params, gateway: resolvedGateway })
                     mapOutputsToState({ node, result, state: flowState })
                 }
                 catch (error) {

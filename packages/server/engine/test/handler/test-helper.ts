@@ -146,13 +146,13 @@ export function buildMockBeginExecuteFlowOperation(
     }
 }
 
-export function buildInteractiveFlowAction({ name, nodes, stateFields, nextAction, greeting, mcpServerUrl }: {
+export function buildInteractiveFlowAction({ name, nodes, stateFields, nextAction, greeting, mcpGatewayId }: {
     name: string
     nodes: InteractiveFlowNode[]
     stateFields?: InteractiveFlowActionSettings['stateFields']
     nextAction?: FlowAction
     greeting?: string
-    mcpServerUrl?: string
+    mcpGatewayId?: string
 }): InteractiveFlowAction {
     return {
         name,
@@ -163,7 +163,7 @@ export function buildInteractiveFlowAction({ name, nodes, stateFields, nextActio
             nodes,
             stateFields: stateFields ?? [],
             greeting,
-            mcpServerUrl,
+            mcpGatewayId,
         },
         nextAction,
         valid: true,

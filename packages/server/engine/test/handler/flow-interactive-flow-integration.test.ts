@@ -15,11 +15,26 @@ const mockFetchResponse = (data: unknown) => {
     } as Response)
 }
 
+const mockResolveResponse = () => Promise.resolve({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ url: 'http://mock-mcp:7860/mcp', headers: {} }),
+} as Response)
+
+const installMcpFetchMock = (impl: () => Promise<Response>) => {
+    return vi.spyOn(global, 'fetch').mockImplementation((input) => {
+        const url = typeof input === 'string' ? input : (input as Request).url ?? String(input)
+        if (url.includes('/v1/engine/mcp-gateways/')) {
+            return mockResolveResponse()
+        }
+        return impl()
+    })
+}
+
 describe('interactive flow - full lifecycle', () => {
 
     it('should execute complete flow: trigger → INTERACTIVE_FLOW(3 nodes) → code step', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch')
-            .mockImplementation(() => mockFetchResponse({ data: 'tool_result' }))
+        const fetchSpy = installMcpFetchMock(() => mockFetchResponse({ data: 'tool_result' }))
 
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
@@ -54,7 +69,7 @@ describe('interactive flow - full lifecycle', () => {
                     message: 'Confirm the result?',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
             nextAction: buildCodeAction({
                 name: 'echo_step',
                 input: {},
@@ -107,8 +122,7 @@ describe('interactive flow - full lifecycle', () => {
 describe('interactive flow - dependency skip', () => {
 
     it('should skip user_input when field is pre-populated and execute downstream directly', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch')
-            .mockImplementation(() => mockFetchResponse({ processed: true }))
+        const fetchSpy = installMcpFetchMock(() => mockFetchResponse({ processed: true }))
 
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
@@ -132,7 +146,7 @@ describe('interactive flow - dependency skip', () => {
                     tool: 'mock/tool_a',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         // Provide field1 upfront → user_input skipped, tool executes directly
@@ -148,7 +162,8 @@ describe('interactive flow - dependency skip', () => {
         expect(result.getStepOutput('interactive_flow')?.status).toBe(StepOutputStatus.SUCCEEDED)
         const output = result.getStepOutput('interactive_flow')?.output as Record<string, unknown>
         expect((output.executedNodeIds as string[])).toContain('tool_a')
-        expect(fetchSpy).toHaveBeenCalledTimes(1)
+        // 1 gateway resolve + 1 tool call
+        expect(fetchSpy).toHaveBeenCalledTimes(2)
 
         fetchSpy.mockRestore()
     })
@@ -211,7 +226,7 @@ describe('interactive flow - edge cases', () => {
     })
 
     it('should handle tool failure with FAILED verdict and preserved state', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch').mockImplementation(() =>
+        const fetchSpy = installMcpFetchMock(() =>
             Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) } as Response),
         )
 
@@ -228,7 +243,7 @@ describe('interactive flow - edge cases', () => {
                     tool: 'mock/failing',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         const result = await flowExecutor.execute({

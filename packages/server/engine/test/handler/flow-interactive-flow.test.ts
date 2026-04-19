@@ -15,10 +15,39 @@ const mockFetchResponse = (data: unknown) => {
     } as Response)
 }
 
+const mockResolveResponse = () => Promise.resolve({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ url: 'http://mock-mcp:7860/mcp', headers: {} }),
+} as Response)
+
+const installMcpFetchMock = (impl: () => Promise<Response>) => {
+    return vi.spyOn(global, 'fetch').mockImplementation((input) => {
+        const url = typeof input === 'string' ? input : (input as Request).url ?? String(input)
+        if (url.includes('/v1/engine/mcp-gateways/')) {
+            return mockResolveResponse()
+        }
+        return impl()
+    })
+}
+
+const installMcpFetchSequence = (impls: Array<() => Promise<Response>>) => {
+    let toolIdx = 0
+    return vi.spyOn(global, 'fetch').mockImplementation((input) => {
+        const url = typeof input === 'string' ? input : (input as Request).url ?? String(input)
+        if (url.includes('/v1/engine/mcp-gateways/')) {
+            return mockResolveResponse()
+        }
+        const impl = impls[Math.min(toolIdx, impls.length - 1)]
+        toolIdx++
+        return impl()
+    })
+}
+
 describe('interactive flow executor - dependency resolution', () => {
 
     it('should execute node with empty stateInputs immediately', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch').mockImplementation(() =>
+        const fetchSpy = installMcpFetchMock(() =>
             mockFetchResponse([{ code: 'UL', label: 'Limited usage' }]),
         )
 
@@ -35,7 +64,7 @@ describe('interactive flow executor - dependency resolution', () => {
                     tool: 'banking/list_closure_reasons',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         const result = await flowExecutor.execute({
@@ -52,8 +81,7 @@ describe('interactive flow executor - dependency resolution', () => {
     })
 
     it('should NOT execute tool node with unsatisfied stateInputs', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch')
-            .mockImplementation(() => mockFetchResponse({ data: 'result' }))
+        const fetchSpy = installMcpFetchMock(() => mockFetchResponse({ data: 'result' }))
 
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
@@ -78,7 +106,7 @@ describe('interactive flow executor - dependency resolution', () => {
                     tool: 'banking/search_customer',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         const result = await flowExecutor.execute({
@@ -98,9 +126,10 @@ describe('interactive flow executor - dependency resolution', () => {
     })
 
     it('should execute node after predecessor provides required stateOutput', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch')
-            .mockImplementationOnce(() => mockFetchResponse([{ ndg: '123', name: 'Test' }]))
-            .mockImplementationOnce(() => mockFetchResponse({ ndg: '123', fullName: 'Test User' }))
+        const fetchSpy = installMcpFetchSequence([
+            () => mockFetchResponse([{ ndg: '123', name: 'Test' }]),
+            () => mockFetchResponse({ ndg: '123', fullName: 'Test User' }),
+        ])
 
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
@@ -124,7 +153,7 @@ describe('interactive flow executor - dependency resolution', () => {
                     tool: 'banking/get_profile',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         const result = await flowExecutor.execute({
@@ -142,8 +171,7 @@ describe('interactive flow executor - dependency resolution', () => {
     })
 
     it('should execute multiple ready nodes in same resolution cycle', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch')
-            .mockImplementation(() => mockFetchResponse({ data: 'result' }))
+        const fetchSpy = installMcpFetchMock(() => mockFetchResponse({ data: 'result' }))
 
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
@@ -167,7 +195,7 @@ describe('interactive flow executor - dependency resolution', () => {
                     tool: 'mock/tool_b',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         const result = await flowExecutor.execute({
@@ -184,8 +212,7 @@ describe('interactive flow executor - dependency resolution', () => {
     })
 
     it('should execute node only once after resume (no duplicates)', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch')
-            .mockImplementation(() => mockFetchResponse({ data: 'result' }))
+        const fetchSpy = installMcpFetchMock(() => mockFetchResponse({ data: 'result' }))
 
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
@@ -209,7 +236,7 @@ describe('interactive flow executor - dependency resolution', () => {
                     render: { component: 'TextInput', props: {} },
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         // First execution: tool_a executes, then pauses at user_input
@@ -231,13 +258,14 @@ describe('interactive flow executor - dependency resolution', () => {
 
         expect(resumeResult.verdict.status).toBe(FlowRunStatus.RUNNING)
         // tool_a should still be in executedNodeIds (not re-executed)
-        expect(fetchSpy).toHaveBeenCalledTimes(1)
+        // Total fetches: 1 resolve + 1 tool_a = 2
+        expect(fetchSpy).toHaveBeenCalledTimes(2)
         fetchSpy.mockRestore()
     })
 
     it('should handle diamond dependency: A→B, A→C, B+C→D', async () => {
         let callCount = 0
-        const fetchSpy = vi.spyOn(global, 'fetch').mockImplementation(() => {
+        const fetchSpy = installMcpFetchMock(() => {
             callCount++
             return mockFetchResponse({ value: `result_${callCount}` })
         })
@@ -282,7 +310,7 @@ describe('interactive flow executor - dependency resolution', () => {
                     tool: 'mock/d',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         const result = await flowExecutor.execute({
@@ -328,7 +356,7 @@ describe('interactive flow executor - dependency resolution', () => {
                     tool: 'mock/b',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         await expect(flowExecutor.execute({
@@ -342,8 +370,7 @@ describe('interactive flow executor - dependency resolution', () => {
 describe('interactive flow executor - skip behavior', () => {
 
     it('should skip user_input node when field is already in state', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch')
-            .mockImplementation(() => mockFetchResponse({ data: 'result' }))
+        const fetchSpy = installMcpFetchMock(() => mockFetchResponse({ data: 'result' }))
 
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
@@ -367,7 +394,7 @@ describe('interactive flow executor - skip behavior', () => {
                     render: { component: 'TextInput', props: {} },
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         // Provide userValue in resume payload, simulating field already available
@@ -387,8 +414,7 @@ describe('interactive flow executor - skip behavior', () => {
     })
 
     it('should complete without pause when all fields pre-populated', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch')
-            .mockImplementation(() => mockFetchResponse({ data: 'result' }))
+        const fetchSpy = installMcpFetchMock(() => mockFetchResponse({ data: 'result' }))
 
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
@@ -412,7 +438,7 @@ describe('interactive flow executor - skip behavior', () => {
                     render: { component: 'ConfirmCard', props: {} },
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         // Provide ALL fields (field1 + confirmed)
@@ -461,8 +487,7 @@ describe('interactive flow executor - pause and resume', () => {
     })
 
     it('should resume with user data, update state, and continue to next pause', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch')
-            .mockImplementation(() => mockFetchResponse([{ ndg: '123', name: 'Test' }]))
+        const fetchSpy = installMcpFetchMock(() => mockFetchResponse([{ ndg: '123', name: 'Test' }]))
 
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
@@ -498,7 +523,7 @@ describe('interactive flow executor - pause and resume', () => {
                     message: 'Select a customer',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         // Turn 1: pauses at collect_name
@@ -526,8 +551,7 @@ describe('interactive flow executor - pause and resume', () => {
     })
 
     it('should handle three sequential turns (full interactive flow)', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch')
-            .mockImplementation(() => mockFetchResponse({ data: 'tool_result' }))
+        const fetchSpy = installMcpFetchMock(() => mockFetchResponse({ data: 'tool_result' }))
 
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
@@ -569,7 +593,7 @@ describe('interactive flow executor - pause and resume', () => {
                     render: { component: 'ConfirmCard', props: {} },
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         // Turn 1: pauses at input_1
@@ -649,8 +673,7 @@ describe('interactive flow executor - pause and resume', () => {
 describe('interactive flow executor - flow integration', () => {
 
     it('should continue to nextAction after interactive flow completes', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch')
-            .mockImplementation(() => mockFetchResponse({ data: 'result' }))
+        const fetchSpy = installMcpFetchMock(() => mockFetchResponse({ data: 'result' }))
 
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
@@ -665,7 +688,7 @@ describe('interactive flow executor - flow integration', () => {
                     tool: 'mock/tool_a',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
             nextAction: buildCodeAction({
                 name: 'echo_step',
                 input: {},
@@ -689,7 +712,7 @@ describe('interactive flow executor - flow integration', () => {
 describe('interactive flow executor - error handling', () => {
 
     it('should handle tool execution failure', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch').mockImplementation(() =>
+        const fetchSpy = installMcpFetchMock(() =>
             Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) } as Response),
         )
 
@@ -706,7 +729,7 @@ describe('interactive flow executor - error handling', () => {
                     tool: 'mock/failing',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         const result = await flowExecutor.execute({
@@ -795,8 +818,7 @@ describe('interactive flow executor - GenericStepOutput', () => {
     })
 
     it('should include state and executedNodeIds in output', async () => {
-        const fetchSpy = vi.spyOn(global, 'fetch')
-            .mockImplementation(() => mockFetchResponse({ value: 42 }))
+        const fetchSpy = installMcpFetchMock(() => mockFetchResponse({ value: 42 }))
 
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
@@ -811,7 +833,7 @@ describe('interactive flow executor - GenericStepOutput', () => {
                     tool: 'mock/tool_a',
                 },
             ],
-            mcpServerUrl: 'http://mock-mcp:7860/mcp',
+            mcpGatewayId: 'gw1234567890123456789A',
         })
 
         const result = await flowExecutor.execute({
@@ -865,5 +887,32 @@ describe('interactive flow executor - GenericStepOutput', () => {
         })
 
         expect(result.getStepOutput('interactive_flow')?.status).toBe(StepOutputStatus.SUCCEEDED)
+    })
+
+    it('should fail when a TOOL node runs without an mcpGatewayId configured', async () => {
+        const action = buildInteractiveFlowAction({
+            name: 'interactive_flow',
+            nodes: [
+                {
+                    id: 'tool_a',
+                    name: 'tool_a',
+                    displayName: 'Tool A',
+                    nodeType: InteractiveFlowNodeType.TOOL,
+                    stateInputs: [],
+                    stateOutputs: ['result'],
+                    tool: 'mock/tool_a',
+                },
+            ],
+        })
+
+        const result = await flowExecutor.execute({
+            action,
+            executionState: FlowExecutorContext.empty(),
+            constants: generateMockEngineConstants(),
+        })
+
+        expect(result.verdict.status).toBe(FlowRunStatus.FAILED)
+        const output = result.getStepOutput('interactive_flow')
+        expect(output?.status).toBe(StepOutputStatus.FAILED)
     })
 })

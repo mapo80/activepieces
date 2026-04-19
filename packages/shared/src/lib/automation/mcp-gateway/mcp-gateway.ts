@@ -82,6 +82,11 @@ export const ListMcpGatewayToolsResponseSchema = z.object({
     tools: z.array(McpGatewayToolSummarySchema),
 })
 
+export const ResolveMcpGatewayResponseSchema = z.object({
+    url: z.string().url(),
+    headers: z.record(z.string(), z.string()),
+})
+
 export type McpGatewayId = string
 export type McpGatewayAuthType = 'NONE' | 'BEARER' | 'API_KEY' | 'HEADER'
 export type McpGatewayAuth = z.infer<typeof McpGatewayAuthSchema>
@@ -91,3 +96,4 @@ export type CreateMcpGatewayRequest = z.infer<typeof CreateMcpGatewayRequestSche
 export type UpdateMcpGatewayRequest = z.infer<typeof UpdateMcpGatewayRequestSchema>
 export type McpGatewayToolSummary = z.infer<typeof McpGatewayToolSummarySchema>
 export type ListMcpGatewayToolsResponse = z.infer<typeof ListMcpGatewayToolsResponseSchema>
+export type ResolveMcpGatewayResponse = z.infer<typeof ResolveMcpGatewayResponseSchema>
