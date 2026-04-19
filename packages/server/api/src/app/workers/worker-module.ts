@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
+import { aiProviderWorkerController } from '../ai/ai-provider-worker.controller'
 import { runsMetadataQueue } from '../flows/flow-run/flow-runs-queue'
 import { pubsub } from '../helper/pubsub'
 import { mcpGatewayWorkerController } from '../mcp-gateway/mcp-gateway-worker.controller'
@@ -15,6 +16,9 @@ export const workerModule: FastifyPluginAsyncZod = async (app) => {
     })
     await app.register(mcpGatewayWorkerController, {
         prefix: '/v1/engine/mcp-gateways',
+    })
+    await app.register(aiProviderWorkerController, {
+        prefix: '/v1/engine/ai-providers',
     })
     await app.register(workerMachineController, {
         prefix: '/v1/worker-machines',
@@ -35,7 +39,7 @@ export const workerModule: FastifyPluginAsyncZod = async (app) => {
 
 
 // This should be called after the app is booted, to ensure no plugin timeout
-export const migrateQueuesAndRunConsumers = async (app: FastifyInstance) => {
+export const migrateQueuesAndRunConsumers = async (app: FastifyInstance): Promise<void> => {
     await queueMigration(app.log).run()
     await jobBroker(app.log).init()
 }
