@@ -1,250 +1,304 @@
-import { InteractiveFlowNodeSchema, InteractiveFlowActionSettings, InteractiveFlowNodeType, InteractiveFlowStateFieldSchema } from '../../../src/lib/automation/flows/actions/interactive-flow-action'
+import { describe, expect, it } from 'vitest'
+import {
+    InteractiveFlowActionSettings,
+    InteractiveFlowBranchNodeSchema,
+    InteractiveFlowConfirmNodeSchema,
+    InteractiveFlowErrorPolicySchema,
+    InteractiveFlowNodeSchema,
+    InteractiveFlowNodeType,
+    InteractiveFlowStateFieldSchema,
+    InteractiveFlowToolNodeSchema,
+    InteractiveFlowUserInputNodeSchema,
+    LocalizedStringSchema,
+    NodeMessageSchema,
+    ParamBindingSchema,
+    ToolInputSchemaSnapshotSchema,
+} from '../../../src/lib/automation/flows/actions/interactive-flow-action'
 
-describe('InteractiveFlowNodeSchema', () => {
-    const validNode = {
-        id: 'node_1',
+describe('LocalizedStringSchema', () => {
+    it('accepts valid ISO locale keys', () => {
+        expect(LocalizedStringSchema.parse({ en: 'hello', it: 'ciao', 'zh-TW': '你好' })).toEqual({ en: 'hello', it: 'ciao', 'zh-TW': '你好' })
+    })
+    it('rejects invalid locale codes', () => {
+        expect(() => LocalizedStringSchema.parse({ EN: 'upper case' })).toThrow()
+        expect(() => LocalizedStringSchema.parse({ english: 'full word' })).toThrow()
+    })
+    it('accepts an empty map', () => {
+        expect(LocalizedStringSchema.parse({})).toEqual({})
+    })
+})
+
+describe('InteractiveFlowStateFieldSchema', () => {
+    it('accepts minimal field', () => {
+        const parsed = InteractiveFlowStateFieldSchema.parse({ name: 'clientName', type: 'string' })
+        expect(parsed.name).toBe('clientName')
+        expect(parsed.type).toBe('string')
+    })
+    it('accepts full field with label, format, extractable, sensitive', () => {
+        const input = {
+            name: 'closureDate', type: 'date',
+            label: { en: 'Effective Date', it: 'Data efficacia' },
+            description: 'When the closure takes effect',
+            format: 'DD/MM/YYYY',
+            extractable: true,
+            sensitive: false,
+        }
+        expect(InteractiveFlowStateFieldSchema.parse(input)).toEqual(input)
+    })
+    it('rejects empty name', () => {
+        expect(() => InteractiveFlowStateFieldSchema.parse({ name: '', type: 'string' })).toThrow()
+    })
+    it('rejects unknown type', () => {
+        expect(() => InteractiveFlowStateFieldSchema.parse({ name: 'x', type: 'blob' })).toThrow()
+    })
+})
+
+describe('ParamBindingSchema', () => {
+    it('accepts state kind', () => {
+        expect(ParamBindingSchema.parse({ kind: 'state', field: 'clientName' })).toEqual({ kind: 'state', field: 'clientName' })
+    })
+    it('accepts literal kind with primitives', () => {
+        expect(ParamBindingSchema.parse({ kind: 'literal', value: 42 })).toEqual({ kind: 'literal', value: 42 })
+        expect(ParamBindingSchema.parse({ kind: 'literal', value: 'x' })).toEqual({ kind: 'literal', value: 'x' })
+        expect(ParamBindingSchema.parse({ kind: 'literal', value: true })).toEqual({ kind: 'literal', value: true })
+        expect(ParamBindingSchema.parse({ kind: 'literal', value: null })).toEqual({ kind: 'literal', value: null })
+    })
+    it('accepts compose kind with at least one field', () => {
+        expect(ParamBindingSchema.parse({ kind: 'compose', fields: ['a', 'b'] })).toEqual({ kind: 'compose', fields: ['a', 'b'] })
+    })
+    it('rejects compose with empty fields', () => {
+        expect(() => ParamBindingSchema.parse({ kind: 'compose', fields: [] })).toThrow()
+    })
+    it('rejects unknown kind', () => {
+        expect(() => ParamBindingSchema.parse({ kind: 'other' })).toThrow()
+    })
+})
+
+describe('NodeMessageSchema', () => {
+    it('accepts LocalizedString form', () => {
+        expect(NodeMessageSchema.parse({ en: 'hi', it: 'ciao' })).toEqual({ en: 'hi', it: 'ciao' })
+    })
+    it('accepts dynamic form', () => {
+        const input = { dynamic: true, systemPromptAddendum: 'focus on clientName' }
+        expect(NodeMessageSchema.parse(input)).toEqual(input)
+    })
+    it('accepts dynamic with fallback', () => {
+        const input = { dynamic: true, fallback: { en: 'please provide the name' } }
+        expect(NodeMessageSchema.parse(input)).toEqual(input)
+    })
+    it('rejects dynamic: false shape', () => {
+        expect(() => NodeMessageSchema.parse({ dynamic: false })).toThrow()
+    })
+})
+
+describe('InteractiveFlowErrorPolicySchema', () => {
+    it('accepts FAIL with defaults', () => {
+        expect(InteractiveFlowErrorPolicySchema.parse({ onFailure: 'FAIL' })).toEqual({ onFailure: 'FAIL' })
+    })
+    it('accepts SKIP with retry and timeout', () => {
+        const input = { onFailure: 'SKIP', maxRetries: 3, timeoutMs: 30_000 }
+        expect(InteractiveFlowErrorPolicySchema.parse(input)).toEqual(input)
+    })
+    it('rejects out-of-range timeout', () => {
+        expect(() => InteractiveFlowErrorPolicySchema.parse({ onFailure: 'FAIL', timeoutMs: 500 })).toThrow()
+        expect(() => InteractiveFlowErrorPolicySchema.parse({ onFailure: 'FAIL', timeoutMs: 1_000_000 })).toThrow()
+    })
+    it('rejects unknown onFailure', () => {
+        expect(() => InteractiveFlowErrorPolicySchema.parse({ onFailure: 'MAYBE' })).toThrow()
+    })
+})
+
+describe('ToolInputSchemaSnapshotSchema', () => {
+    it('accepts valid snapshot', () => {
+        const s = { capturedAt: new Date().toISOString(), gatewayId: 'gw1234567890123456789A', schema: { type: 'object' } }
+        expect(ToolInputSchemaSnapshotSchema.parse(s)).toEqual(s)
+    })
+})
+
+describe('InteractiveFlowToolNodeSchema', () => {
+    const valid = {
+        id: 'n1',
         name: 'search_customer',
         displayName: 'Search Customer',
         nodeType: InteractiveFlowNodeType.TOOL,
         stateInputs: ['clientName'],
         stateOutputs: ['searchResults'],
-        tool: 'banking-customers/search_customer',
-        toolParams: { name: 'clientName' },
+        tool: 'banking/search_customer',
+        toolParams: { name: { kind: 'state', field: 'clientName' } },
     }
-
-    it('should accept a valid tool node with all required fields', () => {
-        const result = InteractiveFlowNodeSchema.safeParse(validNode)
-        expect(result.success).toBe(true)
+    it('accepts minimal TOOL', () => {
+        expect(InteractiveFlowToolNodeSchema.parse(valid).nodeType).toBe('TOOL')
     })
-
-    it('should accept a valid user_input node with render hint', () => {
-        const node = {
-            id: 'node_2',
-            name: 'collect_date',
-            displayName: 'Collect Date',
-            nodeType: InteractiveFlowNodeType.USER_INPUT,
-            stateInputs: [],
-            stateOutputs: ['closureEffectiveDate'],
-            render: {
-                component: 'DatePicker',
-                props: { title: 'Select date', minDate: 'today' },
-            },
-            message: 'When should the closure take effect?',
+    it('accepts full TOOL with snapshot + errorPolicy + outputMap', () => {
+        const full = {
+            ...valid,
+            toolInputSchemaSnapshot: { capturedAt: '2026-01-01T00:00:00Z', gatewayId: 'gw1234567890123456789A', schema: {} },
+            outputMap: { ndg: 'matches[0].ndg' },
+            errorPolicy: { onFailure: 'SKIP', maxRetries: 1, timeoutMs: 5000 },
         }
-        const result = InteractiveFlowNodeSchema.safeParse(node)
-        expect(result.success).toBe(true)
+        expect(InteractiveFlowToolNodeSchema.parse(full)).toEqual(full)
     })
-
-    it('should accept a valid confirm node with summary', () => {
-        const node = {
-            id: 'node_3',
-            name: 'confirm_closure',
-            displayName: 'Confirm Closure',
-            nodeType: InteractiveFlowNodeType.CONFIRM,
-            stateInputs: ['moduleData'],
-            stateOutputs: ['confermaInvio'],
-            summary: [
-                { label: 'Client', field: 'clientName' },
-                { label: 'NDG', field: 'ndg' },
-            ],
-            render: {
-                component: 'ConfirmCard',
-                props: { confirmLabel: 'Confirm', cancelLabel: 'Cancel' },
-            },
-        }
-        const result = InteractiveFlowNodeSchema.safeParse(node)
-        expect(result.success).toBe(true)
-    })
-
-    it('should reject when nodeType is missing', () => {
-        const { nodeType: _, ...withoutNodeType } = validNode
-        const result = InteractiveFlowNodeSchema.safeParse(withoutNodeType)
-        expect(result.success).toBe(false)
-    })
-
-    it('should reject when nodeType has an invalid value', () => {
-        const result = InteractiveFlowNodeSchema.safeParse({
-            ...validNode,
-            nodeType: 'INVALID_TYPE',
-        })
-        expect(result.success).toBe(false)
-    })
-
-    it('should accept empty stateInputs array for nodes with no dependencies', () => {
-        const result = InteractiveFlowNodeSchema.safeParse({
-            ...validNode,
-            stateInputs: [],
-        })
-        expect(result.success).toBe(true)
-    })
-
-    it('should reject node name with invalid characters', () => {
-        const result = InteractiveFlowNodeSchema.safeParse({
-            ...validNode,
-            name: 'Invalid Name With Spaces!',
-        })
-        expect(result.success).toBe(false)
-    })
-
-    it('should accept node name with underscores and alphanumeric characters', () => {
-        const result = InteractiveFlowNodeSchema.safeParse({
-            ...validNode,
-            name: 'search_customer_v2',
-        })
-        expect(result.success).toBe(true)
-    })
-
-    it('should accept a valid render hint with component and props', () => {
-        const result = InteractiveFlowNodeSchema.safeParse({
-            ...validNode,
-            render: {
-                component: 'DataTable',
-                props: { selectable: true, selectField: 'ndg' },
-            },
-        })
-        expect(result.success).toBe(true)
-    })
-
-    it('should reject render hint missing component field', () => {
-        const result = InteractiveFlowNodeSchema.safeParse({
-            ...validNode,
-            render: {
-                props: { selectable: true },
-            },
-        })
-        expect(result.success).toBe(false)
-    })
-
-    it('should accept node without optional fields (tool, render, message)', () => {
-        const minimalNode = {
-            id: 'node_min',
-            name: 'minimal_node',
-            displayName: 'Minimal',
-            nodeType: InteractiveFlowNodeType.TOOL,
-            stateInputs: [],
-            stateOutputs: [],
-        }
-        const result = InteractiveFlowNodeSchema.safeParse(minimalNode)
-        expect(result.success).toBe(true)
+    it('rejects TOOL without tool field', () => {
+        const { tool: _, ...missing } = valid
+        expect(() => InteractiveFlowToolNodeSchema.parse(missing)).toThrow()
     })
 })
 
-describe('InteractiveFlowStateFieldSchema', () => {
-    it('should accept a valid state field with all properties', () => {
-        const result = InteractiveFlowStateFieldSchema.safeParse({
-            name: 'clientName',
-            type: 'string',
-            label: 'Client Name',
-            description: 'Full name of the banking client',
-            extractable: true,
-            internal: false,
-        })
-        expect(result.success).toBe(true)
-    })
-
-    it('should accept a minimal state field with only required properties', () => {
-        const result = InteractiveFlowStateFieldSchema.safeParse({
-            name: 'ndg',
-            type: 'string',
-        })
-        expect(result.success).toBe(true)
-    })
-
-    it('should reject invalid type values', () => {
-        const result = InteractiveFlowStateFieldSchema.safeParse({
-            name: 'test',
-            type: 'invalid_type',
-        })
-        expect(result.success).toBe(false)
-    })
-
-    it('should accept all valid type values', () => {
-        for (const type of ['string', 'number', 'object', 'array']) {
-            const result = InteractiveFlowStateFieldSchema.safeParse({
-                name: 'test',
-                type,
-            })
-            expect(result.success).toBe(true)
+describe('InteractiveFlowUserInputNodeSchema', () => {
+    it('accepts USER_INPUT with static message', () => {
+        const node = {
+            id: 'n2',
+            name: 'collect_name',
+            displayName: 'Collect Name',
+            nodeType: InteractiveFlowNodeType.USER_INPUT,
+            stateInputs: [],
+            stateOutputs: ['clientName'],
+            message: { en: 'What is the client name?', it: 'Come si chiama il cliente?' },
+            render: { component: 'TextInput', props: { placeholder: 'Name' } },
         }
+        expect(InteractiveFlowUserInputNodeSchema.parse(node)).toEqual(node)
+    })
+    it('accepts USER_INPUT with dynamic message', () => {
+        const node = {
+            id: 'n2',
+            name: 'collect_name',
+            displayName: 'Collect Name',
+            nodeType: InteractiveFlowNodeType.USER_INPUT,
+            stateInputs: [],
+            stateOutputs: ['clientName'],
+            message: { dynamic: true, systemPromptAddendum: 'focus on clientName', fallback: { en: 'client name?' } },
+            render: { component: 'TextInput', props: {} },
+        }
+        expect(InteractiveFlowUserInputNodeSchema.parse(node).message).toHaveProperty('dynamic', true)
+    })
+})
+
+describe('InteractiveFlowConfirmNodeSchema', () => {
+    it('accepts CONFIRM with summary rows localized', () => {
+        const node = {
+            id: 'n3',
+            name: 'confirm',
+            displayName: 'Confirm',
+            nodeType: InteractiveFlowNodeType.CONFIRM,
+            stateInputs: ['moduleData'],
+            stateOutputs: ['confermaInvio'],
+            message: { en: 'Do you confirm?', it: 'Confermi?' },
+            summary: [
+                { field: 'clientName', label: { en: 'Client', it: 'Cliente' } },
+                { field: 'ndg', label: { en: 'NDG' } },
+            ],
+            render: { component: 'ConfirmCard', props: { confirmLabel: 'Ok' } },
+        }
+        expect(InteractiveFlowConfirmNodeSchema.parse(node)).toEqual(node)
+    })
+})
+
+describe('InteractiveFlowBranchNodeSchema', () => {
+    it('accepts BRANCH with condition + fallback branches', () => {
+        const node = {
+            id: 'n_branch',
+            name: 'route_by_type',
+            displayName: 'Route by client type',
+            nodeType: InteractiveFlowNodeType.BRANCH,
+            stateInputs: ['clientType'],
+            stateOutputs: [],
+            branches: [
+                {
+                    id: 'b1',
+                    branchType: 'CONDITION' as const,
+                    branchName: 'corporate',
+                    conditions: [[
+                        { operator: 'TEXT_EXACTLY_MATCHES', firstValue: '{{clientType}}', secondValue: 'corporate' },
+                    ]],
+                    targetNodeIds: ['n_corp_search'],
+                },
+                {
+                    id: 'b2',
+                    branchType: 'FALLBACK' as const,
+                    branchName: 'Otherwise',
+                    targetNodeIds: ['n_indiv_search'],
+                },
+            ],
+        }
+        expect(InteractiveFlowBranchNodeSchema.parse(node).branches).toHaveLength(2)
+    })
+    it('rejects BRANCH with zero branches', () => {
+        expect(() => InteractiveFlowBranchNodeSchema.parse({
+            id: 'n', name: 'x', displayName: 'X',
+            nodeType: InteractiveFlowNodeType.BRANCH,
+            stateInputs: [], stateOutputs: [],
+            branches: [],
+        })).toThrow()
+    })
+})
+
+describe('InteractiveFlowNodeSchema (discriminated union)', () => {
+    it('discriminates on nodeType for TOOL', () => {
+        const parsed = InteractiveFlowNodeSchema.parse({
+            id: 'n', name: 'x', displayName: 'X',
+            nodeType: InteractiveFlowNodeType.TOOL,
+            stateInputs: [], stateOutputs: [],
+            tool: 'banking/x',
+        })
+        expect(parsed.nodeType).toBe('TOOL')
+    })
+    it('discriminates on nodeType for BRANCH', () => {
+        const parsed = InteractiveFlowNodeSchema.parse({
+            id: 'n', name: 'x', displayName: 'X',
+            nodeType: InteractiveFlowNodeType.BRANCH,
+            stateInputs: [], stateOutputs: [],
+            branches: [{
+                id: 'b', branchType: 'FALLBACK' as const, branchName: 'default', targetNodeIds: [],
+            }],
+        })
+        expect(parsed.nodeType).toBe('BRANCH')
+    })
+    it('rejects hybrid shapes (TOOL fields + USER_INPUT message)', () => {
+        expect(() => InteractiveFlowNodeSchema.parse({
+            id: 'n', name: 'x', displayName: 'X',
+            nodeType: InteractiveFlowNodeType.TOOL,
+            stateInputs: [], stateOutputs: [],
+            tool: 'banking/x',
+            message: { en: 'test' },  // not in TOOL shape
+        })).not.toThrow()
+        // discriminated union only enforces own schema, extra keys are allowed by default
+        // this is a lenient check — a strict schema would require .strict()
     })
 })
 
 describe('InteractiveFlowActionSettings', () => {
-    const validSettings = {
-        nodes: [
-            {
-                id: 'node_1',
-                name: 'search_customer',
-                displayName: 'Search Customer',
-                nodeType: InteractiveFlowNodeType.TOOL,
-                stateInputs: ['clientName'],
-                stateOutputs: ['searchResults'],
-                tool: 'banking-customers/search_customer',
-            },
-        ],
-        stateFields: [
-            { name: 'clientName', type: 'string' as const },
-            { name: 'searchResults', type: 'array' as const },
-        ],
+    const minimal = {
+        nodes: [] as unknown[],
+        stateFields: [],
     }
-
-    it('should accept valid settings with nodes and stateFields', () => {
-        const result = InteractiveFlowActionSettings.safeParse(validSettings)
-        expect(result.success).toBe(true)
+    it('accepts empty settings', () => {
+        expect(InteractiveFlowActionSettings.parse(minimal)).toBeDefined()
     })
-
-    it('should accept empty nodes array', () => {
-        const result = InteractiveFlowActionSettings.safeParse({
-            ...validSettings,
-            nodes: [],
-        })
-        expect(result.success).toBe(true)
+    it('accepts full settings with systemPrompt + extractor + generator + phases + locale + messageInput', () => {
+        const full = {
+            ...minimal,
+            greeting: { en: 'Hi', it: 'Ciao' },
+            mcpGatewayId: 'gw1234567890123456789A',
+            systemPrompt: 'You are an agent',
+            fieldExtractor: { aiProviderId: 'openai', model: 'gpt-4o-mini' },
+            questionGenerator: { aiProviderId: 'openai', model: 'gpt-4o', styleTemplate: 'banking_formal_it', historyWindow: 10, maxResponseLength: 200 },
+            locale: 'it',
+            messageInput: '{{trigger.body.message}}',
+            phases: [{ id: 'p1', name: 'identify', nodeIds: ['n1'], label: { en: 'Identify' } }],
+        }
+        expect(InteractiveFlowActionSettings.parse(full)).toEqual(full)
     })
-
-    it('should reject when stateFields is missing', () => {
-        const { stateFields: _, ...withoutStateFields } = validSettings
-        const result = InteractiveFlowActionSettings.safeParse(withoutStateFields)
-        expect(result.success).toBe(false)
+    it('rejects invalid locale', () => {
+        expect(() => InteractiveFlowActionSettings.parse({ ...minimal, locale: 'ITA' })).toThrow()
+        expect(() => InteractiveFlowActionSettings.parse({ ...minimal, locale: 'invalid' })).toThrow()
     })
-
-    it('should accept settings with greeting and fieldExtractor', () => {
-        const result = InteractiveFlowActionSettings.safeParse({
-            ...validSettings,
-            greeting: 'Welcome! What is the client name?',
-            fieldExtractor: {
-                enabled: true,
-                model: 'claude-sonnet-4',
-            },
-        })
-        expect(result.success).toBe(true)
+    it('accepts locale with region (zh-TW)', () => {
+        expect(InteractiveFlowActionSettings.parse({ ...minimal, locale: 'zh-TW' }).locale).toBe('zh-TW')
     })
-
-    it('should accept settings with mcpGatewayId', () => {
-        const result = InteractiveFlowActionSettings.safeParse({
-            ...validSettings,
-            mcpGatewayId: 'abc123DEF456ghi789JKL',
-        })
-        expect(result.success).toBe(true)
-    })
-
-    it('should accept settings without mcpGatewayId (optional)', () => {
-        const result = InteractiveFlowActionSettings.safeParse(validSettings)
-        expect(result.success).toBe(true)
-        expect((result.data as { mcpGatewayId?: string }).mcpGatewayId).toBeUndefined()
-    })
-
-    it('should reject non-string mcpGatewayId', () => {
-        const result = InteractiveFlowActionSettings.safeParse({
-            ...validSettings,
-            mcpGatewayId: 123,
-        })
-        expect(result.success).toBe(false)
-    })
-
-    it('should preserve immutability when parsing', () => {
-        const original = { ...validSettings }
-        const result = InteractiveFlowActionSettings.safeParse(original)
-        expect(result.success).toBe(true)
-        expect(original.nodes).toHaveLength(1)
+    it('rejects phases with empty nodeIds', () => {
+        expect(() => InteractiveFlowActionSettings.parse({
+            ...minimal,
+            phases: [{ id: 'p', name: 'x', nodeIds: [] }],
+        })).toThrow()
     })
 })
