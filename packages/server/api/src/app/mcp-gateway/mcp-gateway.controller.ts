@@ -2,6 +2,8 @@ import {
     ApId,
     CreateMcpGatewayRequestSchema,
     ListMcpGatewayToolsResponseSchema,
+    McpGatewayToolDiffRequestSchema,
+    McpGatewayToolDiffResponseSchema,
     McpGatewayWithoutSensitiveDataSchema,
     PrincipalType,
     SERVICE_KEY_SECURITY_OPENAPI,
@@ -55,6 +57,14 @@ export const mcpGatewayController: FastifyPluginAsyncZod = async (app) => {
         return mcpGatewayService(request.log).listTools({
             id: request.params.id,
             platformId: request.principal.platform.id,
+        })
+    })
+
+    app.post('/:id/tools/diff', ToolsDiffRoute, async (request) => {
+        return mcpGatewayService(request.log).diffTools({
+            id: request.params.id,
+            platformId: request.principal.platform.id,
+            tools: request.body.tools,
         })
     })
 }
@@ -133,6 +143,19 @@ const ListToolsRoute = {
         security: [SERVICE_KEY_SECURITY_OPENAPI],
         response: {
             [StatusCodes.OK]: ListMcpGatewayToolsResponseSchema,
+        },
+    },
+}
+
+const ToolsDiffRoute = {
+    config: AdminSecurity,
+    schema: {
+        tags: ['mcp-gateways'],
+        params: IdParams,
+        body: McpGatewayToolDiffRequestSchema,
+        security: [SERVICE_KEY_SECURITY_OPENAPI],
+        response: {
+            [StatusCodes.OK]: McpGatewayToolDiffResponseSchema,
         },
     },
 }

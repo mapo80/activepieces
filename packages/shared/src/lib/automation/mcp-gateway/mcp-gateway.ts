@@ -87,6 +87,23 @@ export const ResolveMcpGatewayResponseSchema = z.object({
     headers: z.record(z.string(), z.string()),
 })
 
+export const McpGatewayToolDiffRequestSchema = z.object({
+    tools: z.array(z.object({
+        name: z.string().min(1),
+        snapshot: z.unknown().optional(),
+    })).min(1),
+})
+
+export const McpGatewayToolDiffEntrySchema = z.object({
+    name: z.string(),
+    status: z.enum(['OK', 'DRIFTED', 'REMOVED']),
+    liveSchema: z.unknown().optional(),
+})
+
+export const McpGatewayToolDiffResponseSchema = z.object({
+    results: z.array(McpGatewayToolDiffEntrySchema),
+})
+
 export type McpGatewayId = string
 export type McpGatewayAuthType = 'NONE' | 'BEARER' | 'API_KEY' | 'HEADER'
 export type McpGatewayAuth = z.infer<typeof McpGatewayAuthSchema>
@@ -97,3 +114,6 @@ export type UpdateMcpGatewayRequest = z.infer<typeof UpdateMcpGatewayRequestSche
 export type McpGatewayToolSummary = z.infer<typeof McpGatewayToolSummarySchema>
 export type ListMcpGatewayToolsResponse = z.infer<typeof ListMcpGatewayToolsResponseSchema>
 export type ResolveMcpGatewayResponse = z.infer<typeof ResolveMcpGatewayResponseSchema>
+export type McpGatewayToolDiffRequest = z.infer<typeof McpGatewayToolDiffRequestSchema>
+export type McpGatewayToolDiffEntry = z.infer<typeof McpGatewayToolDiffEntrySchema>
+export type McpGatewayToolDiffResponse = z.infer<typeof McpGatewayToolDiffResponseSchema>

@@ -7,6 +7,7 @@ import {
     ListMcpGatewayToolsResponse,
     McpGateway,
     McpGatewayAuth,
+    McpGatewayToolDiffResponse,
     McpGatewayToolSummary,
     McpGatewayWithoutSensitiveData,
     UpdateMcpGatewayRequest,
@@ -89,6 +90,32 @@ export const mcpGatewayService = (log: FastifyBaseLogger) => ({
         const response = await fetchToolsFromGateway({ url: resolved.url, auth: resolved.auth, log })
         toolListCache.set(id, response)
         return response
+    },
+
+    async diffTools({ id, platformId, tools }: {
+        id: string
+        platformId: string
+        tools: ReadonlyArray<{ name: string, snapshot?: unknown }>
+    }): Promise<McpGatewayToolDiffResponse> {
+        const live = await this.listTools({ id, platformId })
+        const liveByName = new Map(live.tools.map(t => [t.name, t]))
+        const results = tools.map((t) => {
+            const liveTool = liveByName.get(t.name)
+            if (isNil(liveTool)) {
+                return { name: t.name, status: 'REMOVED' as const }
+            }
+            const liveInput = liveTool.inputSchema
+            if (isNil(t.snapshot)) {
+                return { name: t.name, status: 'OK' as const, liveSchema: liveInput }
+            }
+            const drift = JSON.stringify(liveInput) !== JSON.stringify(t.snapshot)
+            return {
+                name: t.name,
+                status: drift ? ('DRIFTED' as const) : ('OK' as const),
+                liveSchema: liveInput,
+            }
+        })
+        return { results }
     },
 })
 
