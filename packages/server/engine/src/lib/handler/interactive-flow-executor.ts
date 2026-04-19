@@ -24,6 +24,8 @@ import {
 import { BaseExecutor } from './base-executor'
 import { EngineConstants } from './context/engine-constants'
 import { FlowExecutorContext } from './context/flow-execution-context'
+import { fieldExtractor } from './field-extractor'
+import { questionGenerator } from './question-generator'
 
 type InteractiveFlowState = Record<string, unknown>
 
@@ -139,7 +141,16 @@ function mapOutputsToState({ node, result, state, fields }: {
     if (node.stateOutputs.length === 1) {
         const target = node.stateOutputs[0]
         const source = outputMap[target]
-        const value = isNil(source) ? result : resultObj ? resultObj[source] : result
+        let value: unknown
+        if (!isNil(source)) {
+            value = resultObj ? resultObj[source] : result
+        }
+        else if (resultObj && target in resultObj) {
+            value = resultObj[target]
+        }
+        else {
+            value = result
+        }
         const field = fieldsByName.get(target)
         state[target] = isNil(field) ? value : coerceStateValue({ value, field })
         return
@@ -476,6 +487,23 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 if (k === 'locale' || k === 'message') continue
                 flowState[k] = v
             }
+
+            const userMessage = typeof incoming.message === 'string' ? incoming.message : undefined
+            if (!isNil(userMessage) && !isNil(settings.fieldExtractor)) {
+                const extracted = await fieldExtractor.extract({
+                    constants,
+                    config: settings.fieldExtractor,
+                    message: userMessage,
+                    stateFields: fields,
+                    currentState: flowState,
+                    systemPrompt: settings.systemPrompt,
+                    locale: resolveLocale({ constants, settings }),
+                })
+                const coercedExtracted = coerceIncomingState({ incoming: extracted, fields })
+                for (const [k, v] of Object.entries(coercedExtracted)) {
+                    if (isNil(flowState[k])) flowState[k] = v
+                }
+            }
         }
 
         // Nodes with outputs already satisfied = already executed (e.g. field extractor pre-filled them)
@@ -575,7 +603,29 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
         }
 
         if (nextPauseNode) {
-            const message = resolveNodeMessage({ message: nextPauseNode.message, locale })
+            let message = resolveNodeMessage({ message: nextPauseNode.message, locale })
+            const nodeMessage = nextPauseNode.message
+            const isDynamicMessage = typeof nodeMessage === 'object' && nodeMessage !== null && 'dynamic' in nodeMessage && nodeMessage.dynamic === true
+            if (isDynamicMessage && !isNil(settings.questionGenerator)) {
+                const generated = await questionGenerator.generate({
+                    constants,
+                    config: settings.questionGenerator,
+                    node: nextPauseNode,
+                    stateFields: fields,
+                    currentState: redactSensitiveState({ state: flowState, fields }),
+                    locale,
+                    systemPrompt: settings.systemPrompt,
+                    systemPromptAddendum: typeof nodeMessage === 'object' && 'systemPromptAddendum' in nodeMessage ? nodeMessage.systemPromptAddendum : undefined,
+                })
+                if (!isNil(generated)) {
+                    message = generated
+                }
+                else if (isNil(message)) {
+                    const firstTarget = fields.find(f => nextPauseNode.stateOutputs.includes(f.name))
+                    const label = firstTarget?.label ? resolveLocalizedString({ value: firstTarget.label, locale }) : firstTarget?.name
+                    message = `Please provide ${label ?? nextPauseNode.stateOutputs[0] ?? 'the requested information'}`
+                }
+            }
             const visibleState = redactSensitiveState({ state: flowState, fields })
             const stepOutput = GenericStepOutput.create({
                 type: FlowActionType.INTERACTIVE_FLOW,
