@@ -43,6 +43,14 @@ export enum ApplicationEventName {
     PROJECT_ROLE_DELETED = 'project.role.deleted',
     PROJECT_ROLE_UPDATED = 'project.role.updated',
     PROJECT_RELEASE_CREATED = 'project.release.created',
+    INTERACTIVE_FLOW_STARTED = 'interactive_flow.started',
+    INTERACTIVE_FLOW_PAUSED = 'interactive_flow.paused',
+    INTERACTIVE_FLOW_RESUMED = 'interactive_flow.resumed',
+    INTERACTIVE_FLOW_COMPLETED = 'interactive_flow.completed',
+    INTERACTIVE_FLOW_FAILED = 'interactive_flow.failed',
+    INTERACTIVE_FLOW_FIELD_EXTRACTED = 'interactive_flow.field_extracted',
+    INTERACTIVE_FLOW_QUESTION_GENERATED = 'interactive_flow.question_generated',
+    INTERACTIVE_FLOW_BRANCH_SELECTED = 'interactive_flow.branch_selected',
 }
 
 const BaseAuditEventProps = {
@@ -271,6 +279,35 @@ export const ProjectReleaseEvent = z.object({
 
 export type ProjectReleaseEvent = z.infer<typeof ProjectReleaseEvent>
 
+export const InteractiveFlowEvent = z.object({
+    ...BaseAuditEventProps,
+    action: z.union([
+        z.literal(ApplicationEventName.INTERACTIVE_FLOW_STARTED),
+        z.literal(ApplicationEventName.INTERACTIVE_FLOW_PAUSED),
+        z.literal(ApplicationEventName.INTERACTIVE_FLOW_RESUMED),
+        z.literal(ApplicationEventName.INTERACTIVE_FLOW_COMPLETED),
+        z.literal(ApplicationEventName.INTERACTIVE_FLOW_FAILED),
+        z.literal(ApplicationEventName.INTERACTIVE_FLOW_FIELD_EXTRACTED),
+        z.literal(ApplicationEventName.INTERACTIVE_FLOW_QUESTION_GENERATED),
+        z.literal(ApplicationEventName.INTERACTIVE_FLOW_BRANCH_SELECTED),
+    ]),
+    data: z.object({
+        flowId: z.string(),
+        flowRunId: z.string(),
+        stepName: z.string(),
+        nodeId: z.string().optional(),
+        tokensUsed: z.number().int().min(0).optional(),
+        aiModel: z.string().optional(),
+        durationMs: z.number().int().min(0).optional(),
+        fallbackUsed: z.boolean().optional(),
+        branchId: z.string().optional(),
+        branchName: z.string().optional(),
+        error: z.string().optional(),
+    }),
+})
+
+export type InteractiveFlowEvent = z.infer<typeof InteractiveFlowEvent>
+
 export const ApplicationEvent = z.union([
     ConnectionEvent,
     FlowCreatedEvent,
@@ -283,11 +320,12 @@ export const ApplicationEvent = z.union([
     SigningKeyEvent,
     ProjectRoleEvent,
     ProjectReleaseEvent,
+    InteractiveFlowEvent,
 ])
 
 export type ApplicationEvent = z.infer<typeof ApplicationEvent>
 
-export function summarizeApplicationEvent(event: ApplicationEvent) {
+export function summarizeApplicationEvent(event: ApplicationEvent): string | undefined {
     switch (event.action) {
         case ApplicationEventName.FLOW_UPDATED: {
             return convertUpdateActionToDetails(event)
@@ -335,10 +373,26 @@ export function summarizeApplicationEvent(event: ApplicationEvent) {
             return `${event.data.projectRole.name} is deleted`
         case ApplicationEventName.PROJECT_RELEASE_CREATED:
             return `${event.data.release.name} is created`
+        case ApplicationEventName.INTERACTIVE_FLOW_STARTED:
+            return `Interactive flow run ${event.data.flowRunId} started`
+        case ApplicationEventName.INTERACTIVE_FLOW_PAUSED:
+            return `Interactive flow run ${event.data.flowRunId} paused at node ${event.data.nodeId ?? 'unknown'}`
+        case ApplicationEventName.INTERACTIVE_FLOW_RESUMED:
+            return `Interactive flow run ${event.data.flowRunId} resumed`
+        case ApplicationEventName.INTERACTIVE_FLOW_COMPLETED:
+            return `Interactive flow run ${event.data.flowRunId} completed`
+        case ApplicationEventName.INTERACTIVE_FLOW_FAILED:
+            return `Interactive flow run ${event.data.flowRunId} failed${event.data.error ? `: ${event.data.error}` : ''}`
+        case ApplicationEventName.INTERACTIVE_FLOW_FIELD_EXTRACTED:
+            return `Interactive flow run ${event.data.flowRunId} — fields extracted (${event.data.tokensUsed ?? 0} tokens, ${event.data.aiModel ?? 'unknown'})`
+        case ApplicationEventName.INTERACTIVE_FLOW_QUESTION_GENERATED:
+            return `Interactive flow run ${event.data.flowRunId} — question generated at node ${event.data.nodeId ?? 'unknown'}${event.data.fallbackUsed ? ' (fallback used)' : ''}`
+        case ApplicationEventName.INTERACTIVE_FLOW_BRANCH_SELECTED:
+            return `Interactive flow run ${event.data.flowRunId} — branch "${event.data.branchName ?? event.data.branchId ?? 'unknown'}" selected`
     }
 }
 
-function convertUpdateActionToDetails(event: FlowUpdatedEvent) {
+function convertUpdateActionToDetails(event: FlowUpdatedEvent): string | undefined {
     switch (event.data.request.type) {
         case FlowOperationType.ADD_ACTION:
             return `Added action "${event.data.request.request.action.displayName}" to "${event.data.flowVersion.displayName}" Flow.`

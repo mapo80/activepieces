@@ -4,21 +4,64 @@ import {
 } from '@activepieces/shared'
 import { FastifyBaseLogger, FastifyReply } from 'fastify'
 import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
+import { StatusCodes } from 'http-status-codes'
 import { z } from 'zod'
 import { securityAccess } from '../../../core/security/authorization/fastify-security'
 import { resumeService } from './resume-service'
+import { verifyResumeSignature } from './resume-signing'
 import { waitpointService } from './waitpoint-service'
+
+function extractSignatureFromQuery(queryParams: Record<string, string>): string | undefined {
+    const sig = queryParams['sig'] ?? queryParams['ap_sig']
+    return typeof sig === 'string' && sig.length > 0 ? sig : undefined
+}
+
+async function enforceSignatureIfPresent({
+    flowRunId,
+    waitpointId,
+    queryParams,
+    reply,
+}: {
+    flowRunId: string
+    waitpointId: string
+    queryParams: Record<string, string>
+    reply: FastifyReply
+}): Promise<boolean> {
+    const signature = extractSignatureFromQuery(queryParams)
+    if (!signature) {
+        return true
+    }
+    if (!verifyResumeSignature(flowRunId, waitpointId, signature)) {
+        await reply.status(StatusCodes.UNAUTHORIZED).send({ code: 'INVALID_RESUME_SIGNATURE' })
+        return false
+    }
+    return true
+}
 
 export const resumeController: FastifyPluginAsyncZod = async (app) => {
     app.all('/:id/waitpoints/:waitpointId', ResumeByWaitpointRequest, async (req, reply) => {
         const headers = req.headers as Record<string, string>
         const queryParams = req.query as Record<string, string>
+        const ok = await enforceSignatureIfPresent({
+            flowRunId: req.params.id,
+            waitpointId: req.params.waitpointId,
+            queryParams,
+            reply,
+        })
+        if (!ok) return
         await handleAsyncResume({ flowRunId: req.params.id, waitpointId: req.params.waitpointId, body: req.body, headers, queryParams, log: req.log, reply })
     })
 
     app.all('/:id/waitpoints/:waitpointId/sync', ResumeByWaitpointRequest, async (req, reply) => {
         const headers = req.headers as Record<string, string>
         const queryParams = req.query as Record<string, string>
+        const ok = await enforceSignatureIfPresent({
+            flowRunId: req.params.id,
+            waitpointId: req.params.waitpointId,
+            queryParams,
+            reply,
+        })
+        if (!ok) return
         await handleSyncResume({ flowRunId: req.params.id, waitpointId: req.params.waitpointId, body: req.body, headers, queryParams, log: req.log, reply, correlationId: req.params.waitpointId })
     })
 

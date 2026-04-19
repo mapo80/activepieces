@@ -22,6 +22,7 @@ import {
 import { FastifyBaseLogger } from 'fastify'
 import { z } from 'zod'
 import { pieceMetadataService } from '../../pieces/metadata/piece-metadata-service'
+import { validateInteractiveFlow } from './interactive-flow-validator'
 
 const loopSettingsValidator = LoopOnItemsActionSettings.and(z.object({
     items: z.string().min(1),
@@ -73,7 +74,9 @@ export const flowVersionValidationUtil = (log: FastifyBaseLogger) => ({
                         ).success
                         break
                     case FlowActionType.INTERACTIVE_FLOW:
-                        clonedRequest.request.action.valid = true
+                        clonedRequest.request.action.valid = validateInteractiveFlow(
+                            clonedRequest.request.action.settings,
+                        ).valid
                         break
                 }
                 break
@@ -106,7 +109,9 @@ export const flowVersionValidationUtil = (log: FastifyBaseLogger) => ({
                         ).success
                         break
                     case FlowActionType.INTERACTIVE_FLOW:
-                        clonedRequest.request.valid = true
+                        clonedRequest.request.valid = validateInteractiveFlow(
+                            clonedRequest.request.settings,
+                        ).valid
                         break
                 }
                 break
