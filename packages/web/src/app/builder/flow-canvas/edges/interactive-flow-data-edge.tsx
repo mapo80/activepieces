@@ -3,16 +3,17 @@ import { t } from 'i18next';
 import React from 'react';
 
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@/components/ui/hover-card';
 import { cn } from '@/lib/utils';
 
 import { flowCanvasConsts } from '../utils/consts';
 import { ApInteractiveFlowDataEdge } from '../utils/types';
 
-const DOT_SIZE = 12;
+const DOT_SIZE = 10;
+const HIT_AREA_SIZE = 16;
 
 export const ApInteractiveFlowDataCanvasEdge = ({
   sourceX,
@@ -69,26 +70,37 @@ export const ApInteractiveFlowDataCanvasEdge = ({
           </span>
         </foreignObject>
       ) : hasFields ? (
-        <foreignObject
-          x={midX - DOT_SIZE / 2}
-          y={midY - DOT_SIZE / 2}
-          width={DOT_SIZE}
-          height={DOT_SIZE}
-          className="overflow-visible"
-        >
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label={ariaLabel}
-                data-testid="interactive-flow-edge-dot"
-                className={cn(
-                  'size-3 rounded-full border border-background bg-foreground transition-transform',
-                  'hover:scale-125 focus:outline-none focus:ring-2 focus:ring-ring',
-                )}
-              />
-            </PopoverTrigger>
-            <PopoverContent
+        <>
+          <circle
+            cx={midX}
+            cy={midY}
+            r={DOT_SIZE / 2}
+            fill="hsl(var(--muted-foreground))"
+            stroke="hsl(var(--background))"
+            strokeWidth={1.5}
+            pointerEvents="none"
+          />
+          <HoverCard openDelay={150} closeDelay={100}>
+            <HoverCardTrigger asChild>
+              <foreignObject
+                x={midX - HIT_AREA_SIZE / 2}
+                y={midY - HIT_AREA_SIZE / 2}
+                width={HIT_AREA_SIZE}
+                height={HIT_AREA_SIZE}
+              >
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label={ariaLabel}
+                  data-testid="interactive-flow-edge-dot"
+                  className={cn(
+                    'block size-full rounded-full border-0 bg-transparent p-0',
+                    'focus:outline-none focus:ring-2 focus:ring-ring',
+                  )}
+                />
+              </foreignObject>
+            </HoverCardTrigger>
+            <HoverCardContent
               className="w-auto max-w-sm p-3 text-xs"
               align="center"
               role="dialog"
@@ -113,9 +125,9 @@ export const ApInteractiveFlowDataCanvasEdge = ({
                   {t('skip connection')}
                 </div>
               )}
-            </PopoverContent>
-          </Popover>
-        </foreignObject>
+            </HoverCardContent>
+          </HoverCard>
+        </>
       ) : null}
     </>
   );
