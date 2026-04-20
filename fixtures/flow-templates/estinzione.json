@@ -9,13 +9,13 @@
       "trigger": {
         "name": "trigger",
         "type": "PIECE_TRIGGER",
-        "displayName": "Catch Webhook",
+        "displayName": "Chat UI",
         "valid": true,
         "settings": {
-          "pieceName": "@activepieces/piece-webhook",
+          "pieceName": "@activepieces/piece-forms",
           "pieceVersion": "__AUTO_PIECE_VERSION__",
-          "triggerName": "catch_webhook",
-          "input": { "authType": "none" },
+          "triggerName": "chat_submission",
+          "input": { "botName": "Assistente Banca" },
           "propertySettings": {}
         },
         "nextAction": {
@@ -26,7 +26,7 @@
           "skip": false,
           "settings": {
             "mcpGatewayId": "__AUTO_MCP_GATEWAY__",
-            "messageInput": "{{trigger.body.message}}",
+            "messageInput": "{{trigger.message}}",
             "systemPrompt": "Sei un assistente bancario esperto in estinzione rapporti bancari. Estrai SOLO i campi realmente presenti nel messaggio dell'utente; non inventare mai dati. Regole di estrazione per campo:\n- `customerName`: un cognome o nome+cognome (es. \"Bellafronte\", \"Mario Rossi\").\n- `ndg`: una sequenza numerica di 6-10 cifre (es. \"11255521\"). Se l'utente dice \"il primo\" o \"seleziona il primo\", NON inferire.\n- `rapportoId`: un identificativo nel formato XX-XXX-XXXXXXXX (es. \"01-034-00392400\").\n- `closureReasonCode`: codice 2 cifre della motivazione (es. \"01\"). Se l'utente cita la descrizione (es. \"trasferimento estero\"), mappa alla motivazione piu' pertinente dalla lista nota.\n- `closureDate`: data in formato ISO YYYY-MM-DD.\n- `confirmed`: true solo se l'utente conferma esplicitamente (es. \"sì, confermo\", \"procedi\", \"ok\").",
             "fieldExtractor": {
               "aiProviderId": "custom",
