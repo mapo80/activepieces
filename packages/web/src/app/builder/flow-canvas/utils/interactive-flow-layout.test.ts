@@ -386,6 +386,30 @@ describe('buildInteractiveFlowChildGraph — new layer-based layout', () => {
     }
   });
 
+  it('container encloses return node and end widget too', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({ id: 'a', stateOutputs: ['x'] }),
+        toolNode({ id: 'b', stateInputs: ['x'] }),
+      ]),
+    );
+    const container = graph.nodes.find(
+      (n): n is ApInteractiveFlowContainerNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CONTAINER,
+    )!;
+    const returnNode = graph.nodes.find(
+      (n) => n.type === ApNodeType.INTERACTIVE_FLOW_RETURN_NODE,
+    )!;
+    const endWidget = graph.nodes.find(
+      (n) => n.type === ApNodeType.GRAPH_END_WIDGET,
+    )!;
+    const containerBottom = container.position.y + container.data.height;
+    expect(returnNode.position.y).toBeGreaterThanOrEqual(container.position.y);
+    expect(returnNode.position.y).toBeLessThanOrEqual(containerBottom);
+    expect(endWidget.position.y).toBeGreaterThanOrEqual(container.position.y);
+    expect(endWidget.position.y).toBeLessThanOrEqual(containerBottom);
+  });
+
   it('container is not emitted when there are zero nodes', () => {
     const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
       buildAction([]),

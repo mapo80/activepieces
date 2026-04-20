@@ -684,7 +684,7 @@ const buildInteractiveFlowChildGraph = (
   const containerX = childrenMinX - containerPadding;
   const containerY = startY - containerPadding;
   const containerWidth = childrenMaxX - childrenMinX + 2 * containerPadding;
-  const containerHeight = childrenBottomY + containerPadding - containerY;
+  const containerHeight = subgraphEndY + containerPadding - containerY;
 
   const containerNode: ApInteractiveFlowContainerNode = {
     id: `${step.name}-interactive-flow-container`,
