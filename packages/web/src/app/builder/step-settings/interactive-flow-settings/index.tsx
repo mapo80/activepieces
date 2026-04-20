@@ -58,6 +58,11 @@ export const InteractiveFlowSettings = React.memo(
           </TabsList>
 
           <TabsContent value="general">
+            <p className="pb-3 text-xs text-muted-foreground">
+              {t(
+                'Greeting shown when the conversation starts, default locale of generated messages, and the expression used to seed the extractor on the very first turn.',
+              )}
+            </p>
             <div className="flex flex-col gap-3">
               <FormField
                 control={form.control}
@@ -67,7 +72,13 @@ export const InteractiveFlowSettings = React.memo(
                     <FormLabel>{t('Greeting Message (EN)')}</FormLabel>
                     <Input
                       disabled={readonly}
-                      onChange={(e) => field.onChange({ en: e.target.value })}
+                      onChange={(e) =>
+                        field.onChange(
+                          e.target.value === ''
+                            ? undefined
+                            : { en: e.target.value },
+                        )
+                      }
                       value={
                         typeof field.value === 'string'
                           ? field.value
@@ -102,19 +113,20 @@ export const InteractiveFlowSettings = React.memo(
                 name="settings.messageInput"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      {t('Initial message expression')}{' '}
-                      <span className="text-muted-foreground">
-                        (e.g. {'{{trigger.body.message}}'})
-                      </span>
-                    </FormLabel>
+                    <FormLabel>{t('Initial message expression')}</FormLabel>
                     <Input
                       disabled={readonly}
+                      placeholder="{{trigger.body.message}}"
                       value={field.value ?? ''}
                       onChange={(e) =>
                         field.onChange(e.target.value || undefined)
                       }
                     />
+                    <p className="text-xs text-muted-foreground">
+                      {t(
+                        'AP template expression read when the flow starts — use `{{trigger.body.message}}` to feed the field-extractor with the first free-text message from the webhook payload.',
+                      )}
+                    </p>
                   </FormItem>
                 )}
               />
@@ -122,6 +134,11 @@ export const InteractiveFlowSettings = React.memo(
           </TabsContent>
 
           <TabsContent value="gateway">
+            <p className="pb-3 text-xs text-muted-foreground">
+              {t(
+                'Which MCP Gateway powers the tool calls, and which AI provider/model the field-extractor uses to read free-text user messages into stateFields.',
+              )}
+            </p>
             <div className="flex flex-col gap-3">
               <FormField
                 control={form.control}
@@ -217,6 +234,11 @@ export const InteractiveFlowSettings = React.memo(
           </TabsContent>
 
           <TabsContent value="prompt">
+            <p className="pb-3 text-xs text-muted-foreground">
+              {t(
+                'Role and guardrails shared by the field-extractor and the question-generator LLMs. Keep it short; the full conversation context is already appended at runtime.',
+              )}
+            </p>
             <FormField
               control={form.control}
               name="settings.systemPrompt"
@@ -240,6 +262,11 @@ export const InteractiveFlowSettings = React.memo(
           </TabsContent>
 
           <TabsContent value="style">
+            <p className="pb-3 text-xs text-muted-foreground">
+              {t(
+                'Configures the LLM that generates pause-time questions for nodes whose message is set to `dynamic`. Pick the provider/model and one of the built-in style templates (e.g. banking_formal_it) to match your domain tone.',
+              )}
+            </p>
             <div className="flex flex-col gap-3">
               <FormField
                 control={form.control}
@@ -316,18 +343,27 @@ export const InteractiveFlowSettings = React.memo(
           </TabsContent>
 
           <TabsContent value="fields">
+            <p className="pb-3 text-xs text-muted-foreground">
+              {t(
+                'The conversation memory. Each row is one field the flow reads/writes. `extract` lets the field-extractor LLM fill it from free-text; `sensitive` redacts it from pause metadata and LLM prompts.',
+              )}
+            </p>
             <StateFieldsEditor readonly={readonly} />
           </TabsContent>
 
           <TabsContent value="nodes">
+            <p className="pb-3 text-xs text-muted-foreground">
+              {t(
+                'The sequence of TOOL / USER_INPUT / CONFIRM / BRANCH nodes. The `reads` / `writes` of each node on stateFields determine the execution order (no manual wiring needed).',
+              )}
+            </p>
             <NodesEditor readonly={readonly} />
           </TabsContent>
         </Tabs>
 
         <div className="text-sm text-muted-foreground">
-          {t('Interactive flow nodes: {{count}}', {
-            count: form.watch('settings.nodes')?.length ?? 0,
-          })}
+          {t('Interactive flow nodes')}:{' '}
+          {form.watch('settings.nodes')?.length ?? 0}
         </div>
       </div>
     );
