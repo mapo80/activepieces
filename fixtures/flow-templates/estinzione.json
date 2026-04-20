@@ -1,0 +1,207 @@
+{
+  "name": "Estinzione Rapporto Bancario",
+  "description": "Flow INTERACTIVE_FLOW per l'estinzione di un rapporto bancario: identificazione cliente, selezione rapporto, scelta motivazione + data, generazione modulo PDF, conferma e invio pratica al Core Banking via MCP.",
+  "type": "FLOW",
+  "flows": [
+    {
+      "displayName": "Estinzione Rapporto",
+      "schemaVersion": "20",
+      "trigger": {
+        "name": "trigger",
+        "type": "PIECE_TRIGGER",
+        "displayName": "Catch Webhook",
+        "valid": true,
+        "settings": {
+          "pieceName": "@activepieces/piece-webhook",
+          "pieceVersion": "__AUTO_PIECE_VERSION__",
+          "triggerName": "catch_webhook",
+          "input": { "authType": "none" },
+          "propertySettings": {}
+        },
+        "nextAction": {
+          "name": "interactive_flow",
+          "type": "INTERACTIVE_FLOW",
+          "displayName": "Estinzione",
+          "valid": true,
+          "skip": false,
+          "settings": {
+            "mcpGatewayId": "__AUTO_MCP_GATEWAY__",
+            "messageInput": "{{trigger.body.message}}",
+            "systemPrompt": "Sei un assistente bancario esperto in estinzione rapporti bancari. Estrai SOLO i campi realmente presenti nel messaggio dell'utente; non inventare mai dati. Regole di estrazione per campo:\n- `customerName`: un cognome o nome+cognome (es. \"Bellafronte\", \"Mario Rossi\").\n- `ndg`: una sequenza numerica di 6-10 cifre (es. \"11255521\"). Se l'utente dice \"il primo\" o \"seleziona il primo\", NON inferire.\n- `rapportoId`: un identificativo nel formato XX-XXX-XXXXXXXX (es. \"01-034-00392400\").\n- `closureReasonCode`: codice 2 cifre della motivazione (es. \"01\"). Se l'utente cita la descrizione (es. \"trasferimento estero\"), mappa alla motivazione piu' pertinente dalla lista nota.\n- `closureDate`: data in formato ISO YYYY-MM-DD.\n- `confirmed`: true solo se l'utente conferma esplicitamente (es. \"sì, confermo\", \"procedi\", \"ok\").",
+            "fieldExtractor": {
+              "aiProviderId": "custom",
+              "model": "claude-cli"
+            },
+            "questionGenerator": {
+              "aiProviderId": "custom",
+              "model": "claude-cli",
+              "styleTemplate": "banking_formal_it"
+            },
+            "stateFields": [
+              { "name": "customerName", "type": "string", "extractable": true, "description": "Cognome o nome completo cliente" },
+              { "name": "customerMatches", "type": "array" },
+              { "name": "ndg", "type": "string", "extractable": true, "description": "Numero Dossier Generale (6-10 cifre)" },
+              { "name": "profile", "type": "object" },
+              { "name": "accounts", "type": "array" },
+              { "name": "rapportoId", "type": "string", "extractable": true, "description": "Identificativo rapporto formato NN-NNN-NNNNNNNN" },
+              { "name": "closureReasons", "type": "array" },
+              { "name": "closureReasonCode", "type": "string", "extractable": true, "description": "Codice motivazione 2 cifre (01-32, 98)" },
+              { "name": "closureDate", "type": "string", "extractable": true, "format": "date", "description": "Data di efficacia in formato YYYY-MM-DD" },
+              { "name": "moduleBase64", "type": "string" },
+              { "name": "confirmed", "type": "boolean", "extractable": true, "description": "Conferma finale esplicita dell'utente" },
+              { "name": "caseId", "type": "string" }
+            ],
+            "nodes": [
+              {
+                "id": "search_customer",
+                "name": "search_customer",
+                "displayName": "Cerca cliente",
+                "nodeType": "TOOL",
+                "stateInputs": ["customerName"],
+                "stateOutputs": ["customerMatches"],
+                "tool": "banking-customers/search_customer",
+                "toolParams": {
+                  "name": { "kind": "state", "field": "customerName" }
+                }
+              },
+              {
+                "id": "pick_ndg",
+                "name": "pick_ndg",
+                "displayName": "Seleziona NDG",
+                "nodeType": "USER_INPUT",
+                "stateInputs": ["customerMatches"],
+                "stateOutputs": ["ndg"],
+                "render": {
+                  "component": "DataTable",
+                  "props": { "sourceField": "customerMatches" }
+                },
+                "message": {
+                  "dynamic": true,
+                  "fallback": { "it": "Seleziona il NDG del cliente dalla lista." },
+                  "systemPromptAddendum": "Saluta brevemente e mostra quanti clienti sono stati trovati, citando i nomi e gli NDG dallo state `customerMatches`. Chiedi di selezionare un NDG per procedere. 1-2 frasi, italiano, tono bancario professionale. Non inventare dati."
+                }
+              },
+              {
+                "id": "load_profile",
+                "name": "load_profile",
+                "displayName": "Carica profilo cliente",
+                "nodeType": "TOOL",
+                "stateInputs": ["ndg"],
+                "stateOutputs": ["profile"],
+                "tool": "banking-customers/get_profile",
+                "toolParams": {
+                  "ndg": { "kind": "state", "field": "ndg" }
+                }
+              },
+              {
+                "id": "load_accounts",
+                "name": "load_accounts",
+                "displayName": "Carica rapporti cliente",
+                "nodeType": "TOOL",
+                "stateInputs": ["ndg"],
+                "stateOutputs": ["accounts"],
+                "tool": "banking-accounts/list_accounts",
+                "toolParams": {
+                  "ndg": { "kind": "state", "field": "ndg" }
+                }
+              },
+              {
+                "id": "pick_rapporto",
+                "name": "pick_rapporto",
+                "displayName": "Seleziona rapporto",
+                "nodeType": "USER_INPUT",
+                "stateInputs": ["accounts"],
+                "stateOutputs": ["rapportoId"],
+                "render": {
+                  "component": "DataTable",
+                  "props": { "sourceField": "accounts" }
+                },
+                "message": {
+                  "dynamic": true,
+                  "fallback": { "it": "Seleziona il rapporto da estinguere." },
+                  "systemPromptAddendum": "Conferma il cliente scelto citando nome e NDG dallo state `profile`/`ndg`. Indica quanti rapporti sono disponibili dallo state `accounts` e chiedi quale estinguere, suggerendo il formato NN-NNN-NNNNNNNN. 1-2 frasi, italiano, tono bancario professionale."
+                }
+              },
+              {
+                "id": "load_reasons",
+                "name": "load_reasons",
+                "displayName": "Carica motivazioni",
+                "nodeType": "TOOL",
+                "stateInputs": ["rapportoId"],
+                "stateOutputs": ["closureReasons"],
+                "tool": "banking-operations/list_closure_reasons",
+                "toolParams": {}
+              },
+              {
+                "id": "collect_reason_and_date",
+                "name": "collect_reason_and_date",
+                "displayName": "Motivazione e data",
+                "nodeType": "USER_INPUT",
+                "stateInputs": ["closureReasons"],
+                "stateOutputs": ["closureReasonCode", "closureDate"],
+                "render": {
+                  "component": "ClosureForm",
+                  "props": { "sourceField": "closureReasons" }
+                },
+                "message": {
+                  "dynamic": true,
+                  "fallback": { "it": "Scegli motivazione e data di efficacia." },
+                  "systemPromptAddendum": "Conferma il rapporto scelto dallo state `rapportoId`. Chiedi di indicare la motivazione di estinzione (codice 2 cifre, dal catalogo in `closureReasons`) e la data di efficacia in formato YYYY-MM-DD. Elenca massimo 3 motivazioni tipiche tra quelle più comuni. 2-3 frasi, italiano, tono bancario professionale."
+                }
+              },
+              {
+                "id": "generate_pdf",
+                "name": "generate_pdf",
+                "displayName": "Genera modulo PDF",
+                "nodeType": "TOOL",
+                "stateInputs": ["ndg", "rapportoId", "closureReasonCode", "closureDate"],
+                "stateOutputs": ["moduleBase64"],
+                "tool": "banking-operations/generate_module",
+                "toolParams": {
+                  "data": {
+                    "kind": "compose",
+                    "fields": ["ndg", "rapportoId", "closureReasonCode", "closureDate"]
+                  }
+                },
+                "outputMap": { "moduleBase64": "base64" }
+              },
+              {
+                "id": "confirm_closure",
+                "name": "confirm_closure",
+                "displayName": "Conferma finale",
+                "nodeType": "CONFIRM",
+                "stateInputs": ["moduleBase64"],
+                "stateOutputs": ["confirmed"],
+                "render": {
+                  "component": "ConfirmCard",
+                  "props": { "sourceField": "moduleBase64" }
+                },
+                "message": {
+                  "dynamic": true,
+                  "fallback": { "it": "Confermi l'invio della pratica di estinzione?" },
+                  "systemPromptAddendum": "Riepiloga in modo chiaro: il NDG, il rapporto, la motivazione scelta (codice + descrizione dallo state `closureReasons`) e la data di efficacia. Avvisa che il modulo PDF è pronto. Chiedi conferma esplicita prima di inviare la pratica al Core Banking. 2-3 frasi, italiano, tono bancario professionale."
+                }
+              },
+              {
+                "id": "submit",
+                "name": "submit",
+                "displayName": "Invia pratica",
+                "nodeType": "TOOL",
+                "stateInputs": ["confirmed", "ndg", "rapportoId", "closureReasonCode", "closureDate"],
+                "stateOutputs": ["caseId"],
+                "tool": "banking-operations/submit_closure",
+                "toolParams": {
+                  "request": {
+                    "kind": "compose",
+                    "fields": ["ndg", "rapportoId", "closureReasonCode", "closureDate"]
+                  }
+                },
+                "outputMap": { "caseId": "praticaId" }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
