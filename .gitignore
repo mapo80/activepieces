@@ -86,6 +86,8 @@ scratch.md
 /blob-report/
 /playwright/.cache/
 /redis-binaries/
+packages/tests-e2e/test-results/
+packages/tests-e2e/playwright-report/
 
 # Terraform
 deploy/terraform/**/.terraform/
