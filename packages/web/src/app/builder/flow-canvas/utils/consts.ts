@@ -9,6 +9,7 @@ import {
   NoteColorVariant,
 } from '@activepieces/shared';
 
+import { ApInteractiveFlowDataCanvasEdge } from '../edges/interactive-flow-data-edge';
 import { ApLoopReturnLineCanvasEdge as ApLoopReturnCanvasEdge } from '../edges/loop-return-edge';
 import { ApLoopStartLineCanvasEdge as ApLoopStartCanvasEdge } from '../edges/loop-start-edge';
 import { ApRouterEndCanvasEdge } from '../edges/router-end-edge';
@@ -16,6 +17,7 @@ import { ApRouterStartCanvasEdge } from '../edges/router-start-edge';
 import { ApStraightLineCanvasEdge } from '../edges/straight-line-edge';
 import { ApBigAddButtonCanvasNode } from '../nodes/big-add-button-node';
 import ApGraphEndWidgetNode from '../nodes/flow-end-widget-node';
+import { ApInteractiveFlowChildCanvasNode } from '../nodes/interactive-flow-child-node';
 import ApInteractiveFlowReturnCanvasNode from '../nodes/interactive-flow-return-node';
 import ApLoopReturnCanvasNode from '../nodes/loop-return-node';
 import { ApNoteCanvasNode } from '../nodes/note-node';
@@ -70,6 +72,10 @@ const AP_NODE_SIZE: Record<
     height: FLOW_CANVAS_STEP_HEIGHT,
     width: FLOW_CANVAS_STEP_WIDTH,
   },
+  [ApNodeType.INTERACTIVE_FLOW_CHILD]: {
+    height: FLOW_CANVAS_STEP_HEIGHT,
+    width: FLOW_CANVAS_STEP_WIDTH,
+  },
   [ApNodeType.GRAPH_END_WIDGET]: {
     height: 0,
     width: 0,
@@ -82,11 +88,13 @@ const doesNodeAffectBoundingBoxWidth: (
   | ApNodeType.BIG_ADD_BUTTON
   | ApNodeType.STEP
   | ApNodeType.LOOP_RETURN_NODE
-  | ApNodeType.INTERACTIVE_FLOW_RETURN_NODE = (type) =>
+  | ApNodeType.INTERACTIVE_FLOW_RETURN_NODE
+  | ApNodeType.INTERACTIVE_FLOW_CHILD = (type) =>
   type === ApNodeType.BIG_ADD_BUTTON ||
   type === ApNodeType.STEP ||
   type === ApNodeType.LOOP_RETURN_NODE ||
-  type === ApNodeType.INTERACTIVE_FLOW_RETURN_NODE;
+  type === ApNodeType.INTERACTIVE_FLOW_RETURN_NODE ||
+  type === ApNodeType.INTERACTIVE_FLOW_CHILD;
 export const flowCanvasConsts = {
   ARC_LENGTH,
   ARC_LEFT,
@@ -111,12 +119,14 @@ export const flowCanvasConsts = {
     [ApEdgeType.LOOP_RETURN_EDGE]: ApLoopReturnCanvasEdge,
     [ApEdgeType.ROUTER_START_EDGE]: ApRouterStartCanvasEdge,
     [ApEdgeType.ROUTER_END_EDGE]: ApRouterEndCanvasEdge,
+    [ApEdgeType.INTERACTIVE_FLOW_DATA_EDGE]: ApInteractiveFlowDataCanvasEdge,
   },
   nodeTypes: {
     [ApNodeType.STEP]: ApStepCanvasNode,
     [ApNodeType.LOOP_RETURN_NODE]: ApLoopReturnCanvasNode,
     [ApNodeType.INTERACTIVE_FLOW_RETURN_NODE]:
       ApInteractiveFlowReturnCanvasNode,
+    [ApNodeType.INTERACTIVE_FLOW_CHILD]: ApInteractiveFlowChildCanvasNode,
     [ApNodeType.BIG_ADD_BUTTON]: ApBigAddButtonCanvasNode,
     [ApNodeType.GRAPH_END_WIDGET]: ApGraphEndWidgetNode,
     [ApNodeType.NOTE]: ApNoteCanvasNode,

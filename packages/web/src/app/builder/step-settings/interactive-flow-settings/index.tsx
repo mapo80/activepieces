@@ -36,8 +36,12 @@ export const InteractiveFlowSettings = React.memo(
               <FormLabel>{t('Greeting Message')}</FormLabel>
               <Input
                 disabled={readonly}
-                onChange={field.onChange}
-                value={field.value ?? ''}
+                onChange={(e) => field.onChange({ en: e.target.value })}
+                value={
+                  typeof field.value === 'string'
+                    ? field.value
+                    : field.value?.en ?? ''
+                }
                 placeholder={t('Welcome message for the interactive flow')}
               />
             </FormItem>

@@ -2,6 +2,7 @@ import {
   FlowAction,
   StepLocationRelativeToParent,
   FlowTrigger,
+  InteractiveFlowNode,
   Note,
 } from '@activepieces/shared';
 import { Edge } from '@xyflow/react';
@@ -16,6 +17,8 @@ export enum ApNodeType {
   LOOP_RETURN_NODE = 'LOOP_RETURN_NODE',
   /**Used for calculating the interactive flow graph width */
   INTERACTIVE_FLOW_RETURN_NODE = 'INTERACTIVE_FLOW_RETURN_NODE',
+  /**Child node for an interactive-flow action (TOOL, USER_INPUT, CONFIRM, BRANCH) */
+  INTERACTIVE_FLOW_CHILD = 'INTERACTIVE_FLOW_CHILD',
   NOTE = 'NOTE',
 }
 export type ApBoundingBox = {
@@ -114,12 +117,29 @@ export type ApInteractiveFlowReturnNode = {
   selectable?: boolean;
 };
 
+export type ApInteractiveFlowChildNode = {
+  id: string;
+  type: ApNodeType.INTERACTIVE_FLOW_CHILD;
+  position: {
+    x: number;
+    y: number;
+  };
+  data: {
+    parentStepName: string;
+    node: InteractiveFlowNode;
+    hasDrift?: boolean;
+    isExtractorTarget?: boolean;
+  };
+  selectable?: boolean;
+};
+
 export type ApNode =
   | ApStepNode
   | ApGraphEndNode
   | ApBigAddButtonNode
   | ApLoopReturnNode
   | ApInteractiveFlowReturnNode
+  | ApInteractiveFlowChildNode
   | ApNoteNode;
 
 export enum ApEdgeType {
@@ -129,6 +149,7 @@ export enum ApEdgeType {
   LOOP_RETURN_EDGE = 'ApLoopReturnEdge',
   ROUTER_START_EDGE = 'ApRouterStartEdge',
   ROUTER_END_EDGE = 'ApRouterEndEdge',
+  INTERACTIVE_FLOW_DATA_EDGE = 'ApInteractiveFlowDataEdge',
 }
 
 export type ApStraightLineEdge = Edge & {
@@ -191,12 +212,22 @@ export type ApRouterEndEdge = Edge & {
   );
 };
 
+export type ApInteractiveFlowDataEdge = Edge & {
+  type: ApEdgeType.INTERACTIVE_FLOW_DATA_EDGE;
+  data: {
+    fieldName?: string;
+    branchName?: string;
+    parentStepName: string;
+  };
+};
+
 export type ApEdge =
   | ApLoopStartEdge
   | ApLoopReturnEdge
   | ApStraightLineEdge
   | ApRouterStartEdge
-  | ApRouterEndEdge;
+  | ApRouterEndEdge
+  | ApInteractiveFlowDataEdge;
 export type ApGraph = {
   nodes: ApNode[];
   edges: ApEdge[];

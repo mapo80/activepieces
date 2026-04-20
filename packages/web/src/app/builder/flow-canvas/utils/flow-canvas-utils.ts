@@ -5,6 +5,9 @@ import {
   FlowRun,
   flowStructureUtil,
   FlowVersion,
+  InteractiveFlowBranchNode,
+  InteractiveFlowNode,
+  InteractiveFlowNodeType,
   isNil,
   LoopOnItemsAction,
   RouterAction,
@@ -27,6 +30,8 @@ import {
   ApEdgeType,
   ApGraph,
   ApGraphEndNode,
+  ApInteractiveFlowChildNode,
+  ApInteractiveFlowDataEdge,
   ApLoopReturnNode,
   ApNode,
   ApNodeType,
@@ -436,6 +441,53 @@ const offsetRouterChildSteps = (childGraphs: ApGraph[]) => {
   });
 };
 
+function assignInteractiveFlowLayers(
+  nodes: InteractiveFlowNode[],
+): Map<string, number> {
+  const producer = new Map<string, string>();
+  for (const n of nodes) {
+    for (const out of n.stateOutputs) {
+      if (!producer.has(out)) producer.set(out, n.id);
+    }
+  }
+  const layer = new Map<string, number>();
+  const visiting = new Set<string>();
+  function resolve(nodeId: string): number {
+    if (layer.has(nodeId)) return layer.get(nodeId)!;
+    if (visiting.has(nodeId)) return 0;
+    visiting.add(nodeId);
+    const node = nodes.find((n) => n.id === nodeId);
+    if (isNil(node)) {
+      visiting.delete(nodeId);
+      return 0;
+    }
+    let maxUpstream = -1;
+    for (const input of node.stateInputs) {
+      const up = producer.get(input);
+      if (!isNil(up) && up !== nodeId) {
+        maxUpstream = Math.max(maxUpstream, resolve(up));
+      }
+    }
+    const level = maxUpstream + 1;
+    layer.set(nodeId, level);
+    visiting.delete(nodeId);
+    return level;
+  }
+  for (const n of nodes) resolve(n.id);
+  return layer;
+}
+
+function findUpstreamField(
+  targetNode: InteractiveFlowNode,
+  nodes: InteractiveFlowNode[],
+): { sourceId: string; fieldName: string } | null {
+  for (const input of targetNode.stateInputs) {
+    const source = nodes.find((n) => n.stateOutputs.includes(input));
+    if (!isNil(source)) return { sourceId: source.id, fieldName: input };
+  }
+  return null;
+}
+
 const buildInteractiveFlowChildGraph = (
   step: InteractiveFlowAction,
 ): ApGraph => {
@@ -449,39 +501,55 @@ const buildInteractiveFlowChildGraph = (
   const vSpace = flowCanvasConsts.VERTICAL_SPACE_BETWEEN_STEPS;
   const startY =
     stepHeight + flowCanvasConsts.VERTICAL_OFFSET_BETWEEN_LOOP_AND_CHILD;
+  const baseX = stepWidth + flowCanvasConsts.HORIZONTAL_SPACE_BETWEEN_NODES;
 
-  const childNodes: ApNode[] = interactiveNodes.map((node, index) => ({
-    id: `${step.name}-iflow-${node.id}`,
-    type: ApNodeType.STEP as const,
-    position: {
-      x: stepWidth + flowCanvasConsts.HORIZONTAL_SPACE_BETWEEN_NODES,
-      y: startY + index * (stepHeight + vSpace),
-    },
-    data: {
-      step: {
-        name: `${step.name}_${node.name}`,
-        displayName: node.displayName,
-        type: FlowActionType.PIECE,
-        valid: true,
-        settings: {
-          input: {},
-          pieceName: node.tool ?? 'interactive-flow',
-          pieceVersion: '0.0.0',
-          actionName: node.nodeType,
-          propertySettings: {},
+  const layers = assignInteractiveFlowLayers(interactiveNodes);
+  const ordered = [...interactiveNodes].sort((a, b) => {
+    const la = layers.get(a.id) ?? 0;
+    const lb = layers.get(b.id) ?? 0;
+    if (la !== lb) return la - lb;
+    return interactiveNodes.indexOf(a) - interactiveNodes.indexOf(b);
+  });
+
+  const nodeIdToCanvasId = new Map<string, string>();
+  const childNodes: ApInteractiveFlowChildNode[] = ordered.map(
+    (node, index) => {
+      const canvasId = `${step.name}-iflow-${node.id}`;
+      nodeIdToCanvasId.set(node.id, canvasId);
+      return {
+        id: canvasId,
+        type: ApNodeType.INTERACTIVE_FLOW_CHILD,
+        position: {
+          x: baseX,
+          y: startY + index * (stepHeight + vSpace),
         },
-      } as FlowAction,
+        data: {
+          parentStepName: step.name,
+          node,
+          hasDrift:
+            node.nodeType === InteractiveFlowNodeType.TOOL &&
+            !isNil(node.toolInputSchemaSnapshot) &&
+            isNil(node.toolInputSchemaSnapshot.schema),
+          isExtractorTarget:
+            node.nodeType !== InteractiveFlowNodeType.BRANCH &&
+            node.stateOutputs.some((out) => {
+              const field = step.settings.stateFields.find(
+                (f) => f.name === out,
+              );
+              return !isNil(field) && field.extractable !== false;
+            }),
+        },
+        selectable: false,
+      };
     },
-    selectable: false,
-  }));
+  );
 
-  const lastChildY =
-    startY + (interactiveNodes.length - 1) * (stepHeight + vSpace);
+  const lastChildY = startY + (ordered.length - 1) * (stepHeight + vSpace);
   const returnNode: ApNode = {
     id: `${step.name}-interactive-flow-return-node`,
     type: ApNodeType.INTERACTIVE_FLOW_RETURN_NODE,
     position: {
-      x: stepWidth + flowCanvasConsts.HORIZONTAL_SPACE_BETWEEN_NODES,
+      x: baseX,
       y: lastChildY + stepHeight + vSpace,
     },
     data: {},
@@ -499,7 +567,7 @@ const buildInteractiveFlowChildGraph = (
     selectable: false,
   };
 
-  const edges: ApEdge[] = [
+  const wrapperEdges: ApEdge[] = [
     {
       id: `${step.name}-interactive-flow-start-edge`,
       source: step.name,
@@ -521,22 +589,54 @@ const buildInteractiveFlowChildGraph = (
     },
   ];
 
-  const childEdges: ApEdge[] = childNodes.slice(0, -1).map((node, index) => ({
-    id: `${step.name}-iflow-edge-${index}`,
-    source: node.id,
-    target: childNodes[index + 1].id,
-    type: ApEdgeType.STRAIGHT_LINE,
-    data: {
-      drawArrowHead: true,
-      parentStepName: step.name,
-    },
-  }));
+  const seenEdgeKeys = new Set<string>();
+  const childEdges: ApInteractiveFlowDataEdge[] = [];
+  ordered.forEach((node, index) => {
+    if (index === 0) return;
+    const prev = ordered[index - 1];
+    const upstream = findUpstreamField(node, interactiveNodes);
+    const sourceCanvas =
+      !isNil(upstream) && nodeIdToCanvasId.has(upstream.sourceId)
+        ? nodeIdToCanvasId.get(upstream.sourceId)!
+        : nodeIdToCanvasId.get(prev.id)!;
+    const targetCanvas = nodeIdToCanvasId.get(node.id)!;
+    const key = `${sourceCanvas}->${targetCanvas}`;
+    if (seenEdgeKeys.has(key)) return;
+    seenEdgeKeys.add(key);
+    const branchHit = findBranchEdgeLabel(node, interactiveNodes);
+    childEdges.push({
+      id: `${step.name}-iflow-data-edge-${index}`,
+      source: sourceCanvas,
+      target: targetCanvas,
+      type: ApEdgeType.INTERACTIVE_FLOW_DATA_EDGE,
+      data: {
+        parentStepName: step.name,
+        fieldName: upstream?.fieldName,
+        branchName: branchHit,
+      },
+    });
+  });
 
   return {
     nodes: [...childNodes, returnNode, subgraphEndSubNode],
-    edges: [...edges, ...childEdges],
+    edges: [...wrapperEdges, ...childEdges],
   };
 };
+
+function findBranchEdgeLabel(
+  targetNode: InteractiveFlowNode,
+  nodes: InteractiveFlowNode[],
+): string | undefined {
+  for (const n of nodes) {
+    if (n.nodeType !== InteractiveFlowNodeType.BRANCH) continue;
+    const branchNode = n as InteractiveFlowBranchNode;
+    const matching = branchNode.branches.find((b) =>
+      b.targetNodeIds.includes(targetNode.id),
+    );
+    if (!isNil(matching)) return matching.branchName;
+  }
+  return undefined;
+}
 
 const createAddOperationFromAddButtonData = (data: ApButtonData) => {
   if (
@@ -662,4 +762,5 @@ export const flowCanvasUtils = {
   getStepStatus,
   determineInitiallySelectedStep,
   doesSelectionRectangleExist,
+  buildInteractiveFlowChildGraph,
 };
