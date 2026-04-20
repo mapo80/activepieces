@@ -136,20 +136,37 @@
                 "toolParams": {}
               },
               {
-                "id": "collect_reason_and_date",
-                "name": "collect_reason_and_date",
-                "displayName": "Motivazione e data",
+                "id": "collect_reason",
+                "name": "collect_reason",
+                "displayName": "Motivazione",
                 "nodeType": "USER_INPUT",
                 "stateInputs": ["closureReasons"],
-                "stateOutputs": ["closureReasonCode", "closureDate"],
+                "stateOutputs": ["closureReasonCode"],
                 "render": {
-                  "component": "ClosureForm",
+                  "component": "ClosureReasonPicker",
                   "props": { "sourceField": "closureReasons" }
                 },
                 "message": {
                   "dynamic": true,
-                  "fallback": { "it": "Scegli motivazione e data di efficacia." },
-                  "systemPromptAddendum": "Conferma il rapporto scelto dallo state `rapportoId`. Chiedi di indicare la motivazione di estinzione (codice 2 cifre, dal catalogo in `closureReasons`) e la data di efficacia in formato YYYY-MM-DD. Elenca massimo 3 motivazioni tipiche tra quelle più comuni. 2-3 frasi, italiano, tono bancario professionale."
+                  "fallback": { "it": "Scegli la motivazione di estinzione." },
+                  "systemPromptAddendum": "Conferma il rapporto scelto dallo state `rapportoId`. Chiedi di indicare la motivazione di estinzione (codice 2 cifre, dal catalogo in `closureReasons`). Elenca massimo 3 motivazioni tipiche. 1-2 frasi, italiano, tono bancario professionale."
+                }
+              },
+              {
+                "id": "collect_date",
+                "name": "collect_date",
+                "displayName": "Data efficacia",
+                "nodeType": "USER_INPUT",
+                "stateInputs": [],
+                "stateOutputs": ["closureDate"],
+                "render": {
+                  "component": "DatePicker",
+                  "props": { "format": "YYYY-MM-DD" }
+                },
+                "message": {
+                  "dynamic": true,
+                  "fallback": { "it": "Indica la data di efficacia." },
+                  "systemPromptAddendum": "Chiedi la data di efficacia in formato YYYY-MM-DD. 1 frase, italiano, tono bancario professionale."
                 }
               },
               {
@@ -173,7 +190,7 @@
                 "name": "confirm_closure",
                 "displayName": "Conferma finale",
                 "nodeType": "CONFIRM",
-                "stateInputs": ["moduleBase64"],
+                "stateInputs": ["moduleBase64", "profile"],
                 "stateOutputs": ["confirmed"],
                 "render": {
                   "component": "ConfirmCard",

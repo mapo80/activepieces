@@ -3,6 +3,7 @@ import {
   StepLocationRelativeToParent,
   FlowTrigger,
   InteractiveFlowNode,
+  InteractiveFlowPhase,
   Note,
 } from '@activepieces/shared';
 import { Edge } from '@xyflow/react';
@@ -19,6 +20,8 @@ export enum ApNodeType {
   INTERACTIVE_FLOW_RETURN_NODE = 'INTERACTIVE_FLOW_RETURN_NODE',
   /**Child node for an interactive-flow action (TOOL, USER_INPUT, CONFIRM, BRANCH) */
   INTERACTIVE_FLOW_CHILD = 'INTERACTIVE_FLOW_CHILD',
+  /**Dashed container around the interactive-flow subgraph */
+  INTERACTIVE_FLOW_CONTAINER = 'INTERACTIVE_FLOW_CONTAINER',
   NOTE = 'NOTE',
 }
 export type ApBoundingBox = {
@@ -129,8 +132,29 @@ export type ApInteractiveFlowChildNode = {
     node: InteractiveFlowNode;
     hasDrift?: boolean;
     isExtractorTarget?: boolean;
+    phaseId?: string;
+    phases?: InteractiveFlowPhase[];
   };
   selectable?: boolean;
+  zIndex?: number;
+};
+
+export type ApInteractiveFlowContainerNode = {
+  id: string;
+  type: ApNodeType.INTERACTIVE_FLOW_CONTAINER;
+  position: {
+    x: number;
+    y: number;
+  };
+  data: {
+    parentStepName: string;
+    parentDisplayName: string;
+    width: number;
+    height: number;
+  };
+  selectable?: boolean;
+  draggable?: boolean;
+  zIndex?: number;
 };
 
 export type ApNode =
@@ -140,6 +164,7 @@ export type ApNode =
   | ApLoopReturnNode
   | ApInteractiveFlowReturnNode
   | ApInteractiveFlowChildNode
+  | ApInteractiveFlowContainerNode
   | ApNoteNode;
 
 export enum ApEdgeType {
@@ -150,6 +175,8 @@ export enum ApEdgeType {
   ROUTER_START_EDGE = 'ApRouterStartEdge',
   ROUTER_END_EDGE = 'ApRouterEndEdge',
   INTERACTIVE_FLOW_DATA_EDGE = 'ApInteractiveFlowDataEdge',
+  INTERACTIVE_FLOW_START_EDGE = 'ApInteractiveFlowStartEdge',
+  INTERACTIVE_FLOW_RETURN_EDGE = 'ApInteractiveFlowReturnEdge',
 }
 
 export type ApStraightLineEdge = Edge & {
@@ -215,9 +242,27 @@ export type ApRouterEndEdge = Edge & {
 export type ApInteractiveFlowDataEdge = Edge & {
   type: ApEdgeType.INTERACTIVE_FLOW_DATA_EDGE;
   data: {
-    fieldName?: string;
+    fieldNames: string[];
     branchName?: string;
     parentStepName: string;
+    isSkipConnection?: boolean;
+    sourceDisplayName?: string;
+    targetDisplayName?: string;
+  };
+};
+
+export type ApInteractiveFlowStartEdge = Edge & {
+  type: ApEdgeType.INTERACTIVE_FLOW_START_EDGE;
+  data: {
+    parentStepName: string;
+  };
+};
+
+export type ApInteractiveFlowReturnEdge = Edge & {
+  type: ApEdgeType.INTERACTIVE_FLOW_RETURN_EDGE;
+  data: {
+    parentStepName: string;
+    drawArrowHeadAfterEnd: boolean;
   };
 };
 
@@ -227,7 +272,9 @@ export type ApEdge =
   | ApStraightLineEdge
   | ApRouterStartEdge
   | ApRouterEndEdge
-  | ApInteractiveFlowDataEdge;
+  | ApInteractiveFlowDataEdge
+  | ApInteractiveFlowStartEdge
+  | ApInteractiveFlowReturnEdge;
 export type ApGraph = {
   nodes: ApNode[];
   edges: ApEdge[];

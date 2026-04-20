@@ -1498,5 +1498,11 @@
   "McpGateway.invalidUrl": "Please enter a valid URL",
   "MCP Gateway": "MCP Gateway",
   "Select an MCP gateway": "Select an MCP gateway",
-  "Create one": "Create one"
+  "Create one": "Create one",
+  "Interactive Flow": "Interactive Flow",
+  "READS": "READS",
+  "WRITES": "WRITES",
+  "branches": "branches",
+  "skip connection": "skip connection",
+  "Data flow {{fields}} from {{source}} to {{target}}": "Data flow {{fields}} from {{source}} to {{target}}"
 }

@@ -1,6 +1,7 @@
 import {
   FLOW_CANVAS_ARC,
   FLOW_CANVAS_HSPACE,
+  FLOW_CANVAS_INTERACTIVE_FLOW_CHILD_HEIGHT,
   FLOW_CANVAS_LOOP_VOFFSET,
   FLOW_CANVAS_ROUTER_VOFFSET,
   FLOW_CANVAS_STEP_HEIGHT,
@@ -10,6 +11,8 @@ import {
 } from '@activepieces/shared';
 
 import { ApInteractiveFlowDataCanvasEdge } from '../edges/interactive-flow-data-edge';
+import { ApInteractiveFlowReturnCanvasEdge } from '../edges/interactive-flow-return-edge';
+import { ApInteractiveFlowStartCanvasEdge } from '../edges/interactive-flow-start-edge';
 import { ApLoopReturnLineCanvasEdge as ApLoopReturnCanvasEdge } from '../edges/loop-return-edge';
 import { ApLoopStartLineCanvasEdge as ApLoopStartCanvasEdge } from '../edges/loop-start-edge';
 import { ApRouterEndCanvasEdge } from '../edges/router-end-edge';
@@ -18,6 +21,7 @@ import { ApStraightLineCanvasEdge } from '../edges/straight-line-edge';
 import { ApBigAddButtonCanvasNode } from '../nodes/big-add-button-node';
 import ApGraphEndWidgetNode from '../nodes/flow-end-widget-node';
 import { ApInteractiveFlowChildCanvasNode } from '../nodes/interactive-flow-child-node';
+import { ApInteractiveFlowContainerCanvasNode } from '../nodes/interactive-flow-container-node';
 import ApInteractiveFlowReturnCanvasNode from '../nodes/interactive-flow-return-node';
 import ApLoopReturnCanvasNode from '../nodes/loop-return-node';
 import { ApNoteCanvasNode } from '../nodes/note-node';
@@ -73,8 +77,12 @@ const AP_NODE_SIZE: Record<
     width: FLOW_CANVAS_STEP_WIDTH,
   },
   [ApNodeType.INTERACTIVE_FLOW_CHILD]: {
-    height: FLOW_CANVAS_STEP_HEIGHT,
+    height: FLOW_CANVAS_INTERACTIVE_FLOW_CHILD_HEIGHT,
     width: FLOW_CANVAS_STEP_WIDTH,
+  },
+  [ApNodeType.INTERACTIVE_FLOW_CONTAINER]: {
+    height: 0,
+    width: 0,
   },
   [ApNodeType.GRAPH_END_WIDGET]: {
     height: 0,
@@ -120,6 +128,9 @@ export const flowCanvasConsts = {
     [ApEdgeType.ROUTER_START_EDGE]: ApRouterStartCanvasEdge,
     [ApEdgeType.ROUTER_END_EDGE]: ApRouterEndCanvasEdge,
     [ApEdgeType.INTERACTIVE_FLOW_DATA_EDGE]: ApInteractiveFlowDataCanvasEdge,
+    [ApEdgeType.INTERACTIVE_FLOW_START_EDGE]: ApInteractiveFlowStartCanvasEdge,
+    [ApEdgeType.INTERACTIVE_FLOW_RETURN_EDGE]:
+      ApInteractiveFlowReturnCanvasEdge,
   },
   nodeTypes: {
     [ApNodeType.STEP]: ApStepCanvasNode,
@@ -127,6 +138,8 @@ export const flowCanvasConsts = {
     [ApNodeType.INTERACTIVE_FLOW_RETURN_NODE]:
       ApInteractiveFlowReturnCanvasNode,
     [ApNodeType.INTERACTIVE_FLOW_CHILD]: ApInteractiveFlowChildCanvasNode,
+    [ApNodeType.INTERACTIVE_FLOW_CONTAINER]:
+      ApInteractiveFlowContainerCanvasNode,
     [ApNodeType.BIG_ADD_BUTTON]: ApBigAddButtonCanvasNode,
     [ApNodeType.GRAPH_END_WIDGET]: ApGraphEndWidgetNode,
     [ApNodeType.NOTE]: ApNoteCanvasNode,

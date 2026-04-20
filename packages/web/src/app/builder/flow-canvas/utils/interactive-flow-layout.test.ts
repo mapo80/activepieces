@@ -1,169 +1,470 @@
 // @vitest-environment jsdom
 import {
+  FLOW_CANVAS_INTERACTIVE_FLOW_CHILD_HEIGHT,
+  FLOW_CANVAS_STEP_WIDTH,
   FlowActionType,
   InteractiveFlowAction,
+  InteractiveFlowNode,
   InteractiveFlowNodeType,
+  InteractiveFlowPhase,
 } from '@activepieces/shared';
 import { describe, expect, it } from 'vitest';
 
 import { flowCanvasUtils } from './flow-canvas-utils';
+import {
+  ApEdgeType,
+  ApInteractiveFlowChildNode,
+  ApInteractiveFlowContainerNode,
+  ApNodeType,
+} from './types';
+
+function toolNode(opts: {
+  id: string;
+  stateInputs?: string[];
+  stateOutputs?: string[];
+  tool?: string;
+}): InteractiveFlowNode {
+  return {
+    id: opts.id,
+    name: opts.id,
+    displayName: opts.id,
+    nodeType: InteractiveFlowNodeType.TOOL,
+    tool: opts.tool ?? 'test/tool',
+    stateInputs: opts.stateInputs ?? [],
+    stateOutputs: opts.stateOutputs ?? [],
+  };
+}
+
+function userInputNode(opts: {
+  id: string;
+  stateInputs?: string[];
+  stateOutputs?: string[];
+}): InteractiveFlowNode {
+  return {
+    id: opts.id,
+    name: opts.id,
+    displayName: opts.id,
+    nodeType: InteractiveFlowNodeType.USER_INPUT,
+    render: { component: 'TextInput', props: {} },
+    message: { en: 'hi' },
+    stateInputs: opts.stateInputs ?? [],
+    stateOutputs: opts.stateOutputs ?? [],
+  };
+}
 
 function buildAction(
-  nodes: InteractiveFlowAction['settings']['nodes'],
-  stateFields: InteractiveFlowAction['settings']['stateFields'] = [],
+  nodes: InteractiveFlowNode[],
+  phases?: InteractiveFlowPhase[],
 ): InteractiveFlowAction {
   return {
-    name: 'interactive_flow',
-    displayName: 'Interactive Flow',
+    name: 'iflow_test',
+    displayName: 'Estinzione',
     type: FlowActionType.INTERACTIVE_FLOW,
     skip: false,
     valid: true,
     lastUpdatedDate: new Date().toISOString(),
     settings: {
       nodes,
-      stateFields,
+      stateFields: [],
+      phases,
     },
   };
 }
 
-describe('interactive-flow canvas layout', () => {
-  it('renders INTERACTIVE_FLOW_CHILD nodes + return + end widget and labeled edges', () => {
-    const action = buildAction([
-      {
-        id: 'a',
-        name: 'a',
-        displayName: 'Collect name',
-        nodeType: InteractiveFlowNodeType.USER_INPUT,
-        stateInputs: [],
-        stateOutputs: ['clientName'],
-        render: { component: 'TextInput', props: {} },
-        message: { en: 'enter name' },
-      },
-      {
-        id: 'b',
-        name: 'b',
-        displayName: 'Search',
-        nodeType: InteractiveFlowNodeType.TOOL,
-        stateInputs: ['clientName'],
-        stateOutputs: ['searchResults'],
-        tool: 'banking/search',
-      },
-    ]);
+function overlap(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number },
+): boolean {
+  return !(
+    a.x + a.w <= b.x ||
+    b.x + b.w <= a.x ||
+    a.y + a.h <= b.y ||
+    b.y + b.h <= a.y
+  );
+}
 
-    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(action);
-    const childTypes = graph.nodes.map((n) => n.type);
-    expect(childTypes).toContain('INTERACTIVE_FLOW_CHILD');
-    expect(childTypes).toContain('INTERACTIVE_FLOW_RETURN_NODE');
-    expect(childTypes).toContain('GRAPH_END_WIDGET');
+function childBox(n: ApInteractiveFlowChildNode) {
+  return {
+    x: n.position.x,
+    y: n.position.y,
+    w: FLOW_CANVAS_STEP_WIDTH,
+    h: FLOW_CANVAS_INTERACTIVE_FLOW_CHILD_HEIGHT,
+  };
+}
 
-    const dataEdges = graph.edges.filter(
-      (e) => e.type === 'ApInteractiveFlowDataEdge',
-    );
-    expect(dataEdges).toHaveLength(1);
-    expect(
-      (dataEdges[0] as { data: { fieldName?: string } }).data.fieldName,
-    ).toBe('clientName');
-  });
-
-  it('topologically orders nodes (upstream before downstream) even if defined out of order', () => {
-    const action = buildAction([
-      {
-        id: 'b',
-        name: 'b',
-        displayName: 'B',
-        nodeType: InteractiveFlowNodeType.TOOL,
-        stateInputs: ['clientName'],
-        stateOutputs: ['result'],
-        tool: 'banking/b',
-      },
-      {
-        id: 'a',
-        name: 'a',
-        displayName: 'A',
-        nodeType: InteractiveFlowNodeType.USER_INPUT,
-        stateInputs: [],
-        stateOutputs: ['clientName'],
-        render: { component: 'TextInput', props: {} },
-        message: { en: 'name' },
-      },
-    ]);
-
-    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(action);
-    const childNodes = graph.nodes.filter(
-      (n) => n.type === 'INTERACTIVE_FLOW_CHILD',
-    );
-    const ys = childNodes.map((n) => n.position.y);
-    const ids = childNodes.map(
-      (n) => (n as { data: { node: { id: string } } }).data.node.id,
-    );
-    const aIdx = ids.indexOf('a');
-    const bIdx = ids.indexOf('b');
-    expect(aIdx).toBeGreaterThanOrEqual(0);
-    expect(bIdx).toBeGreaterThanOrEqual(0);
-    expect(ys[aIdx]).toBeLessThan(ys[bIdx]);
-  });
-
-  it('annotates data edges with the branch name when the target is a BRANCH target', () => {
-    const action = buildAction([
-      {
-        id: 'router',
-        name: 'router',
-        displayName: 'Route',
-        nodeType: InteractiveFlowNodeType.BRANCH,
-        stateInputs: ['clientType'],
-        stateOutputs: [],
-        branches: [
-          {
-            id: 'br1',
-            branchName: 'corporate',
-            branchType: 'CONDITION',
-            conditions: [],
-            targetNodeIds: ['corp'],
-          },
-          {
-            id: 'br2',
-            branchName: 'individual',
-            branchType: 'FALLBACK',
-            targetNodeIds: ['indiv'],
-          },
-        ],
-      },
-      {
-        id: 'corp',
-        name: 'corp',
-        displayName: 'Corp',
-        nodeType: InteractiveFlowNodeType.TOOL,
-        stateInputs: ['clientType'],
-        stateOutputs: ['corpData'],
-        tool: 'banking/corp',
-      },
-      {
-        id: 'indiv',
-        name: 'indiv',
-        displayName: 'Indiv',
-        nodeType: InteractiveFlowNodeType.TOOL,
-        stateInputs: ['clientType'],
-        stateOutputs: ['indivData'],
-        tool: 'banking/indiv',
-      },
-    ]);
-
-    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(action);
-    const dataEdges = graph.edges.filter(
-      (e) => e.type === 'ApInteractiveFlowDataEdge',
-    );
-    const branchLabels = dataEdges
-      .map((e) => (e as { data: { branchName?: string } }).data.branchName)
-      .filter((label): label is string => !!label);
-    expect(branchLabels).toContain('corporate');
-    expect(branchLabels).toContain('individual');
-  });
-
-  it('returns an empty graph for zero-node actions', () => {
+describe('buildInteractiveFlowChildGraph — new layer-based layout', () => {
+  it('empty graph when no nodes', () => {
     const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
       buildAction([]),
     );
     expect(graph.nodes).toHaveLength(0);
     expect(graph.edges).toHaveLength(0);
+  });
+
+  it('linear chain: all children at x=0 (collinear with parent)', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({ id: 'a', stateOutputs: ['x'] }),
+        toolNode({ id: 'b', stateInputs: ['x'], stateOutputs: ['y'] }),
+        toolNode({ id: 'c', stateInputs: ['y'] }),
+      ]),
+    );
+    const children = graph.nodes.filter(
+      (n): n is ApInteractiveFlowChildNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CHILD,
+    );
+    expect(children).toHaveLength(3);
+    for (const c of children) {
+      expect(c.position.x).toBe(0);
+    }
+  });
+
+  it('parallel nodes in same layer have equal y and distinct x centered on 0', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({ id: 'root', stateOutputs: ['ndg'] }),
+        toolNode({ id: 'a', stateInputs: ['ndg'] }),
+        toolNode({ id: 'b', stateInputs: ['ndg'] }),
+      ]),
+    );
+    const children = graph.nodes.filter(
+      (n): n is ApInteractiveFlowChildNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CHILD,
+    );
+    const byId = new Map(children.map((c) => [c.data.node.id, c]));
+    expect(byId.get('a')!.position.y).toBe(byId.get('b')!.position.y);
+    expect(byId.get('a')!.position.x).not.toBe(byId.get('b')!.position.x);
+    // Simmetrici attorno all'asse centrale del parent (STEP_WIDTH/2)
+    const center = FLOW_CANVAS_STEP_WIDTH / 2;
+    const aCenter = byId.get('a')!.position.x + FLOW_CANVAS_STEP_WIDTH / 2;
+    const bCenter = byId.get('b')!.position.x + FLOW_CANVAS_STEP_WIDTH / 2;
+    expect(Math.abs(aCenter - center + (bCenter - center))).toBeLessThan(1);
+  });
+
+  it('no two child nodes have overlapping bounding boxes (complex Estinzione layout)', () => {
+    const nodes: InteractiveFlowNode[] = [
+      toolNode({
+        id: 'search',
+        stateInputs: ['customerName'],
+        stateOutputs: ['customerMatches'],
+      }),
+      userInputNode({
+        id: 'pick_ndg',
+        stateInputs: ['customerMatches'],
+        stateOutputs: ['ndg'],
+      }),
+      toolNode({
+        id: 'load_profile',
+        stateInputs: ['ndg'],
+        stateOutputs: ['profile'],
+      }),
+      toolNode({
+        id: 'load_accounts',
+        stateInputs: ['ndg'],
+        stateOutputs: ['accounts'],
+      }),
+      userInputNode({
+        id: 'pick_rapporto',
+        stateInputs: ['accounts'],
+        stateOutputs: ['rapportoId'],
+      }),
+      toolNode({
+        id: 'load_reasons',
+        stateInputs: ['rapportoId'],
+        stateOutputs: ['closureReasons'],
+      }),
+      userInputNode({
+        id: 'collect_reason',
+        stateInputs: ['closureReasons'],
+        stateOutputs: ['closureReasonCode'],
+      }),
+      userInputNode({
+        id: 'collect_date',
+        stateInputs: [],
+        stateOutputs: ['closureDate'],
+      }),
+      toolNode({
+        id: 'generate_pdf',
+        stateInputs: ['ndg', 'rapportoId', 'closureReasonCode', 'closureDate'],
+        stateOutputs: ['moduleBase64'],
+      }),
+    ];
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction(nodes),
+    );
+    const children = graph.nodes.filter(
+      (n): n is ApInteractiveFlowChildNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CHILD,
+    );
+    let overlapCount = 0;
+    const overlapPairs: string[] = [];
+    for (let i = 0; i < children.length; i++) {
+      for (let j = i + 1; j < children.length; j++) {
+        const a = childBox(children[i]);
+        const b = childBox(children[j]);
+        if (overlap(a, b)) {
+          overlapCount++;
+          overlapPairs.push(`${children[i].id}/${children[j].id}`);
+        }
+      }
+    }
+    expect(overlapPairs).toEqual([]);
+    expect(overlapCount).toBe(0);
+  });
+
+  it('return node is at x=0 below the last layer', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({ id: 'a', stateOutputs: ['x'] }),
+        toolNode({ id: 'b', stateInputs: ['x'] }),
+      ]),
+    );
+    const returnNode = graph.nodes.find(
+      (n) => n.type === ApNodeType.INTERACTIVE_FLOW_RETURN_NODE,
+    );
+    expect(returnNode).toBeDefined();
+    expect(returnNode!.position.x).toBe(0);
+    const children = graph.nodes.filter(
+      (n) => n.type === ApNodeType.INTERACTIVE_FLOW_CHILD,
+    );
+    const maxChildY = Math.max(...children.map((c) => c.position.y));
+    expect(returnNode!.position.y).toBeGreaterThan(maxChildY);
+  });
+
+  it('end widget is centered horizontally below the return node', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([toolNode({ id: 'a' })]),
+    );
+    const endWidget = graph.nodes.find(
+      (n) => n.type === ApNodeType.GRAPH_END_WIDGET,
+    );
+    const returnNode = graph.nodes.find(
+      (n) => n.type === ApNodeType.INTERACTIVE_FLOW_RETURN_NODE,
+    );
+    expect(endWidget).toBeDefined();
+    // end widget is a zero-width marker; it sits at the horizontal center
+    // of the column so that return_node (x=0, width=STEP_WIDTH) center
+    // aligns with end's center.
+    expect(endWidget!.position.x).toBe(FLOW_CANVAS_STEP_WIDTH / 2);
+    expect(endWidget!.position.y).toBeGreaterThan(returnNode!.position.y);
+  });
+
+  it('uses INTERACTIVE_FLOW_RETURN_EDGE, not LOOP_RETURN_EDGE', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([toolNode({ id: 'a' })]),
+    );
+    expect(
+      graph.edges.every((e) => e.type !== ApEdgeType.LOOP_RETURN_EDGE),
+    ).toBe(true);
+    expect(
+      graph.edges.some(
+        (e) => e.type === ApEdgeType.INTERACTIVE_FLOW_RETURN_EDGE,
+      ),
+    ).toBe(true);
+  });
+
+  it('uses INTERACTIVE_FLOW_START_EDGE instead of LOOP_START_EDGE', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([toolNode({ id: 'a' })]),
+    );
+    expect(
+      graph.edges.every((e) => e.type !== ApEdgeType.LOOP_START_EDGE),
+    ).toBe(true);
+    expect(
+      graph.edges.some(
+        (e) => e.type === ApEdgeType.INTERACTIVE_FLOW_START_EDGE,
+      ),
+    ).toBe(true);
+  });
+
+  it('emits one edge per (source, target) pair, aggregating fieldNames', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({ id: 'a', stateOutputs: ['f1', 'f2'] }),
+        toolNode({ id: 'b', stateInputs: ['f1', 'f2'] }),
+      ]),
+    );
+    const dataEdges = graph.edges.filter(
+      (e) => e.type === ApEdgeType.INTERACTIVE_FLOW_DATA_EDGE,
+    );
+    const abEdges = dataEdges.filter(
+      (e) => e.source.includes('-a') && e.target.includes('-b'),
+    );
+    expect(abEdges).toHaveLength(1);
+    expect(
+      (abEdges[0] as { data: { fieldNames: string[] } }).data.fieldNames,
+    ).toEqual(['f1', 'f2']);
+  });
+
+  it('edge IDs are stable in format ${step}-iflow-edge-${sourceId}-${targetId}', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({ id: 'a', stateOutputs: ['x'] }),
+        toolNode({ id: 'b', stateInputs: ['x'] }),
+      ]),
+    );
+    const dataEdges = graph.edges.filter(
+      (e) => e.type === ApEdgeType.INTERACTIVE_FLOW_DATA_EDGE,
+    );
+    expect(dataEdges[0].id).toContain('iflow-edge-');
+    expect(dataEdges[0].id).toContain('a');
+    expect(dataEdges[0].id).toContain('b');
+    // Unicità: nessun duplicato
+    const allIds = graph.edges.map((e) => e.id);
+    expect(new Set(allIds).size).toBe(allIds.length);
+  });
+
+  it('flags edges with layerDiff > 1 as skip-connections', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({ id: 'a', stateOutputs: ['x'] }),
+        toolNode({ id: 'b', stateInputs: ['x'], stateOutputs: ['y'] }),
+        toolNode({ id: 'c', stateInputs: ['y'], stateOutputs: ['z'] }),
+        toolNode({ id: 'd', stateInputs: ['x', 'z'] }), // legge x da L0 (skip)
+      ]),
+    );
+    const dataEdges = graph.edges.filter(
+      (e) => e.type === ApEdgeType.INTERACTIVE_FLOW_DATA_EDGE,
+    );
+    const adEdge = dataEdges.find(
+      (e) => e.source.includes('-a') && e.target.includes('-d'),
+    );
+    expect(adEdge).toBeDefined();
+    expect(
+      (adEdge as { data: { isSkipConnection?: boolean } }).data
+        .isSkipConnection,
+    ).toBe(true);
+    const cdEdge = dataEdges.find(
+      (e) => e.source.includes('-c') && e.target.includes('-d'),
+    );
+    expect(
+      (cdEdge as { data: { isSkipConnection?: boolean } }).data
+        .isSkipConnection,
+    ).not.toBe(true);
+  });
+
+  it('emits a container node when there are children', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({ id: 'a', stateOutputs: ['x'] }),
+        toolNode({ id: 'b', stateInputs: ['x'] }),
+      ]),
+    );
+    const container = graph.nodes.find(
+      (n): n is ApInteractiveFlowContainerNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CONTAINER,
+    );
+    expect(container).toBeDefined();
+    expect(container!.data.parentDisplayName).toBe('Estinzione');
+  });
+
+  it('container strictly encloses all children', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({ id: 'root', stateOutputs: ['x'] }),
+        toolNode({ id: 'a', stateInputs: ['x'] }),
+        toolNode({ id: 'b', stateInputs: ['x'] }),
+      ]),
+    );
+    const container = graph.nodes.find(
+      (n): n is ApInteractiveFlowContainerNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CONTAINER,
+    )!;
+    const children = graph.nodes.filter(
+      (n): n is ApInteractiveFlowChildNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CHILD,
+    );
+    for (const c of children) {
+      expect(c.position.x).toBeGreaterThanOrEqual(container.position.x);
+      expect(c.position.y).toBeGreaterThanOrEqual(container.position.y);
+      expect(c.position.x + FLOW_CANVAS_STEP_WIDTH).toBeLessThanOrEqual(
+        container.position.x + container.data.width,
+      );
+      expect(
+        c.position.y + FLOW_CANVAS_INTERACTIVE_FLOW_CHILD_HEIGHT,
+      ).toBeLessThanOrEqual(container.position.y + container.data.height);
+    }
+  });
+
+  it('container is not emitted when there are zero nodes', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([]),
+    );
+    expect(
+      graph.nodes.some((n) => n.type === ApNodeType.INTERACTIVE_FLOW_CONTAINER),
+    ).toBe(false);
+  });
+
+  it('injects phaseId and phases into child data when phases are defined', () => {
+    const phases: InteractiveFlowPhase[] = [
+      { id: 'ph1', name: 'phase1', nodeIds: ['a', 'b'] },
+      { id: 'ph2', name: 'phase2', nodeIds: ['c'] },
+    ];
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction(
+        [
+          toolNode({ id: 'a', stateOutputs: ['x'] }),
+          toolNode({ id: 'b', stateInputs: ['x'], stateOutputs: ['y'] }),
+          toolNode({ id: 'c', stateInputs: ['y'] }),
+        ],
+        phases,
+      ),
+    );
+    const children = graph.nodes.filter(
+      (n): n is ApInteractiveFlowChildNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CHILD,
+    );
+    const byId = new Map(children.map((c) => [c.data.node.id, c]));
+    expect(byId.get('a')!.data.phaseId).toBe('ph1');
+    expect(byId.get('b')!.data.phaseId).toBe('ph1');
+    expect(byId.get('c')!.data.phaseId).toBe('ph2');
+    expect(byId.get('a')!.data.phases).toEqual(phases);
+  });
+
+  it('child data.phaseId is undefined when phases are not defined', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([toolNode({ id: 'a' })]),
+    );
+    const child = graph.nodes.find(
+      (n): n is ApInteractiveFlowChildNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CHILD,
+    )!;
+    expect(child.data.phaseId).toBeUndefined();
+  });
+
+  it('isolated node (no upstream producer) receives an entry edge from parent step', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([toolNode({ id: 'lonely', stateInputs: ['unknownField'] })]),
+    );
+    const startEdges = graph.edges.filter(
+      (e) => e.type === ApEdgeType.INTERACTIVE_FLOW_START_EDGE,
+    );
+    expect(startEdges.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('barycenter ordering: second layer permutes to reduce crossings', () => {
+    // L0 nodes: A (leftmost), B (middle), C (rightmost)
+    // L1 nodes reading A, B, C in order: X→C, Y→A, Z→B
+    // After barycenter ordering, L1 should reorder to [Y, Z, X] to reduce crossings.
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({ id: 'A', stateOutputs: ['a'] }),
+        toolNode({ id: 'B', stateOutputs: ['b'] }),
+        toolNode({ id: 'C', stateOutputs: ['c'] }),
+        toolNode({ id: 'X', stateInputs: ['c'] }),
+        toolNode({ id: 'Y', stateInputs: ['a'] }),
+        toolNode({ id: 'Z', stateInputs: ['b'] }),
+      ]),
+    );
+    const children = graph.nodes.filter(
+      (n): n is ApInteractiveFlowChildNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CHILD,
+    );
+    const byId = new Map(children.map((c) => [c.data.node.id, c]));
+    // Expected ordering (x-ascending) in L1: Y (under A), Z (under B), X (under C)
+    const ySorted = [byId.get('Y')!, byId.get('Z')!, byId.get('X')!]
+      .sort((p, q) => p.position.x - q.position.x)
+      .map((n) => n.data.node.id);
+    expect(ySorted).toEqual(['Y', 'Z', 'X']);
   });
 });

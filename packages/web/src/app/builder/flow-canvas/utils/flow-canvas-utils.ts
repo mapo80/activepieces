@@ -1,4 +1,7 @@
 import {
+  FLOW_CANVAS_INTERACTIVE_FLOW_CHILD_HEIGHT,
+  FLOW_CANVAS_INTERACTIVE_FLOW_CONTAINER_PADDING,
+  FLOW_CANVAS_VSPACE,
   FlowAction,
   FlowActionType,
   FlowOperationType,
@@ -8,6 +11,7 @@ import {
   InteractiveFlowBranchNode,
   InteractiveFlowNode,
   InteractiveFlowNodeType,
+  InteractiveFlowPhase,
   isNil,
   LoopOnItemsAction,
   RouterAction,
@@ -31,7 +35,10 @@ import {
   ApGraph,
   ApGraphEndNode,
   ApInteractiveFlowChildNode,
+  ApInteractiveFlowContainerNode,
   ApInteractiveFlowDataEdge,
+  ApInteractiveFlowReturnEdge,
+  ApInteractiveFlowStartEdge,
   ApLoopReturnNode,
   ApNode,
   ApNodeType,
@@ -204,20 +211,17 @@ function createFocusStepInGraphParams(stepName: string) {
 }
 
 const calculateGraphBoundingBox = (graph: ApGraph) => {
-  const minX = Math.min(
-    ...graph.nodes
-      .filter((node) => flowCanvasConsts.doesNodeAffectBoundingBox(node.type))
-      .map((node) => node.position.x),
+  const affectingNodes = graph.nodes.filter((node) =>
+    flowCanvasConsts.doesNodeAffectBoundingBox(node.type),
   );
-  const minY = Math.min(...graph.nodes.map((node) => node.position.y));
+  const minX = Math.min(...affectingNodes.map((node) => node.position.x));
+  const minY = Math.min(...affectingNodes.map((node) => node.position.y));
   const maxX = Math.max(
-    ...graph.nodes
-      .filter((node) => flowCanvasConsts.doesNodeAffectBoundingBox(node.type))
-      .map(
-        (node) => node.position.x + flowCanvasConsts.AP_NODE_SIZE.STEP.width,
-      ),
+    ...affectingNodes.map(
+      (node) => node.position.x + flowCanvasConsts.AP_NODE_SIZE.STEP.width,
+    ),
   );
-  const maxY = Math.max(...graph.nodes.map((node) => node.position.y));
+  const maxY = Math.max(...affectingNodes.map((node) => node.position.y));
   const width = maxX - minX;
   const height = maxY - minY;
 
@@ -474,18 +478,112 @@ function assignInteractiveFlowLayers(
     return level;
   }
   for (const n of nodes) resolve(n.id);
+
+  const consumersOf = new Map<string, string[]>();
+  for (const n of nodes) {
+    for (const input of n.stateInputs) {
+      const upId = producer.get(input);
+      if (!upId || upId === n.id) continue;
+      if (!consumersOf.has(upId)) consumersOf.set(upId, []);
+      consumersOf.get(upId)!.push(n.id);
+    }
+  }
+  for (const n of nodes) {
+    if (n.stateInputs.length !== 0) continue;
+    const consumers = consumersOf.get(n.id);
+    if (!consumers || consumers.length === 0) continue;
+    const minConsumerLayer = Math.min(
+      ...consumers.map((id) => layer.get(id) ?? 0),
+    );
+    const pushed = Math.max(0, minConsumerLayer - 1);
+    if (pushed > (layer.get(n.id) ?? 0)) {
+      layer.set(n.id, pushed);
+    }
+  }
   return layer;
 }
 
-function findUpstreamField(
-  targetNode: InteractiveFlowNode,
+function groupNodesByLayer(
+  layers: Map<string, number>,
   nodes: InteractiveFlowNode[],
-): { sourceId: string; fieldName: string } | null {
-  for (const input of targetNode.stateInputs) {
-    const source = nodes.find((n) => n.stateOutputs.includes(input));
-    if (!isNil(source)) return { sourceId: source.id, fieldName: input };
+): InteractiveFlowNode[][] {
+  const byLayer = new Map<number, InteractiveFlowNode[]>();
+  for (const node of nodes) {
+    const layer = layers.get(node.id) ?? 0;
+    if (!byLayer.has(layer)) byLayer.set(layer, []);
+    byLayer.get(layer)!.push(node);
   }
-  return null;
+  const ordered: InteractiveFlowNode[][] = [];
+  const maxLayer = Math.max(-1, ...Array.from(byLayer.keys()));
+  for (let i = 0; i <= maxLayer; i++) {
+    ordered.push(byLayer.get(i) ?? []);
+  }
+  return ordered;
+}
+
+function findProducerMap(nodes: InteractiveFlowNode[]): Map<string, string> {
+  const producer = new Map<string, string>();
+  for (const n of nodes) {
+    for (const out of n.stateOutputs) {
+      if (!producer.has(out)) producer.set(out, n.id);
+    }
+  }
+  return producer;
+}
+
+function barycenterOrderLayers(
+  initialLayers: InteractiveFlowNode[][],
+  producer: Map<string, string>,
+  layerOfNode: Map<string, number>,
+): InteractiveFlowNode[][] {
+  const orderedLayers = initialLayers.map((layer) => [...layer]);
+  for (let layerIdx = 1; layerIdx < orderedLayers.length; layerIdx++) {
+    const positionsInPrevLayers = new Map<string, number>();
+    for (let i = 0; i < layerIdx; i++) {
+      orderedLayers[i].forEach((n, idx) => {
+        positionsInPrevLayers.set(n.id, idx);
+      });
+    }
+    const scored = orderedLayers[layerIdx].map((node) => {
+      const upstreamPositions: number[] = [];
+      for (const input of node.stateInputs) {
+        const srcId = producer.get(input);
+        if (
+          srcId &&
+          srcId !== node.id &&
+          (layerOfNode.get(srcId) ?? 0) < layerIdx
+        ) {
+          const pos = positionsInPrevLayers.get(srcId);
+          if (pos !== undefined) upstreamPositions.push(pos);
+        }
+      }
+      const barycenter =
+        upstreamPositions.length === 0
+          ? Number.POSITIVE_INFINITY
+          : upstreamPositions.reduce((a, b) => a + b, 0) /
+            upstreamPositions.length;
+      return { node, barycenter };
+    });
+    scored.sort((a, b) => {
+      if (a.barycenter !== b.barycenter) return a.barycenter - b.barycenter;
+      return 0;
+    });
+    orderedLayers[layerIdx] = scored.map((s) => s.node);
+  }
+  return orderedLayers;
+}
+
+function computePhaseLookup(
+  phases: InteractiveFlowPhase[] | undefined,
+): Map<string, string> {
+  const lookup = new Map<string, string>();
+  if (!phases) return lookup;
+  for (const phase of phases) {
+    for (const nodeId of phase.nodeIds) {
+      if (!lookup.has(nodeId)) lookup.set(nodeId, phase.id);
+    }
+  }
+  return lookup;
 }
 
 const buildInteractiveFlowChildGraph = (
@@ -496,32 +594,43 @@ const buildInteractiveFlowChildGraph = (
     return { nodes: [], edges: [] };
   }
 
-  const stepHeight = flowCanvasConsts.AP_NODE_SIZE.STEP.height;
   const stepWidth = flowCanvasConsts.AP_NODE_SIZE.STEP.width;
-  const vSpace = flowCanvasConsts.VERTICAL_SPACE_BETWEEN_STEPS;
-  const startY =
-    stepHeight + flowCanvasConsts.VERTICAL_OFFSET_BETWEEN_LOOP_AND_CHILD;
-  const baseX = stepWidth + flowCanvasConsts.HORIZONTAL_SPACE_BETWEEN_NODES;
+  const hSpace = flowCanvasConsts.HORIZONTAL_SPACE_BETWEEN_NODES;
+  const vSpace = FLOW_CANVAS_VSPACE;
+  const childHeight = FLOW_CANVAS_INTERACTIVE_FLOW_CHILD_HEIGHT;
+  const containerPadding = FLOW_CANVAS_INTERACTIVE_FLOW_CONTAINER_PADDING;
 
-  const layers = assignInteractiveFlowLayers(interactiveNodes);
-  const ordered = [...interactiveNodes].sort((a, b) => {
-    const la = layers.get(a.id) ?? 0;
-    const lb = layers.get(b.id) ?? 0;
-    if (la !== lb) return la - lb;
-    return interactiveNodes.indexOf(a) - interactiveNodes.indexOf(b);
-  });
+  const layerOfNode = assignInteractiveFlowLayers(interactiveNodes);
+  const initialLayers = groupNodesByLayer(layerOfNode, interactiveNodes);
+  const producer = findProducerMap(interactiveNodes);
+  const orderedLayers = barycenterOrderLayers(
+    initialLayers,
+    producer,
+    layerOfNode,
+  );
+  const phaseLookup = computePhaseLookup(step.settings.phases);
+  const parentCenterX = stepWidth / 2;
+  const startY =
+    flowCanvasConsts.AP_NODE_SIZE.STEP.height + vSpace + containerPadding;
 
   const nodeIdToCanvasId = new Map<string, string>();
-  const childNodes: ApInteractiveFlowChildNode[] = ordered.map(
-    (node, index) => {
+  const childNodes: ApInteractiveFlowChildNode[] = [];
+  let currentY = startY;
+
+  orderedLayers.forEach((layer) => {
+    const layerCount = layer.length;
+    const layerWidth =
+      layerCount * stepWidth + Math.max(0, layerCount - 1) * hSpace;
+    const firstLeftX = parentCenterX - layerWidth / 2;
+    layer.forEach((node, idx) => {
       const canvasId = `${step.name}-iflow-${node.id}`;
       nodeIdToCanvasId.set(node.id, canvasId);
-      return {
+      childNodes.push({
         id: canvasId,
         type: ApNodeType.INTERACTIVE_FLOW_CHILD,
         position: {
-          x: baseX,
-          y: startY + index * (stepHeight + vSpace),
+          x: firstLeftX + idx * (stepWidth + hSpace),
+          y: currentY,
         },
         data: {
           parentStepName: step.name,
@@ -538,88 +647,149 @@ const buildInteractiveFlowChildGraph = (
               );
               return !isNil(field) && field.extractable !== false;
             }),
+          phaseId: phaseLookup.get(node.id),
+          phases: step.settings.phases,
         },
         selectable: false,
-      };
-    },
-  );
+        zIndex: 10,
+      });
+    });
+    currentY += childHeight + vSpace;
+  });
 
-  const lastChildY = startY + (ordered.length - 1) * (stepHeight + vSpace);
+  const childrenBottomY = currentY - vSpace;
+
+  const returnNodeY = childrenBottomY + containerPadding + vSpace;
   const returnNode: ApNode = {
     id: `${step.name}-interactive-flow-return-node`,
     type: ApNodeType.INTERACTIVE_FLOW_RETURN_NODE,
-    position: {
-      x: baseX,
-      y: lastChildY + stepHeight + vSpace,
-    },
+    position: { x: 0, y: returnNodeY },
     data: {},
     selectable: false,
   };
 
+  const subgraphEndY = returnNodeY + flowCanvasConsts.AP_NODE_SIZE.STEP.height;
   const subgraphEndSubNode: ApGraphEndNode = {
     id: `${step.name}-interactive-flow-subgraph-end`,
     type: ApNodeType.GRAPH_END_WIDGET,
-    position: {
-      x: 0,
-      y: lastChildY + stepHeight + vSpace + stepHeight,
-    },
+    position: { x: stepWidth / 2, y: subgraphEndY },
     data: {},
     selectable: false,
   };
 
-  const wrapperEdges: ApEdge[] = [
-    {
-      id: `${step.name}-interactive-flow-start-edge`,
-      source: step.name,
-      target: childNodes[0].id,
-      type: ApEdgeType.LOOP_START_EDGE,
-      data: { isLoopEmpty: false },
+  const childrenMinX = Math.min(...childNodes.map((c) => c.position.x));
+  const childrenMaxX = Math.max(
+    ...childNodes.map((c) => c.position.x + stepWidth),
+  );
+  const containerX = childrenMinX - containerPadding;
+  const containerY = startY - containerPadding;
+  const containerWidth = childrenMaxX - childrenMinX + 2 * containerPadding;
+  const containerHeight = childrenBottomY + containerPadding - containerY;
+
+  const containerNode: ApInteractiveFlowContainerNode = {
+    id: `${step.name}-interactive-flow-container`,
+    type: ApNodeType.INTERACTIVE_FLOW_CONTAINER,
+    position: { x: containerX, y: containerY },
+    data: {
+      parentStepName: step.name,
+      parentDisplayName: step.displayName,
+      width: containerWidth,
+      height: containerHeight,
     },
-    {
-      id: `${step.name}-interactive-flow-return-edge`,
-      source: childNodes[childNodes.length - 1].id,
+    selectable: false,
+    draggable: false,
+    zIndex: -1,
+  };
+
+  const firstLayerNodes = orderedLayers[0] ?? [];
+  const startEdges: ApInteractiveFlowStartEdge[] = firstLayerNodes.map(
+    (node) => ({
+      id: `${step.name}-iflow-start-${node.id}`,
+      source: step.name,
+      target: nodeIdToCanvasId.get(node.id)!,
+      type: ApEdgeType.INTERACTIVE_FLOW_START_EDGE,
+      data: { parentStepName: step.name },
+    }),
+  );
+
+  const lastLayerNodes = orderedLayers[orderedLayers.length - 1] ?? [];
+  const returnEdges: ApInteractiveFlowReturnEdge[] = lastLayerNodes.map(
+    (node) => ({
+      id: `${step.name}-iflow-return-${node.id}`,
+      source: nodeIdToCanvasId.get(node.id)!,
       target: returnNode.id,
-      type: ApEdgeType.LOOP_RETURN_EDGE,
+      type: ApEdgeType.INTERACTIVE_FLOW_RETURN_EDGE,
       data: {
         parentStepName: step.name,
-        isLoopEmpty: false,
         drawArrowHeadAfterEnd: !isNil(step.nextAction),
-        verticalSpaceBetweenReturnNodeStartAndEnd: vSpace,
       },
-    },
-  ];
+    }),
+  );
 
-  const seenEdgeKeys = new Set<string>();
+  const edgeAggregation = new Map<
+    string,
+    {
+      source: string;
+      target: string;
+      fieldNames: string[];
+      sourceId: string;
+      targetId: string;
+    }
+  >();
+  for (const node of interactiveNodes) {
+    for (const input of node.stateInputs) {
+      const srcId = producer.get(input);
+      if (!srcId || srcId === node.id) continue;
+      if (!nodeIdToCanvasId.has(srcId) || !nodeIdToCanvasId.has(node.id))
+        continue;
+      const key = `${srcId}->${node.id}`;
+      const existing = edgeAggregation.get(key) ?? {
+        source: nodeIdToCanvasId.get(srcId)!,
+        target: nodeIdToCanvasId.get(node.id)!,
+        fieldNames: [],
+        sourceId: srcId,
+        targetId: node.id,
+      };
+      existing.fieldNames.push(input);
+      edgeAggregation.set(key, existing);
+    }
+  }
+
   const childEdges: ApInteractiveFlowDataEdge[] = [];
-  ordered.forEach((node, index) => {
-    if (index === 0) return;
-    const prev = ordered[index - 1];
-    const upstream = findUpstreamField(node, interactiveNodes);
-    const sourceCanvas =
-      !isNil(upstream) && nodeIdToCanvasId.has(upstream.sourceId)
-        ? nodeIdToCanvasId.get(upstream.sourceId)!
-        : nodeIdToCanvasId.get(prev.id)!;
-    const targetCanvas = nodeIdToCanvasId.get(node.id)!;
-    const key = `${sourceCanvas}->${targetCanvas}`;
-    if (seenEdgeKeys.has(key)) return;
-    seenEdgeKeys.add(key);
-    const branchHit = findBranchEdgeLabel(node, interactiveNodes);
+  for (const {
+    source,
+    target,
+    fieldNames,
+    sourceId,
+    targetId,
+  } of edgeAggregation.values()) {
+    const sourceLayer = layerOfNode.get(sourceId) ?? 0;
+    const targetLayer = layerOfNode.get(targetId) ?? 0;
+    const isSkipConnection = targetLayer - sourceLayer > 1;
+    const sourceNode = interactiveNodes.find((n) => n.id === sourceId);
+    const targetNode = interactiveNodes.find((n) => n.id === targetId);
+    const branchName = targetNode
+      ? findBranchEdgeLabel(targetNode, interactiveNodes)
+      : undefined;
     childEdges.push({
-      id: `${step.name}-iflow-data-edge-${index}`,
-      source: sourceCanvas,
-      target: targetCanvas,
+      id: `${step.name}-iflow-edge-${sourceId}-${targetId}`,
+      source,
+      target,
       type: ApEdgeType.INTERACTIVE_FLOW_DATA_EDGE,
       data: {
         parentStepName: step.name,
-        fieldName: upstream?.fieldName,
-        branchName: branchHit,
+        fieldNames,
+        branchName,
+        isSkipConnection,
+        sourceDisplayName: sourceNode?.displayName,
+        targetDisplayName: targetNode?.displayName,
       },
     });
-  });
+  }
 
   return {
-    nodes: [...childNodes, returnNode, subgraphEndSubNode],
-    edges: [...wrapperEdges, ...childEdges],
+    nodes: [containerNode, ...childNodes, returnNode, subgraphEndSubNode],
+    edges: [...startEdges, ...returnEdges, ...childEdges],
   };
 };
 

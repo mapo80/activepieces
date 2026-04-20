@@ -8,6 +8,7 @@ import {
   isNil,
 } from '@activepieces/shared';
 import { Handle, NodeProps, Position } from '@xyflow/react';
+import { t } from 'i18next';
 import {
   AlertTriangle,
   ArrowRightLeft,
@@ -28,6 +29,7 @@ import { useInteractiveFlowNodeStates } from '@/features/interactive-flow/hooks/
 import { cn } from '@/lib/utils';
 
 import { flowCanvasConsts } from '../utils/consts';
+import { phaseColors } from '../utils/phase-colors';
 import { ApInteractiveFlowChildNode } from '../utils/types';
 
 type ChildNodeProps = NodeProps & { data: ApInteractiveFlowChildNode['data'] };
@@ -35,13 +37,15 @@ type ChildNodeProps = NodeProps & { data: ApInteractiveFlowChildNode['data'] };
 function nodeTypeIcon(nodeType: InteractiveFlowNodeType): React.ReactElement {
   switch (nodeType) {
     case InteractiveFlowNodeType.TOOL:
-      return <Wrench className="size-4" aria-label="Tool node" />;
+      return <Wrench className="size-3.5" aria-label="Tool node" />;
     case InteractiveFlowNodeType.USER_INPUT:
-      return <MessageSquare className="size-4" aria-label="User input node" />;
+      return (
+        <MessageSquare className="size-3.5" aria-label="User input node" />
+      );
     case InteractiveFlowNodeType.CONFIRM:
-      return <CheckCircle2 className="size-4" aria-label="Confirm node" />;
+      return <CheckCircle2 className="size-3.5" aria-label="Confirm node" />;
     case InteractiveFlowNodeType.BRANCH:
-      return <GitBranch className="size-4" aria-label="Branch node" />;
+      return <GitBranch className="size-3.5" aria-label="Branch node" />;
   }
 }
 
@@ -64,6 +68,44 @@ function statusIcon(
   }
 }
 
+function TypeBadge({
+  node,
+}: {
+  node: InteractiveFlowNode;
+}): React.ReactElement | null {
+  if (node.nodeType === InteractiveFlowNodeType.TOOL) {
+    const tool = (node as InteractiveFlowToolNode).tool;
+    const short = tool.split('/').pop() ?? tool;
+    return (
+      <span className="truncate rounded bg-blue-100 px-1.5 py-0.5 font-mono text-[10px] text-blue-700 dark:bg-blue-900 dark:text-blue-200">
+        {short}
+      </span>
+    );
+  }
+  if (
+    node.nodeType === InteractiveFlowNodeType.USER_INPUT ||
+    node.nodeType === InteractiveFlowNodeType.CONFIRM
+  ) {
+    const component = (
+      node as InteractiveFlowUserInputNode | InteractiveFlowConfirmNode
+    ).render.component;
+    return (
+      <span className="truncate rounded bg-purple-100 px-1.5 py-0.5 font-mono text-[10px] text-purple-700 dark:bg-purple-900 dark:text-purple-200">
+        {component}
+      </span>
+    );
+  }
+  if (node.nodeType === InteractiveFlowNodeType.BRANCH) {
+    const branchCount = (node as InteractiveFlowBranchNode).branches.length;
+    return (
+      <span className="truncate rounded bg-orange-100 px-1.5 py-0.5 font-mono text-[10px] text-orange-700 dark:bg-orange-900 dark:text-orange-200">
+        {branchCount} {t('branches')}
+      </span>
+    );
+  }
+  return null;
+}
+
 function FieldPillList({
   label,
   fields,
@@ -73,7 +115,7 @@ function FieldPillList({
 }): React.ReactElement | null {
   if (fields.length === 0) return null;
   return (
-    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+    <div className="flex items-start gap-1 text-[10px] text-muted-foreground">
       <span className="font-semibold uppercase tracking-wider">{label}:</span>
       <div className="flex flex-wrap gap-1">
         {fields.map((f) => (
@@ -86,58 +128,20 @@ function FieldPillList({
   );
 }
 
-function ToolNodeBadges({
-  node,
-}: {
-  node: InteractiveFlowToolNode;
-}): React.ReactElement {
-  return (
-    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-      <span className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-[10px] text-blue-700 dark:bg-blue-900 dark:text-blue-200">
-        MCP {node.tool}
-      </span>
-    </div>
-  );
-}
-
-function UserInputNodeBadges({
-  node,
-}: {
-  node: InteractiveFlowUserInputNode | InteractiveFlowConfirmNode;
-}): React.ReactElement {
-  return (
-    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-      <span className="rounded bg-purple-100 px-1.5 py-0.5 font-mono text-purple-700 dark:bg-purple-900 dark:text-purple-200">
-        {node.render.component}
-      </span>
-    </div>
-  );
-}
-
-function BranchNodeBadges({
-  node,
-}: {
-  node: InteractiveFlowBranchNode;
-}): React.ReactElement {
-  const previews = node.branches
-    .slice(0, 2)
-    .map((b) => b.branchName)
-    .join(' | ');
-  return (
-    <div className="text-[10px] text-muted-foreground">
-      {previews}
-      {node.branches.length > 2 ? ` +${node.branches.length - 2}` : ''}
-    </div>
-  );
-}
-
 export function ApInteractiveFlowChildCanvasNode(
   props: ChildNodeProps,
 ): React.ReactElement {
-  const { node, hasDrift, isExtractorTarget } = props.data;
+  const { node, hasDrift, isExtractorTarget, phaseId, phases } = props.data;
   const run = useBuilderStateContext((state) => state.run);
   const runtime = useInteractiveFlowNodeStates(run?.id);
   const status = runtime.nodeStatuses[node.id];
+  const isSelected = useBuilderStateContext(
+    (state) => state.selectedStep === props.data.parentStepName,
+  );
+  const colors = phaseColors.get({ phaseId, phases });
+  const phaseIndex = phaseColors.getIndex({ phaseId, phases });
+  const phaseLabel = phaseColors.getLabel({ phaseId, phases });
+  const hasPhase = phaseIndex >= 0;
 
   return (
     <>
@@ -148,23 +152,44 @@ export function ApInteractiveFlowChildCanvasNode(
       />
       <div
         className={cn(
-          'flex h-full w-full flex-col gap-1 rounded-lg border-2 bg-card p-2 shadow-sm transition-colors',
+          'group relative flex h-full w-full flex-col rounded-md border-2 bg-card shadow-sm transition-colors',
           status === 'FAILED' && 'border-red-500',
           status === 'PAUSED' && 'border-yellow-500',
           status === 'COMPLETED' && 'border-green-500',
           status === 'SKIPPED' && 'border-gray-300 opacity-60',
           !status && hasDrift && 'border-amber-500',
-          !status && !hasDrift && 'border-border',
+          !status && !hasDrift && hasPhase && colors.border,
+          !status && !hasDrift && !hasPhase && 'border-border',
         )}
         data-node-id={node.id}
         data-node-type={node.nodeType}
+        data-phase-id={phaseId ?? ''}
       >
-        <div className="flex items-center gap-2">
+        {hasPhase && (
+          <div
+            className={cn('h-1 w-full rounded-t-sm', colors.ribbon)}
+            data-testid="phase-ribbon"
+          />
+        )}
+
+        <div className="flex flex-1 items-center gap-2 px-2 py-1">
           <span className="shrink-0">{nodeTypeIcon(node.nodeType)}</span>
-          <span className="truncate text-sm font-semibold">
+          <span className="flex-1 truncate text-xs font-semibold">
             {node.displayName}
           </span>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
+            <TypeBadge node={node} />
+            {hasPhase && phaseLabel && (
+              <span
+                className={cn(
+                  'truncate rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+                  colors.chip,
+                )}
+                data-testid="phase-chip"
+              >
+                {phaseLabel}
+              </span>
+            )}
             {isExtractorTarget && (
               <Zap
                 className="size-3 text-amber-500"
@@ -181,19 +206,22 @@ export function ApInteractiveFlowChildCanvasNode(
           </div>
         </div>
 
-        {node.nodeType === InteractiveFlowNodeType.TOOL && (
-          <ToolNodeBadges node={node} />
-        )}
-        {(node.nodeType === InteractiveFlowNodeType.USER_INPUT ||
-          node.nodeType === InteractiveFlowNodeType.CONFIRM) && (
-          <UserInputNodeBadges node={node} />
-        )}
-        {node.nodeType === InteractiveFlowNodeType.BRANCH && (
-          <BranchNodeBadges node={node} />
-        )}
-
-        <FieldPillList label="reads" fields={node.stateInputs} />
-        <FieldPillList label="writes" fields={node.stateOutputs} />
+        <div
+          className={cn(
+            'absolute left-0 right-0 top-full z-20 hidden flex-col gap-1 rounded-b-md border border-t-0 border-border bg-popover p-2 shadow-lg',
+            'group-hover:flex',
+            isSelected && 'flex',
+          )}
+          data-testid="iflow-node-expanded-overlay"
+        >
+          {hasPhase && phaseLabel && (
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {phaseLabel}
+            </div>
+          )}
+          <FieldPillList label={t('READS')} fields={node.stateInputs} />
+          <FieldPillList label={t('WRITES')} fields={node.stateOutputs} />
+        </div>
       </div>
       <Handle
         type="source"
@@ -220,3 +248,5 @@ const interactiveFlowChildNodeUtilsObject = {
     );
   },
 };
+
+export const INTERACTIVE_FLOW_CHILD_NODE_HEIGHT = 44;
