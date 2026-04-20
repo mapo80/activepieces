@@ -87,5 +87,12 @@ function buildSandboxEnv(settings: ReturnType<typeof workerSettings.getSettings>
             env[key] = process.env[key]!
         }
     }
+    // Always propagate debug flags used by engine-level loggers so
+    // dev setups can enable tracing without touching settings files.
+    for (const key of ['AP_IF_DEBUG', 'AP_IF_DEBUG_LOG'] as const) {
+        if (process.env[key]) {
+            env[key] = process.env[key]!
+        }
+    }
     return env
 }

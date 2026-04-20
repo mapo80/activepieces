@@ -20,12 +20,40 @@ import {
     ResolveMcpGatewayResponse,
     StepOutputStatus,
 } from '@activepieces/shared'
+import * as nodeFs from 'node:fs'
+import { workerSocket } from '../worker-socket'
 import { BaseExecutor } from './base-executor'
 import { EngineConstants } from './context/engine-constants'
 import { FlowExecutorContext } from './context/flow-execution-context'
 import { fieldExtractor } from './field-extractor'
 import { interactiveFlowEvents } from './interactive-flow-events'
 import { questionGenerator } from './question-generator'
+
+// Debug logger: disabled by default, zero overhead when the env vars
+// below are not set. Enable on-demand without editing this file:
+//   AP_IF_DEBUG_LOG=/tmp/ap-if.log  → JSONL to that file (recommended)
+//   AP_IF_DEBUG=true                → lines to engine stderr (best-effort;
+//                                     engine stderr is only surfaced by
+//                                     the worker on uncaughtException,
+//                                     so the file mode is usually better)
+const IF_DEBUG_PATH = process.env.AP_IF_DEBUG_LOG
+const IF_DEBUG_ENABLED = (!isNilString(IF_DEBUG_PATH)) || process.env.AP_IF_DEBUG === 'true'
+function ifDebug(stage: string, data: Record<string, unknown> = {}): void {
+    if (!IF_DEBUG_ENABLED) return
+    const line = JSON.stringify({ ts: new Date().toISOString(), stage, ...data }) + '\n'
+    try {
+        if (!isNilString(IF_DEBUG_PATH)) {
+            nodeFs.appendFileSync(IF_DEBUG_PATH, line)
+        }
+        else {
+            process.stderr.write(`[IF-DEBUG] ${line}`)
+        }
+    }
+    catch { /* best-effort */ }
+}
+function isNilString(s: string | undefined): s is undefined {
+    return s === undefined || s.length === 0
+}
 
 type InteractiveFlowState = Record<string, unknown>
 
@@ -486,7 +514,15 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
         executionState: FlowExecutorContext
         constants: EngineConstants
     }): Promise<FlowExecutorContext> {
+        ifDebug('handle:enter', {
+            actionName: action.name,
+            flowRunId: constants.flowRunId,
+            isCompleted: executionState.isCompleted({ stepName: action.name }),
+            hasResumeBody: !isNil(constants.resumePayload?.body),
+            hasHttpRequestId: !isNil(constants.httpRequestId),
+        })
         if (executionState.isCompleted({ stepName: action.name })) {
+            ifDebug('handle:already-completed')
             return executionState
         }
 
@@ -520,6 +556,10 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             }
 
             const userMessage = typeof incoming.message === 'string' ? incoming.message : undefined
+            ifDebug('handle:resume:incoming', {
+                incomingKeys: Object.keys(incoming),
+                userMessagePreview: userMessage?.slice(0, 80),
+            })
             if (!isNil(userMessage) && !isNil(settings.fieldExtractor)) {
                 const extracted = await fieldExtractor.extract({
                     constants,
@@ -530,6 +570,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     systemPrompt: settings.systemPrompt,
                     locale: resolveLocale({ constants, settings }),
                 })
+                ifDebug('handle:resume:extracted', { extractedKeys: Object.keys(extracted) })
                 const coercedExtracted = coerceIncomingState({ incoming: extracted, fields })
                 for (const [k, v] of Object.entries(coercedExtracted)) {
                     if (isNil(flowState[k])) flowState[k] = v
@@ -547,19 +588,33 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 template: settings.messageInput,
                 triggerPayload: triggerOutput,
             })
+            ifDebug('handle:first-turn:begin', {
+                template: settings.messageInput,
+                triggerOutputKeys: triggerOutput ? Object.keys(triggerOutput) : null,
+                userMessagePreview: userMessage?.slice(0, 80),
+            })
             if (!isNil(userMessage) && userMessage.trim().length > 0) {
-                const extracted = await fieldExtractor.extract({
-                    constants,
-                    config: settings.fieldExtractor,
-                    message: userMessage,
-                    stateFields: fields,
-                    currentState: flowState,
-                    systemPrompt: settings.systemPrompt,
-                    locale: resolveLocale({ constants, settings }),
-                })
-                const coercedExtracted = coerceIncomingState({ incoming: extracted, fields })
-                for (const [k, v] of Object.entries(coercedExtracted)) {
-                    if (isNil(flowState[k])) flowState[k] = v
+                try {
+                    const extracted = await fieldExtractor.extract({
+                        constants,
+                        config: settings.fieldExtractor,
+                        message: userMessage,
+                        stateFields: fields,
+                        currentState: flowState,
+                        systemPrompt: settings.systemPrompt,
+                        locale: resolveLocale({ constants, settings }),
+                    })
+                    ifDebug('handle:first-turn:extracted', {
+                        extractedKeys: Object.keys(extracted),
+                    })
+                    const coercedExtracted = coerceIncomingState({ incoming: extracted, fields })
+                    for (const [k, v] of Object.entries(coercedExtracted)) {
+                        if (isNil(flowState[k])) flowState[k] = v
+                    }
+                }
+                catch (e) {
+                    ifDebug('handle:first-turn:error', { error: (e as Error).message })
+                    throw e
                 }
             }
         }
@@ -702,6 +757,14 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             !skippedNodeIds.has(n.id),
         )
         if (isNil(nextPauseNode) && hasUnresolvedToolOrBranch) {
+            ifDebug('handle:deadlock', {
+                unresolvedTools: nodes
+                    .filter(n => (isToolNode(n) || isBranchNode(n)) && !executedNodeIds.has(n.id) && !skippedNodeIds.has(n.id))
+                    .map(n => n.id),
+                stateKeys: Object.keys(flowState),
+                executedNodeIds: Array.from(executedNodeIds),
+                skippedNodeIds: Array.from(skippedNodeIds),
+            })
             throw new EngineGenericError(
                 'InteractiveFlowDeadlock',
                 'Circular dependency detected: one or more nodes cannot run because their required inputs are never produced',
@@ -712,6 +775,11 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             let message = resolveNodeMessage({ message: nextPauseNode.message, locale })
             const nodeMessage = nextPauseNode.message
             const isDynamicMessage = typeof nodeMessage === 'object' && nodeMessage !== null && 'dynamic' in nodeMessage && nodeMessage.dynamic === true
+            ifDebug('handle:pause:begin', {
+                nodeId: nextPauseNode.id,
+                hasDynamic: isDynamicMessage,
+                hasQuestionGenerator: !isNil(settings.questionGenerator),
+            })
             if (isDynamicMessage && !isNil(settings.questionGenerator)) {
                 const generated = await questionGenerator.generate({
                     constants,
@@ -732,6 +800,11 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     message = `Please provide ${label ?? nextPauseNode.stateOutputs[0] ?? 'the requested information'}`
                 }
             }
+            ifDebug('handle:pause:message', {
+                nodeId: nextPauseNode.id,
+                messagePreview: (message ?? '').slice(0, 120),
+                generatedFromLlm: isDynamicMessage && !isNil(settings.questionGenerator),
+            })
             const stepOutput = GenericStepOutput.create({
                 type: FlowActionType.INTERACTIVE_FLOW,
                 status: StepOutputStatus.PAUSED,
@@ -748,6 +821,41 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 constants,
                 event: { stepName: action.name, nodeId: nextPauseNode.id, kind: 'PAUSED', locale },
             })
+            // If this flow was triggered via a sync webhook (AP chat UI,
+            // sync forms, or any sync HTTP caller), push the bot's
+            // pause message back to the caller in the `HumanInputFormResult`
+            // shape that the chat UI consumes — otherwise the caller
+            // would hang until webhook timeout and the user sees "No
+            // response from the chatbot. Ensure that Respond on UI is
+            // in your flow."
+            if (!isNil(constants.workerHandlerId) && !isNil(constants.httpRequestId)) {
+                ifDebug('handle:pause:sendFlowResponse', {
+                    workerHandlerId: constants.workerHandlerId,
+                    httpRequestId: constants.httpRequestId,
+                })
+                try {
+                    await workerSocket.getWorkerClient().sendFlowResponse({
+                        workerHandlerId: constants.workerHandlerId,
+                        httpRequestId: constants.httpRequestId,
+                        runResponse: {
+                            status: 200,
+                            body: {
+                                type: 'markdown',
+                                value: message ?? '',
+                                files: [],
+                            },
+                            headers: {},
+                        },
+                    })
+                    ifDebug('handle:pause:sendFlowResponse:result', { ok: true })
+                }
+                catch (e) {
+                    ifDebug('handle:pause:sendFlowResponse:result', {
+                        ok: false,
+                        error: (e as Error).message,
+                    })
+                }
+            }
             return executionState
                 .upsertStep(action.name, stepOutput)
                 .setVerdict({ status: FlowRunStatus.PAUSED })
@@ -764,6 +872,48 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 selectedBranches,
             },
         })
+        // Final success bubble for any sync chat/webhook caller. Pull
+        // the most informative state field (caseId-like ids in common
+        // banking flows) to surface a meaningful confirmation line.
+        ifDebug('handle:success:begin', {
+            stateKeys: Object.keys(flowState),
+            caseId: typeof flowState.caseId === 'string' ? flowState.caseId : null,
+            workerHandlerId: constants.workerHandlerId,
+            httpRequestId: constants.httpRequestId,
+        })
+        if (!isNil(constants.workerHandlerId) && !isNil(constants.httpRequestId)) {
+            const summary = formatSuccessSummary(flowState)
+            try {
+                await workerSocket.getWorkerClient().sendFlowResponse({
+                    workerHandlerId: constants.workerHandlerId,
+                    httpRequestId: constants.httpRequestId,
+                    runResponse: {
+                        status: 200,
+                        body: { type: 'markdown', value: summary, files: [] },
+                        headers: {},
+                    },
+                })
+                ifDebug('handle:success:sendFlowResponse:result', { ok: true })
+            }
+            catch (e) {
+                ifDebug('handle:success:sendFlowResponse:result', {
+                    ok: false,
+                    error: (e as Error).message,
+                })
+            }
+        }
         return executionState.upsertStep(action.name, stepOutput)
     },
+}
+
+function formatSuccessSummary(state: InteractiveFlowState): string {
+    // Heuristic: if state has a `caseId` (produced by `submit_closure`
+    // in the estinzione flow) surface it. Otherwise fall back to a
+    // generic "operation completed" line. Works for any interactive
+    // flow without hard-coding per-scenario strings.
+    const caseId = state.caseId
+    if (typeof caseId === 'string' && caseId.length > 0) {
+        return `✅ Pratica inviata con successo.\n\n**ID pratica:** \`${caseId}\``
+    }
+    return '✅ Operazione completata con successo.'
 }
