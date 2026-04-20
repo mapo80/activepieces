@@ -6,6 +6,7 @@ import {
 } from '@activepieces/shared'
 import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { StatusCodes } from 'http-status-codes'
+import { z } from 'zod'
 import { securityAccess } from '../../core/security/authorization/fastify-security'
 import { websocketService } from '../../core/websockets.service'
 
@@ -26,7 +27,7 @@ const EmitRoute = {
     schema: {
         body: InteractiveFlowNodeStateEvent,
         response: {
-            [StatusCodes.NO_CONTENT]: undefined,
+            [StatusCodes.NO_CONTENT]: z.never(),
         },
     },
 }

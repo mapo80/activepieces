@@ -18,6 +18,7 @@ function buildAction(
     type: FlowActionType.INTERACTIVE_FLOW,
     skip: false,
     valid: true,
+    lastUpdatedDate: new Date().toISOString(),
     settings: {
       nodes,
       stateFields,
@@ -36,7 +37,7 @@ describe('interactive-flow canvas layout', () => {
         stateInputs: [],
         stateOutputs: ['clientName'],
         render: { component: 'TextInput', props: {} },
-        message: 'enter name',
+        message: { en: 'enter name' },
       },
       {
         id: 'b',
@@ -83,7 +84,7 @@ describe('interactive-flow canvas layout', () => {
         stateInputs: [],
         stateOutputs: ['clientName'],
         render: { component: 'TextInput', props: {} },
-        message: 'name',
+        message: { en: 'name' },
       },
     ]);
 
