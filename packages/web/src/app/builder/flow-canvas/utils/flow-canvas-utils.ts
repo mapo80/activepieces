@@ -710,8 +710,9 @@ const buildInteractiveFlowChildGraph = (
   );
 
   const lastLayerNodes = orderedLayers[orderedLayers.length - 1] ?? [];
+  const carrierIdx = Math.floor(lastLayerNodes.length / 2);
   const returnEdges: ApInteractiveFlowReturnEdge[] = lastLayerNodes.map(
-    (node) => ({
+    (node, idx) => ({
       id: `${step.name}-iflow-return-${node.id}`,
       source: nodeIdToCanvasId.get(node.id)!,
       target: subgraphEndSubNode.id,
@@ -719,6 +720,7 @@ const buildInteractiveFlowChildGraph = (
       data: {
         parentStepName: step.name,
         drawArrowHeadAfterEnd: !isNil(step.nextAction),
+        carriesAddButton: idx === carrierIdx,
       },
     }),
   );

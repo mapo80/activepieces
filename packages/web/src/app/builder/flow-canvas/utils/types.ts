@@ -263,6 +263,7 @@ export type ApInteractiveFlowReturnEdge = Edge & {
   data: {
     parentStepName: string;
     drawArrowHeadAfterEnd: boolean;
+    carriesAddButton?: boolean;
   };
 };
 
