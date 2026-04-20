@@ -149,7 +149,7 @@ export function ApInteractiveFlowChildCanvasNode(
       />
       <div
         className={cn(
-          'group relative flex h-full w-full flex-col rounded-md border-2 bg-card shadow-sm transition-colors',
+          'group relative flex h-full flex-col overflow-hidden rounded-md border-2 bg-card shadow-sm transition-colors',
           status === 'FAILED' && 'border-red-500',
           status === 'PAUSED' && 'border-yellow-500',
           status === 'COMPLETED' && 'border-green-500',
@@ -158,6 +158,10 @@ export function ApInteractiveFlowChildCanvasNode(
           !status && !hasDrift && hasPhase && colors.border,
           !status && !hasDrift && !hasPhase && 'border-border',
         )}
+        style={{
+          width: flowCanvasConsts.AP_NODE_SIZE.INTERACTIVE_FLOW_CHILD.width,
+          height: flowCanvasConsts.AP_NODE_SIZE.INTERACTIVE_FLOW_CHILD.height,
+        }}
         data-node-id={node.id}
         data-node-type={node.nodeType}
         data-phase-id={phaseId ?? ''}

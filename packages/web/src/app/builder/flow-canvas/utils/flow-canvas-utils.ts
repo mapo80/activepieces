@@ -132,7 +132,8 @@ const createStepGraph: (
     nodes: [stepNode, graphEndNode],
     edges:
       step.type !== FlowActionType.LOOP_ON_ITEMS &&
-      step.type !== FlowActionType.ROUTER
+      step.type !== FlowActionType.ROUTER &&
+      step.type !== FlowActionType.INTERACTIVE_FLOW
         ? [straightLineEdge]
         : [],
   };
@@ -210,17 +211,22 @@ function createFocusStepInGraphParams(stepName: string) {
 }
 
 const calculateGraphBoundingBox = (graph: ApGraph) => {
-  const affectingNodes = graph.nodes.filter((node) =>
+  const widthAffectingNodes = graph.nodes.filter((node) =>
     flowCanvasConsts.doesNodeAffectBoundingBox(node.type),
   );
-  const minX = Math.min(...affectingNodes.map((node) => node.position.x));
-  const minY = Math.min(...affectingNodes.map((node) => node.position.y));
+  const heightAffectingNodes = graph.nodes.filter(
+    (node) => node.type !== ApNodeType.INTERACTIVE_FLOW_CONTAINER,
+  );
+  const minX = Math.min(...widthAffectingNodes.map((node) => node.position.x));
+  const minY = Math.min(...heightAffectingNodes.map((node) => node.position.y));
   const maxX = Math.max(
-    ...affectingNodes.map(
+    ...widthAffectingNodes.map(
       (node) => node.position.x + flowCanvasConsts.AP_NODE_SIZE.STEP.width,
     ),
   );
-  const maxY = Math.max(...affectingNodes.map((node) => node.position.y));
+  const maxY = Math.max(
+    ...heightAffectingNodes.map((node) => node.position.y),
+  );
   const width = maxX - minX;
   const height = maxY - minY;
 

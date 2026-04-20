@@ -269,6 +269,51 @@ describe('buildInteractiveFlowChildGraph — new layer-based layout', () => {
     ).toBe(true);
   });
 
+  it('parent step of an INTERACTIVE_FLOW does not emit a STRAIGHT_LINE to its own subgraph-end (no duplicate arrow)', () => {
+    const trigger = {
+      name: 'trigger',
+      displayName: 'Trigger',
+      type: 'EMPTY',
+      valid: true,
+      skip: false,
+      lastUpdatedDate: new Date().toISOString(),
+      settings: {},
+      nextAction: buildAction([
+        toolNode({ id: 'a', stateOutputs: ['x'] }),
+        toolNode({ id: 'b', stateInputs: ['x'] }),
+      ]),
+    };
+    const graph = flowCanvasUtils.createFlowGraph(
+      {
+        id: 'v',
+        created: '',
+        updated: '',
+        flowId: 'f',
+        updatedBy: '',
+        displayName: 'test',
+        agentIds: [],
+        notes: [],
+        valid: true,
+        state: 'DRAFT',
+        schemaVersion: '1',
+        trigger,
+      } as unknown as Parameters<typeof flowCanvasUtils.createFlowGraph>[0],
+      [],
+    );
+    const iflowStepName = 'iflow_test';
+    const straightFromIflow = graph.edges.filter(
+      (e) =>
+        e.type === ApEdgeType.STRAIGHT_LINE && e.source === iflowStepName,
+    );
+    expect(straightFromIflow).toHaveLength(0);
+    const startEdges = graph.edges.filter(
+      (e) =>
+        e.type === ApEdgeType.INTERACTIVE_FLOW_START_EDGE &&
+        e.source === iflowStepName,
+    );
+    expect(startEdges.length).toBeGreaterThan(0);
+  });
+
   it('emits one edge per (source, target) pair, aggregating fieldNames', () => {
     const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
       buildAction([
