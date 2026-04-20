@@ -378,7 +378,7 @@ describe('buildInteractiveFlowChildGraph — new layer-based layout', () => {
     }
   });
 
-  it('container encloses end widget', () => {
+  it('end widget sits below the container (outside it)', () => {
     const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
       buildAction([
         toolNode({ id: 'a', stateOutputs: ['x'] }),
@@ -393,8 +393,32 @@ describe('buildInteractiveFlowChildGraph — new layer-based layout', () => {
       (n) => n.type === ApNodeType.GRAPH_END_WIDGET,
     )!;
     const containerBottom = container.position.y + container.data.height;
-    expect(endWidget.position.y).toBeGreaterThanOrEqual(container.position.y);
-    expect(endWidget.position.y).toBeLessThanOrEqual(containerBottom);
+    expect(endWidget.position.y).toBeGreaterThan(containerBottom);
+  });
+
+  it('container height is minimal (children + padding only, no End area)', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({ id: 'a', stateOutputs: ['x'] }),
+        toolNode({ id: 'b', stateInputs: ['x'] }),
+      ]),
+    );
+    const container = graph.nodes.find(
+      (n): n is ApInteractiveFlowContainerNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CONTAINER,
+    )!;
+    const children = graph.nodes.filter(
+      (n): n is ApInteractiveFlowChildNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CHILD,
+    );
+    const childrenTop = Math.min(...children.map((c) => c.position.y));
+    const childrenBottom = Math.max(
+      ...children.map((c) => c.position.y + FLOW_CANVAS_INTERACTIVE_FLOW_CHILD_HEIGHT),
+    );
+    const childrenHeight = childrenBottom - childrenTop;
+    // Container should roughly equal childrenHeight + 2*padding (no End area).
+    // Allow a small tolerance since padding constant may vary over time.
+    expect(container.data.height).toBeLessThan(childrenHeight + 100);
   });
 
   it('return edge connects the last child directly to the end widget', () => {
