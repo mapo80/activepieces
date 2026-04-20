@@ -40,7 +40,6 @@ import {
   ApInteractiveFlowReturnEdge,
   ApInteractiveFlowStartEdge,
   ApLoopReturnNode,
-  ApNode,
   ApNodeType,
   ApStepNode,
   ApStraightLineEdge,
@@ -659,16 +658,8 @@ const buildInteractiveFlowChildGraph = (
 
   const childrenBottomY = currentY - vSpace;
 
-  const returnNodeY = childrenBottomY + containerPadding + vSpace;
-  const returnNode: ApNode = {
-    id: `${step.name}-interactive-flow-return-node`,
-    type: ApNodeType.INTERACTIVE_FLOW_RETURN_NODE,
-    position: { x: 0, y: returnNodeY },
-    data: {},
-    selectable: false,
-  };
-
-  const subgraphEndY = returnNodeY + flowCanvasConsts.AP_NODE_SIZE.STEP.height;
+  const subgraphEndY =
+    childrenBottomY + containerPadding + vSpace + childHeight;
   const subgraphEndSubNode: ApGraphEndNode = {
     id: `${step.name}-interactive-flow-subgraph-end`,
     type: ApNodeType.GRAPH_END_WIDGET,
@@ -717,7 +708,7 @@ const buildInteractiveFlowChildGraph = (
     (node) => ({
       id: `${step.name}-iflow-return-${node.id}`,
       source: nodeIdToCanvasId.get(node.id)!,
-      target: returnNode.id,
+      target: subgraphEndSubNode.id,
       type: ApEdgeType.INTERACTIVE_FLOW_RETURN_EDGE,
       data: {
         parentStepName: step.name,
@@ -788,7 +779,7 @@ const buildInteractiveFlowChildGraph = (
   }
 
   return {
-    nodes: [containerNode, ...childNodes, returnNode, subgraphEndSubNode],
+    nodes: [containerNode, ...childNodes, subgraphEndSubNode],
     edges: [...startEdges, ...returnEdges, ...childEdges],
   };
 };

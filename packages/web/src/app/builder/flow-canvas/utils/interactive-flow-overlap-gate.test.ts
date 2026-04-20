@@ -220,28 +220,15 @@ describe.each(fixtures)('canvas overlap gate: $name', ({ action }) => {
     expect(outside).toEqual([]);
   });
 
-  it('return node is below every child', () => {
-    const returnNode = graph.nodes.find(
-      (n) => n.type === ApNodeType.INTERACTIVE_FLOW_RETURN_NODE,
-    );
-    if (!returnNode || children.length === 0) return;
-    const maxBottom = Math.max(...boxes.map((b) => b.y + b.height));
-    expect(returnNode.position.y).toBeGreaterThanOrEqual(maxBottom);
-  });
-
-  it('end widget is below and horizontally centered on the return node column', () => {
+  it('end widget is below every child and centered on the column', () => {
     const end = graph.nodes.find((n) => n.type === ApNodeType.GRAPH_END_WIDGET);
-    const ret = graph.nodes.find(
-      (n) => n.type === ApNodeType.INTERACTIVE_FLOW_RETURN_NODE,
-    );
-    if (!end || !ret) {
+    if (!end) {
       expect(children.length).toBe(0);
       return;
     }
-    expect(end.position.y).toBeGreaterThan(ret.position.y);
-    // end widget is a zero-width anchor at the center of the return column
+    const maxBottom = Math.max(...boxes.map((b) => b.y + b.height));
+    expect(end.position.y).toBeGreaterThanOrEqual(maxBottom);
     expect(end.position.x).toBe(FLOW_CANVAS_STEP_WIDTH / 2);
-    expect(ret.position.x).toBe(0);
   });
 
   it('edge IDs are unique', () => {

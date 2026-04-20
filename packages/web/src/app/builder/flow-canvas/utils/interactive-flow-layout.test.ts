@@ -212,7 +212,7 @@ describe('buildInteractiveFlowChildGraph — new layer-based layout', () => {
     expect(overlapCount).toBe(0);
   });
 
-  it('return node is at x=0 below the last layer', () => {
+  it('no intermediate return node is emitted (subgraph is flat submit -> end)', () => {
     const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
       buildAction([
         toolNode({ id: 'a', stateOutputs: ['x'] }),
@@ -222,31 +222,23 @@ describe('buildInteractiveFlowChildGraph — new layer-based layout', () => {
     const returnNode = graph.nodes.find(
       (n) => n.type === ApNodeType.INTERACTIVE_FLOW_RETURN_NODE,
     );
-    expect(returnNode).toBeDefined();
-    expect(returnNode!.position.x).toBe(0);
-    const children = graph.nodes.filter(
-      (n) => n.type === ApNodeType.INTERACTIVE_FLOW_CHILD,
-    );
-    const maxChildY = Math.max(...children.map((c) => c.position.y));
-    expect(returnNode!.position.y).toBeGreaterThan(maxChildY);
+    expect(returnNode).toBeUndefined();
   });
 
-  it('end widget is centered horizontally below the return node', () => {
+  it('end widget is centered below the last layer child column', () => {
     const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
       buildAction([toolNode({ id: 'a' })]),
     );
     const endWidget = graph.nodes.find(
       (n) => n.type === ApNodeType.GRAPH_END_WIDGET,
     );
-    const returnNode = graph.nodes.find(
-      (n) => n.type === ApNodeType.INTERACTIVE_FLOW_RETURN_NODE,
+    const children = graph.nodes.filter(
+      (n) => n.type === ApNodeType.INTERACTIVE_FLOW_CHILD,
     );
     expect(endWidget).toBeDefined();
-    // end widget is a zero-width marker; it sits at the horizontal center
-    // of the column so that return_node (x=0, width=STEP_WIDTH) center
-    // aligns with end's center.
     expect(endWidget!.position.x).toBe(FLOW_CANVAS_STEP_WIDTH / 2);
-    expect(endWidget!.position.y).toBeGreaterThan(returnNode!.position.y);
+    const maxChildY = Math.max(...children.map((c) => c.position.y));
+    expect(endWidget!.position.y).toBeGreaterThan(maxChildY);
   });
 
   it('uses INTERACTIVE_FLOW_RETURN_EDGE, not LOOP_RETURN_EDGE', () => {
@@ -386,7 +378,7 @@ describe('buildInteractiveFlowChildGraph — new layer-based layout', () => {
     }
   });
 
-  it('container encloses return node and end widget too', () => {
+  it('container encloses end widget', () => {
     const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
       buildAction([
         toolNode({ id: 'a', stateOutputs: ['x'] }),
@@ -397,17 +389,29 @@ describe('buildInteractiveFlowChildGraph — new layer-based layout', () => {
       (n): n is ApInteractiveFlowContainerNode =>
         n.type === ApNodeType.INTERACTIVE_FLOW_CONTAINER,
     )!;
-    const returnNode = graph.nodes.find(
-      (n) => n.type === ApNodeType.INTERACTIVE_FLOW_RETURN_NODE,
-    )!;
     const endWidget = graph.nodes.find(
       (n) => n.type === ApNodeType.GRAPH_END_WIDGET,
     )!;
     const containerBottom = container.position.y + container.data.height;
-    expect(returnNode.position.y).toBeGreaterThanOrEqual(container.position.y);
-    expect(returnNode.position.y).toBeLessThanOrEqual(containerBottom);
     expect(endWidget.position.y).toBeGreaterThanOrEqual(container.position.y);
     expect(endWidget.position.y).toBeLessThanOrEqual(containerBottom);
+  });
+
+  it('return edge connects the last child directly to the end widget', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({ id: 'a', stateOutputs: ['x'] }),
+        toolNode({ id: 'b', stateInputs: ['x'] }),
+      ]),
+    );
+    const endWidget = graph.nodes.find(
+      (n) => n.type === ApNodeType.GRAPH_END_WIDGET,
+    )!;
+    const returnEdge = graph.edges.find(
+      (e) => e.type === ApEdgeType.INTERACTIVE_FLOW_RETURN_EDGE,
+    )!;
+    expect(returnEdge.target).toBe(endWidget.id);
+    expect(returnEdge.source).toContain('iflow-b');
   });
 
   it('container is not emitted when there are zero nodes', () => {
