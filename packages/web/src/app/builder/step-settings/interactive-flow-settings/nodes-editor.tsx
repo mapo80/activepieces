@@ -1,0 +1,430 @@
+import {
+  InteractiveFlowAction,
+  InteractiveFlowNodeType,
+} from '@activepieces/shared';
+import { Plus, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { useFieldArray, useFormContext } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
+
+import { Button } from '@/components/ui/button';
+import { FormField } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { interactiveFlowComponentRegistry } from '@/features/interactive-flow/components/registry';
+import { cn } from '@/lib/utils';
+
+const NODE_TYPE_VALUES = [
+  InteractiveFlowNodeType.TOOL,
+  InteractiveFlowNodeType.USER_INPUT,
+  InteractiveFlowNodeType.CONFIRM,
+  InteractiveFlowNodeType.BRANCH,
+];
+
+type Props = { readonly: boolean };
+
+export function NodesEditor({ readonly }: Props): React.ReactElement {
+  const form = useFormContext<InteractiveFlowAction>();
+  const { t } = useTranslation();
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'settings.nodes',
+  });
+  const [activeIndex, setActiveIndex] = useState<number>(0);
+  const activeNode = form.watch(`settings.nodes.${activeIndex}`);
+  const stateFieldNames = (form.watch('settings.stateFields') ?? [])
+    .map((f) => f.name)
+    .filter((n): n is string => !!n);
+
+  return (
+    <div className="grid grid-cols-[180px_1fr] gap-3">
+      <div
+        className="flex flex-col gap-1"
+        data-testid="interactive-flow-nodes-list"
+      >
+        {fields.map((f, idx) => {
+          const node = form.watch(`settings.nodes.${idx}`);
+          return (
+            <button
+              key={f.id}
+              type="button"
+              className={cn(
+                'flex items-center justify-between rounded border px-2 py-1.5 text-left text-xs',
+                idx === activeIndex
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border hover:bg-muted',
+              )}
+              onClick={() => setActiveIndex(idx)}
+            >
+              <div className="flex flex-col">
+                <span className="font-mono">{node?.name ?? ''}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {node?.nodeType}
+                </span>
+              </div>
+              <Trash2
+                className="size-3 text-muted-foreground hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  remove(idx);
+                  if (activeIndex >= fields.length - 1) {
+                    setActiveIndex(Math.max(0, fields.length - 2));
+                  }
+                }}
+              />
+            </button>
+          );
+        })}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={readonly}
+          onClick={() => {
+            append({
+              id: `node_${fields.length}`,
+              name: `node_${fields.length}`,
+              displayName: t('New node'),
+              nodeType: InteractiveFlowNodeType.USER_INPUT,
+              stateInputs: [],
+              stateOutputs: [],
+              render: { component: 'TextInput', props: {} },
+              message: { en: '' },
+            });
+            setActiveIndex(fields.length);
+          }}
+          data-testid="interactive-flow-add-node"
+        >
+          <Plus className="size-4" /> {t('Add node')}
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded border border-border p-3">
+        {fields.length === 0 ? (
+          <div className="text-sm text-muted-foreground">
+            {t('No nodes yet — add your first one.')}
+          </div>
+        ) : activeNode ? (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <FormField
+                control={form.control}
+                name={`settings.nodes.${activeIndex}.name`}
+                render={({ field }) => (
+                  <label className="flex flex-col gap-1 text-xs">
+                    {t('Name')}
+                    <Input disabled={readonly} {...field} />
+                  </label>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name={`settings.nodes.${activeIndex}.displayName`}
+                render={({ field }) => (
+                  <label className="flex flex-col gap-1 text-xs">
+                    {t('Display name')}
+                    <Input disabled={readonly} {...field} />
+                  </label>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name={`settings.nodes.${activeIndex}.nodeType`}
+                render={({ field }) => (
+                  <label className="flex flex-col gap-1 text-xs">
+                    {t('Node type')}
+                    <Select
+                      disabled={readonly}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {NODE_TYPE_VALUES.map((nt) => (
+                          <SelectItem key={nt} value={nt}>
+                            {nt}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+                )}
+              />
+              {activeNode.nodeType === InteractiveFlowNodeType.TOOL && (
+                <FormField
+                  control={form.control}
+                  name={`settings.nodes.${activeIndex}.tool`}
+                  render={({ field }) => (
+                    <label className="flex flex-col gap-1 text-xs">
+                      {t('MCP Tool')}
+                      <Input
+                        disabled={readonly}
+                        placeholder="banking/search_customer"
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                      />
+                    </label>
+                  )}
+                />
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <FieldMultiSelect
+                label={t('Reads (state inputs)')}
+                path={`settings.nodes.${activeIndex}.stateInputs`}
+                options={stateFieldNames}
+                disabled={readonly}
+              />
+              <FieldMultiSelect
+                label={t('Writes (state outputs)')}
+                path={`settings.nodes.${activeIndex}.stateOutputs`}
+                options={stateFieldNames}
+                disabled={readonly}
+              />
+            </div>
+
+            {(activeNode.nodeType === InteractiveFlowNodeType.USER_INPUT ||
+              activeNode.nodeType === InteractiveFlowNodeType.CONFIRM) && (
+              <div className="flex flex-col gap-2">
+                <FormField
+                  control={form.control}
+                  name={`settings.nodes.${activeIndex}.render.component`}
+                  render={({ field }) => (
+                    <label className="flex flex-col gap-1 text-xs">
+                      {t('Render component')}
+                      <Select
+                        disabled={readonly}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {interactiveFlowComponentRegistry
+                            .listComponentNames()
+                            .map((name) => (
+                              <SelectItem key={name} value={name}>
+                                {name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </label>
+                  )}
+                />
+                <MessageEditor
+                  path={`settings.nodes.${activeIndex}.message`}
+                  readonly={readonly}
+                />
+                <LivePreview
+                  componentName={activeNode.render?.component}
+                  propsJson={
+                    activeNode.render?.props as
+                      | Record<string, unknown>
+                      | undefined
+                  }
+                />
+              </div>
+            )}
+
+            {activeNode.nodeType === InteractiveFlowNodeType.BRANCH && (
+              <div className="text-xs text-muted-foreground">
+                {t(
+                  'Branch editor uses the ROUTER conditions UI (wire-up in follow-up).',
+                )}
+              </div>
+            )}
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function FieldMultiSelect({
+  label,
+  path,
+  options,
+  disabled,
+}: {
+  label: string;
+  path:
+    | `settings.nodes.${number}.stateInputs`
+    | `settings.nodes.${number}.stateOutputs`;
+  options: string[];
+  disabled: boolean;
+}): React.ReactElement {
+  const form = useFormContext<InteractiveFlowAction>();
+  const value = (form.watch(path) as string[] | undefined) ?? [];
+  const toggle = (name: string): void => {
+    const next = value.includes(name)
+      ? value.filter((v) => v !== name)
+      : [...value, name];
+    form.setValue(path, next, { shouldDirty: true });
+  };
+  return (
+    <div className="flex flex-col gap-1 text-xs">
+      <span>{label}</span>
+      <div className="flex flex-wrap gap-1 rounded border border-border p-1">
+        {options.length === 0 ? (
+          <span className="text-[10px] text-muted-foreground">
+            (define state fields first)
+          </span>
+        ) : (
+          options.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              disabled={disabled}
+              onClick={() => toggle(opt)}
+              className={cn(
+                'rounded border px-1.5 py-0.5 font-mono text-[10px]',
+                value.includes(opt)
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground',
+              )}
+            >
+              {opt}
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MessageEditor({
+  path,
+  readonly,
+}: {
+  path: `settings.nodes.${number}.message`;
+  readonly: boolean;
+}): React.ReactElement {
+  const form = useFormContext<InteractiveFlowAction>();
+  const raw = form.watch(path);
+  const isDynamic = typeof raw === 'object' && raw !== null && 'dynamic' in raw;
+
+  const toggleDynamic = (): void => {
+    if (isDynamic) {
+      form.setValue(path, { en: '' }, { shouldDirty: true });
+    } else {
+      form.setValue(
+        path,
+        { dynamic: true, fallback: { en: '' } },
+        { shouldDirty: true },
+      );
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2 rounded border border-dashed border-border p-2">
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-medium">
+          {isDynamic ? 'Dynamic (LLM-generated)' : 'Static message'}
+        </span>
+        <button
+          type="button"
+          className="text-[10px] underline"
+          disabled={readonly}
+          onClick={toggleDynamic}
+        >
+          Toggle
+        </button>
+      </div>
+      {isDynamic ? (
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-muted-foreground">
+            Fallback (en)
+          </label>
+          <Textarea
+            disabled={readonly}
+            rows={2}
+            value={(raw as { fallback?: { en?: string } }).fallback?.en ?? ''}
+            onChange={(e) =>
+              form.setValue(
+                path,
+                {
+                  dynamic: true,
+                  fallback: { en: e.target.value },
+                },
+                { shouldDirty: true },
+              )
+            }
+          />
+          <label className="text-[10px] text-muted-foreground">
+            Extra guidance (systemPromptAddendum)
+          </label>
+          <Textarea
+            disabled={readonly}
+            rows={2}
+            value={
+              (raw as { systemPromptAddendum?: string }).systemPromptAddendum ??
+              ''
+            }
+            onChange={(e) =>
+              form.setValue(
+                path,
+                {
+                  ...(raw as object),
+                  systemPromptAddendum: e.target.value,
+                },
+                { shouldDirty: true },
+              )
+            }
+          />
+        </div>
+      ) : (
+        <Textarea
+          disabled={readonly}
+          rows={2}
+          value={
+            typeof raw === 'string'
+              ? raw
+              : (raw as Record<string, string> | undefined)?.en ?? ''
+          }
+          onChange={(e) =>
+            form.setValue(path, { en: e.target.value }, { shouldDirty: true })
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+function LivePreview({
+  componentName,
+  propsJson,
+}: {
+  componentName: string | undefined;
+  propsJson: Record<string, unknown> | undefined;
+}): React.ReactElement | null {
+  if (!componentName) return null;
+  const entry = interactiveFlowComponentRegistry.getEntry(componentName);
+  if (!entry) {
+    return (
+      <div className="rounded border border-destructive/50 bg-destructive/5 p-2 text-xs text-destructive">
+        Unknown component: {componentName}
+      </div>
+    );
+  }
+  const sample = entry.sampleState({});
+  return (
+    <div className="flex flex-col gap-1 rounded border border-border p-2">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        Live preview
+      </div>
+      {entry.preview({ ...(propsJson ?? {}), ...sample })}
+    </div>
+  );
+}
