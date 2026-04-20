@@ -4,10 +4,18 @@ import { logger } from '../config/logger'
 
 export const LATEST_CACHE_VERSION = 'v11'
 
-export const GLOBAL_CACHE_ALL_VERSIONS_PATH = path.resolve('cache')
+function resolveCacheRoot(): string {
+    const envOverride = process.env.AP_CACHE_DIR
+    if (envOverride && envOverride.length > 0) {
+        return path.resolve(envOverride)
+    }
+    return path.resolve('cache')
+}
+
+export const GLOBAL_CACHE_ALL_VERSIONS_PATH = resolveCacheRoot()
 
 export function getGlobalCachePathLatestVersion(): string {
-    return path.resolve('cache', LATEST_CACHE_VERSION)
+    return path.resolve(GLOBAL_CACHE_ALL_VERSIONS_PATH, LATEST_CACHE_VERSION)
 }
 
 export function getGlobalCacheCommonPath(): string {

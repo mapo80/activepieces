@@ -412,6 +412,37 @@ function substituteTemplate(raw: unknown, state: InteractiveFlowState): unknown 
     })
 }
 
+function resolveMessageInputFromTrigger({ template, triggerPayload }: {
+    template: string
+    triggerPayload: Record<string, unknown> | undefined
+}): string | undefined {
+    if (isNil(triggerPayload)) return undefined
+    // Minimal AP expression resolver: supports dotted paths such as
+    // `{{trigger.body.message}}` or `{{trigger.body.someField}}`. Only
+    // reads from `triggerPayload`; anything else is left unchanged so
+    // that a bogus template fails loud (empty string) rather than
+    // silently swallowing the extractor call.
+    const replaced = template.replace(
+        /\{\{\s*trigger\.([a-zA-Z0-9_.]+)\s*\}\}/g,
+        (_, path: string) => {
+            const parts = path.split('.')
+            let cur: unknown = triggerPayload
+            for (const part of parts) {
+                if (cur && typeof cur === 'object' && part in (cur as Record<string, unknown>)) {
+                    cur = (cur as Record<string, unknown>)[part]
+                }
+                else {
+                    return ''
+                }
+            }
+            if (typeof cur === 'string') return cur
+            if (isNil(cur)) return ''
+            return JSON.stringify(cur)
+        },
+    )
+    return replaced.length > 0 ? replaced : undefined
+}
+
 function applyBranch({ node, state, nodes, executedNodeIds, skippedNodeIds, selectedBranches }: {
     node: InteractiveFlowBranchNode
     state: InteractiveFlowState
@@ -491,6 +522,33 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
 
             const userMessage = typeof incoming.message === 'string' ? incoming.message : undefined
             if (!isNil(userMessage) && !isNil(settings.fieldExtractor)) {
+                const extracted = await fieldExtractor.extract({
+                    constants,
+                    config: settings.fieldExtractor,
+                    message: userMessage,
+                    stateFields: fields,
+                    currentState: flowState,
+                    systemPrompt: settings.systemPrompt,
+                    locale: resolveLocale({ constants, settings }),
+                })
+                const coercedExtracted = coerceIncomingState({ incoming: extracted, fields })
+                for (const [k, v] of Object.entries(coercedExtracted)) {
+                    if (isNil(flowState[k])) flowState[k] = v
+                }
+            }
+        }
+        else if (
+            isNil(prevFlowOutput)
+            && !isNil(settings.messageInput)
+            && !isNil(settings.fieldExtractor)
+        ) {
+            const triggerStep = executionState.getStepOutput('trigger')
+            const triggerOutput = triggerStep?.output as Record<string, unknown> | undefined
+            const userMessage = resolveMessageInputFromTrigger({
+                template: settings.messageInput,
+                triggerPayload: triggerOutput,
+            })
+            if (!isNil(userMessage) && userMessage.trim().length > 0) {
                 const extracted = await fieldExtractor.extract({
                     constants,
                     config: settings.fieldExtractor,
