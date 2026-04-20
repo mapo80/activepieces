@@ -27,7 +27,10 @@
           "settings": {
             "mcpGatewayId": "__AUTO_MCP_GATEWAY__",
             "messageInput": "{{trigger.message}}",
-            "systemPrompt": "Sei un assistente bancario esperto in estinzione rapporti bancari. Estrai SOLO i campi realmente presenti nel messaggio dell'utente; non inventare mai dati. Regole di estrazione per campo:\n- `customerName`: un cognome o nome+cognome (es. \"Bellafronte\", \"Mario Rossi\").\n- `ndg`: una sequenza numerica di 6-10 cifre (es. \"11255521\"). Se l'utente dice \"il primo\" o \"seleziona il primo\", NON inferire.\n- `rapportoId`: un identificativo nel formato XX-XXX-XXXXXXXX (es. \"01-034-00392400\").\n- `closureReasonCode`: codice 2 cifre della motivazione (es. \"01\"). Se l'utente cita la descrizione (es. \"trasferimento estero\"), mappa alla motivazione piu' pertinente dalla lista nota.\n- `closureDate`: data in formato ISO YYYY-MM-DD.\n- `confirmed`: true solo se l'utente conferma esplicitamente (es. \"sì, confermo\", \"procedi\", \"ok\").",
+            "sessionIdInput": "{{trigger.sessionId}}",
+            "cleanupOnSuccess": true,
+            "historyMaxTurns": 20,
+            "systemPrompt": "Sei un assistente bancario esperto in estinzione rapporti bancari. Estrai SOLO i campi realmente presenti nel messaggio dell'utente; non inventare mai dati. Regole di estrazione per campo:\n- `customerName`: un cognome o nome+cognome (es. \"Bellafronte\", \"Mario Rossi\").\n- `ndg`: una sequenza numerica di 6-10 cifre (es. \"11255521\"). Se l'utente dice \"il primo\" o \"seleziona il primo\", NON inferire.\n- `rapportoId`: un identificativo nel formato XX-XXX-XXXXXXXX (es. \"01-034-00392400\").\n- `closureReasonCode`: codice 2 cifre della motivazione (es. \"01\"). Se l'utente cita la descrizione (es. \"trasferimento estero\"), mappa alla motivazione piu' pertinente dalla lista nota.\n- `closureDate`: data in formato ISO YYYY-MM-DD.\n- `confirmed`: true solo se l'utente conferma esplicitamente (es. \"sì, confermo\", \"procedi\", \"ok\").\n- Se l'utente scrive qualcosa non pertinente al compito (saluti, off-topic, domande estranee), riporta cortesemente la conversazione al task di estinzione in corso senza rispondere al contenuto off-topic.",
             "fieldExtractor": {
               "aiProviderId": "custom",
               "model": "claude-cli"
@@ -39,17 +42,17 @@
             },
             "stateFields": [
               { "name": "customerName", "type": "string", "extractable": true, "description": "Cognome o nome completo cliente" },
-              { "name": "customerMatches", "type": "array" },
+              { "name": "customerMatches", "type": "array", "extractable": false },
               { "name": "ndg", "type": "string", "extractable": true, "description": "Numero Dossier Generale (6-10 cifre)" },
-              { "name": "profile", "type": "object" },
-              { "name": "accounts", "type": "array" },
+              { "name": "profile", "type": "object", "extractable": false },
+              { "name": "accounts", "type": "array", "extractable": false },
               { "name": "rapportoId", "type": "string", "extractable": true, "description": "Identificativo rapporto formato NN-NNN-NNNNNNNN" },
-              { "name": "closureReasons", "type": "array" },
+              { "name": "closureReasons", "type": "array", "extractable": false },
               { "name": "closureReasonCode", "type": "string", "extractable": true, "description": "Codice motivazione 2 cifre (01-32, 98)" },
               { "name": "closureDate", "type": "string", "extractable": true, "format": "date", "description": "Data di efficacia in formato YYYY-MM-DD" },
-              { "name": "moduleBase64", "type": "string" },
+              { "name": "moduleBase64", "type": "string", "extractable": false },
               { "name": "confirmed", "type": "boolean", "extractable": true, "description": "Conferma finale esplicita dell'utente" },
-              { "name": "caseId", "type": "string" }
+              { "name": "caseId", "type": "string", "extractable": false }
             ],
             "nodes": [
               {

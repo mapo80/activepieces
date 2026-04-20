@@ -1,7 +1,9 @@
 import { FlowRunStatus, InteractiveFlowNodeType, StepOutputStatus } from '@activepieces/shared'
+import { describe, expect, it, vi } from 'vitest'
 import { FlowExecutorContext } from '../../src/lib/handler/context/flow-execution-context'
 import { StepExecutionPath } from '../../src/lib/handler/context/step-execution-path'
 import { flowExecutor } from '../../src/lib/handler/flow-executor'
+import { workerSocket } from '../../src/lib/worker-socket'
 import { buildCodeAction, buildInteractiveFlowAction, generateMockEngineConstants } from './test-helper'
 
 const mockFetchResponse = (data: unknown): Promise<Response> => {
@@ -655,7 +657,15 @@ describe('interactive flow executor - pause and resume', () => {
         fetchSpy.mockRestore()
     })
 
-    it('should include render hint and message in pause metadata response', async () => {
+    it('should push pause message to sync caller via sendFlowResponse', async () => {
+        const sendFlowResponseSpy = vi.fn().mockResolvedValue(undefined)
+        vi.spyOn(workerSocket, 'getWorkerClient').mockReturnValue({
+            sendFlowResponse: sendFlowResponseSpy,
+            updateRunProgress: vi.fn(),
+            uploadRunLog: vi.fn(),
+            updateStepProgress: vi.fn(),
+        } as never)
+
         const action = buildInteractiveFlowAction({
             name: 'interactive_flow',
             nodes: [
@@ -675,15 +685,18 @@ describe('interactive flow executor - pause and resume', () => {
         const result = await flowExecutor.execute({
             action,
             executionState: FlowExecutorContext.empty(),
-            constants: generateMockEngineConstants(),
+            constants: generateMockEngineConstants({
+                workerHandlerId: 'test-worker-handler',
+                httpRequestId: 'test-http-request',
+            }),
         })
 
         expect(result.verdict.status).toBe(FlowRunStatus.PAUSED)
-        const verdict = result.verdict as { status: FlowRunStatus.PAUSED, pauseMetadata: Record<string, unknown> }
-        const response = verdict.pauseMetadata.response as Record<string, unknown>
-        const body = response.body as Record<string, unknown>
-        expect(body.message).toBe('What is the client name?')
-        expect(body.render).toEqual({ component: 'TextInput', props: { placeholder: 'Enter name' } })
+        expect(sendFlowResponseSpy).toHaveBeenCalledTimes(1)
+        const call = sendFlowResponseSpy.mock.calls[0][0] as { runResponse: { body: Record<string, unknown> } }
+        expect(call.runResponse.body).toMatchObject({ type: 'markdown', value: 'What is the client name?' })
+        const output = result.getStepOutput('interactive_flow')?.output as Record<string, unknown>
+        expect(output.currentNodeId).toBe('user_name')
     })
 })
 

@@ -191,5 +191,9 @@ export const InteractiveFlowActionSettings = z.object({
     questionGenerator: QuestionGeneratorConfigSchema.optional(),
     locale: z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/).optional(),
     messageInput: z.string().optional(),
+    sessionIdInput: z.string().optional(),
+    sessionNamespace: z.string().optional(),
+    cleanupOnSuccess: z.boolean().optional(),
+    historyMaxTurns: z.number().int().min(1).max(100).optional(),
 })
 export type InteractiveFlowActionSettings = z.infer<typeof InteractiveFlowActionSettings>

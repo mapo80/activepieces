@@ -3,7 +3,24 @@ import { describe, expect, it, vi } from 'vitest'
 import { FlowExecutorContext } from '../../src/lib/handler/context/flow-execution-context'
 import { StepExecutionPath } from '../../src/lib/handler/context/step-execution-path'
 import { flowExecutor } from '../../src/lib/handler/flow-executor'
+import { workerSocket } from '../../src/lib/worker-socket'
 import { buildInteractiveFlowAction, generateMockEngineConstants } from './test-helper'
+
+function spyOnSendFlowResponse(): ReturnType<typeof vi.fn> {
+    const sendFlowResponse = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(workerSocket, 'getWorkerClient').mockReturnValue({
+        sendFlowResponse,
+        updateRunProgress: vi.fn(),
+        uploadRunLog: vi.fn(),
+        updateStepProgress: vi.fn(),
+    } as never)
+    return sendFlowResponse
+}
+
+const SYNC_CHANNEL_OVERRIDES = {
+    workerHandlerId: 'test-worker-handler',
+    httpRequestId: 'test-http-request',
+}
 
 function mockResolveGateway(): Response {
     return {
@@ -140,6 +157,7 @@ describe('interactive flow executor - LLM integration (field extractor)', () => 
 describe('interactive flow executor - LLM integration (question generator)', () => {
 
     it('generates a dynamic pause message when node.message.dynamic and generator configured', async () => {
+        const sendFlowResponseSpy = spyOnSendFlowResponse()
         const genSpy = vi.fn()
         vi.spyOn(global, 'fetch').mockImplementation((input) => {
             const url = typeof input === 'string' ? input : (input as Request).url ?? String(input)
@@ -170,17 +188,18 @@ describe('interactive flow executor - LLM integration (question generator)', () 
         const result = await flowExecutor.execute({
             action,
             executionState: FlowExecutorContext.empty(),
-            constants: generateMockEngineConstants(),
+            constants: generateMockEngineConstants(SYNC_CHANNEL_OVERRIDES),
         })
 
         expect(result.verdict.status).toBe(FlowRunStatus.PAUSED)
-        const verdict = result.verdict as { status: FlowRunStatus.PAUSED, pauseMetadata: Record<string, unknown> }
-        const body = (verdict.pauseMetadata.response as { body: Record<string, unknown> }).body
-        expect(body.message).toBe('Qual è il NDG del cliente?')
         expect(genSpy).toHaveBeenCalledTimes(1)
+        expect(sendFlowResponseSpy).toHaveBeenCalledTimes(1)
+        const call = sendFlowResponseSpy.mock.calls[0][0] as { runResponse: { body: Record<string, unknown> } }
+        expect(call.runResponse.body).toMatchObject({ type: 'markdown', value: 'Qual è il NDG del cliente?' })
     })
 
     it('falls back to static fallback text when generator returns empty', async () => {
+        const sendFlowResponseSpy = spyOnSendFlowResponse()
         vi.spyOn(global, 'fetch').mockImplementation((input) => {
             const url = typeof input === 'string' ? input : (input as Request).url ?? String(input)
             if (url.includes('/interactive-flow-ai/question-generate')) {
@@ -206,13 +225,14 @@ describe('interactive flow executor - LLM integration (question generator)', () 
             locale: 'en',
         })
 
-        const result = await flowExecutor.execute({
+        await flowExecutor.execute({
             action,
             executionState: FlowExecutorContext.empty(),
-            constants: generateMockEngineConstants(),
+            constants: generateMockEngineConstants(SYNC_CHANNEL_OVERRIDES),
         })
-        const verdict = result.verdict as { status: FlowRunStatus.PAUSED, pauseMetadata: Record<string, unknown> }
-        const body = (verdict.pauseMetadata.response as { body: Record<string, unknown> }).body
-        expect(body.message).toBe('What is the NDG?')
+
+        expect(sendFlowResponseSpy).toHaveBeenCalledTimes(1)
+        const call = sendFlowResponseSpy.mock.calls[0][0] as { runResponse: { body: Record<string, unknown> } }
+        expect(call.runResponse.body).toMatchObject({ type: 'markdown', value: 'What is the NDG?' })
     })
 })

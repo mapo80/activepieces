@@ -88,6 +88,8 @@ scratch.md
 /redis-binaries/
 packages/tests-e2e/test-results/
 packages/tests-e2e/playwright-report/
+packages/server/engine/test-results/
+packages/server/engine/coverage/
 
 # Terraform
 deploy/terraform/**/.terraform/

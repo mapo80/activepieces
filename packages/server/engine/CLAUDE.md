@@ -44,6 +44,57 @@ JSONL lines at these permanent trace points:
 | `handle:pause:sendFlowResponse` / `:result` | attempt + outcome of pushing sync bot bubble |
 | `handle:success:begin` | success path reached (state keys + caseId if any) |
 | `handle:success:sendFlowResponse:result` | outcome of final sync push |
+| `handle:session:loaded` | cross-run state+history pulled from store-entries |
+| `handle:session:miss` | no persisted session for this key (first turn) |
+| `handle:session:version-reset` | `flowVersionId` mismatch → state reset |
+| `handle:session:topic-change` | extractor changed an already-set extractable field → cleared tool outputs |
+| `handle:session:saved` | bytes/history-length of just-written record |
+| `handle:session:cleared` | terminal success + `cleanupOnSuccess:true` → DELETE |
+| `handle:session:load-error` | store-entries GET failed (network / 5xx) |
+| `handle:session:save-error` | store-entries PUT/DELETE failed |
 
 Disabled = zero overhead (early return). No need to edit the file to
 add/remove logs — toggle the env var instead.
+
+## Session store (cross-run state + history)
+
+`INTERACTIVE_FLOW` actions declare `sessionIdInput` (expression
+against the trigger, e.g. `{{trigger.sessionId}}`) to opt into
+multi-turn persistence. The helper lives at
+[session-store.ts](src/lib/handler/session-store.ts) and wraps the
+`/v1/store-entries` API via [createContextStore](src/lib/piece-context/store.ts:6).
+
+Key shape: `ifsession:<namespace>:<sessionId>`, where
+`namespace = settings.sessionNamespace ?? action.name`. Different IF
+actions are isolated by default; set the same `sessionNamespace`
+value on two IFs to share state+history (pipeline mode).
+
+Record shape (`SessionRecord`):
+- `state`: `InteractiveFlowState`
+- `history`: `{ role: 'user' | 'assistant', text: string }[]`
+- `flowVersionId`: current version — on mismatch the record is
+  dropped at load time.
+- `lastTurnAt`: ISO timestamp, informational.
+
+Constraints:
+- 512KB per store-entry — the helper logs `handle:session:over-size`
+  and truncates history to 5 turns when the payload crosses 400KB.
+- `historyMaxTurns` (default 20) only caps what's persisted + passed
+  to the question-generator; the React chat UI keeps its own local
+  log so the user never sees a mid-conversation gap.
+
+## Coverage
+
+Enforced thresholds in [vitest.config.ts](vitest.config.ts):
+
+| File | Lines | Functions |
+|---|---|---|
+| `session-store.ts` | ≥ 90% | ≥ 90% |
+| `interactive-flow-executor.ts` | ≥ 70% | ≥ 80% |
+
+Run locally:
+
+```bash
+cd packages/server/engine
+npm run test:coverage
+```

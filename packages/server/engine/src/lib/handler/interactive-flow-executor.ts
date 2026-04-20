@@ -1,3 +1,4 @@
+import * as nodeFs from 'node:fs'
 import {
     EngineGenericError,
     FlowActionType,
@@ -20,7 +21,6 @@ import {
     ResolveMcpGatewayResponse,
     StepOutputStatus,
 } from '@activepieces/shared'
-import * as nodeFs from 'node:fs'
 import { workerSocket } from '../worker-socket'
 import { BaseExecutor } from './base-executor'
 import { EngineConstants } from './context/engine-constants'
@@ -28,6 +28,7 @@ import { FlowExecutorContext } from './context/flow-execution-context'
 import { fieldExtractor } from './field-extractor'
 import { interactiveFlowEvents } from './interactive-flow-events'
 import { questionGenerator } from './question-generator'
+import { DEFAULT_HISTORY_MAX_TURNS, HistoryEntry, sessionStore } from './session-store'
 
 // Debug logger: disabled by default, zero overhead when the env vars
 // below are not set. Enable on-demand without editing this file:
@@ -547,6 +548,55 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
         const skippedNodeIds = new Set<string>(prevFlowOutput?.skippedNodeIds ?? [])
         const selectedBranches: Record<string, string> = { ...(prevFlowOutput?.selectedBranches ?? {}) }
 
+        const triggerStep = executionState.getStepOutput('trigger')
+        const triggerOutput = triggerStep?.output as Record<string, unknown> | undefined
+        const sessionId = !isNil(settings.sessionIdInput)
+            ? resolveMessageInputFromTrigger({ template: settings.sessionIdInput, triggerPayload: triggerOutput })
+            : undefined
+        const sessionKey = !isNil(sessionId) && sessionId.trim().length > 0
+            ? sessionStore.makeSessionKey({
+                actionName: action.name,
+                sessionNamespace: settings.sessionNamespace,
+                sessionId,
+            })
+            : undefined
+        const historyMaxTurns = settings.historyMaxTurns ?? DEFAULT_HISTORY_MAX_TURNS
+        let history: HistoryEntry[] = []
+        if (!isNil(sessionKey)) {
+            try {
+                const loaded = await sessionStore.load({
+                    key: sessionKey,
+                    constants,
+                    currentFlowVersionId: constants.flowVersionId,
+                })
+                if (!isNil(loaded.record) && !loaded.versionMismatch) {
+                    if (isNil(prevFlowOutput)) {
+                        for (const [k, v] of Object.entries(loaded.record.state)) {
+                            flowState[k] = v
+                        }
+                    }
+                    history = [...loaded.record.history]
+                    ifDebug('handle:session:loaded', {
+                        sessionId,
+                        stateKeys: Object.keys(loaded.record.state),
+                        historyLen: loaded.record.history.length,
+                    })
+                }
+                else if (!isNil(loaded.record) && loaded.versionMismatch) {
+                    ifDebug('handle:session:version-reset', {
+                        was: loaded.record.flowVersionId,
+                        now: constants.flowVersionId,
+                    })
+                }
+                else {
+                    ifDebug('handle:session:miss', { sessionId })
+                }
+            }
+            catch (e) {
+                ifDebug('handle:session:load-error', { error: (e as Error).message })
+            }
+        }
+
         if (constants.resumePayload?.body && typeof constants.resumePayload.body === 'object') {
             const incoming = constants.resumePayload.body as Record<string, unknown>
             const coerced = coerceIncomingState({ incoming, fields })
@@ -556,6 +606,9 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             }
 
             const userMessage = typeof incoming.message === 'string' ? incoming.message : undefined
+            if (!isNil(userMessage)) {
+                history = sessionStore.appendHistory({ history, role: 'user', text: userMessage, historyMaxTurns })
+            }
             ifDebug('handle:resume:incoming', {
                 incomingKeys: Object.keys(incoming),
                 userMessagePreview: userMessage?.slice(0, 80),
@@ -572,8 +625,15 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 })
                 ifDebug('handle:resume:extracted', { extractedKeys: Object.keys(extracted) })
                 const coercedExtracted = coerceIncomingState({ incoming: extracted, fields })
-                for (const [k, v] of Object.entries(coercedExtracted)) {
-                    if (isNil(flowState[k])) flowState[k] = v
+                const applied = sessionStore.applyStateOverwriteWithTopicChange({
+                    flowState,
+                    incoming: coercedExtracted,
+                    fields,
+                })
+                if (applied.topicChanged) {
+                    executedNodeIds.clear()
+                    skippedNodeIds.clear()
+                    ifDebug('handle:session:topic-change', { stateKeys: Object.keys(flowState) })
                 }
             }
         }
@@ -582,8 +642,6 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             && !isNil(settings.messageInput)
             && !isNil(settings.fieldExtractor)
         ) {
-            const triggerStep = executionState.getStepOutput('trigger')
-            const triggerOutput = triggerStep?.output as Record<string, unknown> | undefined
             const userMessage = resolveMessageInputFromTrigger({
                 template: settings.messageInput,
                 triggerPayload: triggerOutput,
@@ -594,6 +652,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 userMessagePreview: userMessage?.slice(0, 80),
             })
             if (!isNil(userMessage) && userMessage.trim().length > 0) {
+                history = sessionStore.appendHistory({ history, role: 'user', text: userMessage, historyMaxTurns })
                 try {
                     const extracted = await fieldExtractor.extract({
                         constants,
@@ -608,14 +667,53 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                         extractedKeys: Object.keys(extracted),
                     })
                     const coercedExtracted = coerceIncomingState({ incoming: extracted, fields })
-                    for (const [k, v] of Object.entries(coercedExtracted)) {
-                        if (isNil(flowState[k])) flowState[k] = v
+                    const applied = sessionStore.applyStateOverwriteWithTopicChange({
+                        flowState,
+                        incoming: coercedExtracted,
+                        fields,
+                    })
+                    if (applied.topicChanged) {
+                        executedNodeIds.clear()
+                        skippedNodeIds.clear()
+                        ifDebug('handle:session:topic-change', { stateKeys: Object.keys(flowState) })
                     }
                 }
                 catch (e) {
                     ifDebug('handle:first-turn:error', { error: (e as Error).message })
                     throw e
                 }
+            }
+        }
+
+        const persistSession = async (opts: { botMessage?: string, terminal?: boolean }): Promise<void> => {
+            if (isNil(sessionKey)) return
+            try {
+                const withBot = !isNil(opts.botMessage) && opts.botMessage.trim().length > 0
+                    ? sessionStore.appendHistory({ history, role: 'assistant', text: opts.botMessage, historyMaxTurns })
+                    : history
+                history = withBot
+                if (opts.terminal === true && (settings.cleanupOnSuccess ?? true)) {
+                    await sessionStore.clear({ key: sessionKey, constants })
+                    ifDebug('handle:session:cleared', { sessionId })
+                    return
+                }
+                const saved = await sessionStore.save({
+                    key: sessionKey,
+                    constants,
+                    state: flowState,
+                    history: withBot,
+                    flowVersionId: constants.flowVersionId,
+                    historyMaxTurns,
+                })
+                ifDebug('handle:session:saved', {
+                    sessionId,
+                    bytes: saved.bytes,
+                    historyLen: withBot.length,
+                    truncated: saved.truncated,
+                })
+            }
+            catch (e) {
+                ifDebug('handle:session:save-error', { error: (e as Error).message })
             }
         }
 
@@ -757,14 +855,117 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             !skippedNodeIds.has(n.id),
         )
         if (isNil(nextPauseNode) && hasUnresolvedToolOrBranch) {
-            ifDebug('handle:deadlock', {
-                unresolvedTools: nodes
-                    .filter(n => (isToolNode(n) || isBranchNode(n)) && !executedNodeIds.has(n.id) && !skippedNodeIds.has(n.id))
-                    .map(n => n.id),
+            // Distinguish two cases:
+            //   (a) "insufficient info" — the unresolved tools' missing
+            //       stateInputs are ALL extractable from user text
+            //       (i.e. the user simply hasn't said enough yet). Not
+            //       a programming error. Emit a natural-language prompt
+            //       asking for the missing fields and close the run
+            //       gracefully. The next user message opens a fresh
+            //       run (chat trigger = new run per message) and the
+            //       extractor tries again.
+            //   (b) "real deadlock" — at least one missing input is NOT
+            //       extractable (e.g. a tool output that never fires).
+            //       That's a flow design bug — keep throwing.
+            const unresolvedNodes = nodes.filter(n =>
+                (isToolNode(n) || isBranchNode(n))
+                && !executedNodeIds.has(n.id)
+                && !skippedNodeIds.has(n.id),
+            )
+            const missingExtractable = new Set<string>()
+            let hasNonExtractableMissing = false
+            for (const n of unresolvedNodes) {
+                if (!isToolNode(n)) continue
+                for (const fieldName of n.stateInputs) {
+                    if (!isNil(flowState[fieldName])) continue
+                    const fieldDef = fields.find(f => f.name === fieldName)
+                    if (fieldDef && fieldDef.extractable !== false) {
+                        missingExtractable.add(fieldName)
+                    }
+                    else {
+                        hasNonExtractableMissing = true
+                    }
+                }
+            }
+            ifDebug('handle:insufficient-info-or-deadlock', {
+                unresolvedTools: unresolvedNodes.map(n => n.id),
+                missingExtractable: Array.from(missingExtractable),
+                hasNonExtractableMissing,
                 stateKeys: Object.keys(flowState),
-                executedNodeIds: Array.from(executedNodeIds),
-                skippedNodeIds: Array.from(skippedNodeIds),
             })
+            if (!hasNonExtractableMissing && missingExtractable.size > 0) {
+                const missingList = Array.from(missingExtractable)
+                const virtualNode: InteractiveFlowUserInputNode = {
+                    id: '__insufficient_info__',
+                    name: 'insufficient_info',
+                    displayName: 'Ask for missing info',
+                    nodeType: InteractiveFlowNodeType.USER_INPUT,
+                    stateInputs: [],
+                    stateOutputs: missingList,
+                    render: { component: 'TextInput', props: {} },
+                    message: {
+                        dynamic: true,
+                        fallback: { [locale]: 'Per proseguire ho bisogno di qualche informazione in più. Puoi fornirmela?' },
+                        systemPromptAddendum: `L'utente non ha ancora fornito: ${missingList.join(', ')}. Chiedi in modo naturale uno o due di questi (il primo è il più prioritario) senza elencare tutti i campi tecnici. Se il messaggio dell'utente era off-topic, riporta cortesemente la conversazione al compito in corso.`,
+                    },
+                }
+                let prompt: string | undefined
+                if (!isNil(settings.questionGenerator)) {
+                    const generated = await questionGenerator.generate({
+                        constants,
+                        config: settings.questionGenerator,
+                        node: virtualNode,
+                        stateFields: fields,
+                        currentState: redactSensitiveState({ state: flowState, fields }),
+                        locale,
+                        systemPrompt: settings.systemPrompt,
+                        systemPromptAddendum: typeof virtualNode.message === 'object' && 'systemPromptAddendum' in virtualNode.message ? virtualNode.message.systemPromptAddendum : undefined,
+                        history,
+                    })
+                    if (!isNil(generated)) prompt = generated
+                }
+                if (isNil(prompt)) {
+                    prompt = resolveNodeMessage({ message: virtualNode.message, locale })
+                        ?? 'Per proseguire ho bisogno di qualche informazione in più.'
+                }
+                ifDebug('handle:insufficient-info:message', {
+                    missing: missingList,
+                    messagePreview: prompt.slice(0, 140),
+                })
+                if (!isNil(constants.workerHandlerId) && !isNil(constants.httpRequestId)) {
+                    try {
+                        await workerSocket.getWorkerClient().sendFlowResponse({
+                            workerHandlerId: constants.workerHandlerId,
+                            httpRequestId: constants.httpRequestId,
+                            runResponse: {
+                                status: 200,
+                                body: { type: 'markdown', value: prompt, files: [] },
+                                headers: {},
+                            },
+                        })
+                        ifDebug('handle:insufficient-info:sendFlowResponse:result', { ok: true })
+                    }
+                    catch (e) {
+                        ifDebug('handle:insufficient-info:sendFlowResponse:result', {
+                            ok: false,
+                            error: (e as Error).message,
+                        })
+                    }
+                }
+                await persistSession({ botMessage: prompt })
+                const stepOutput = GenericStepOutput.create({
+                    type: FlowActionType.INTERACTIVE_FLOW,
+                    status: StepOutputStatus.SUCCEEDED,
+                    input: {},
+                    output: {
+                        state: flowState,
+                        executedNodeIds: Array.from(executedNodeIds),
+                        skippedNodeIds: Array.from(skippedNodeIds),
+                        selectedBranches,
+                    },
+                })
+                return executionState.upsertStep(action.name, stepOutput)
+            }
             throw new EngineGenericError(
                 'InteractiveFlowDeadlock',
                 'Circular dependency detected: one or more nodes cannot run because their required inputs are never produced',
@@ -790,6 +991,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     locale,
                     systemPrompt: settings.systemPrompt,
                     systemPromptAddendum: typeof nodeMessage === 'object' && 'systemPromptAddendum' in nodeMessage ? nodeMessage.systemPromptAddendum : undefined,
+                    history,
                 })
                 if (!isNil(generated)) {
                     message = generated
@@ -856,6 +1058,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     })
                 }
             }
+            await persistSession({ botMessage: message ?? undefined })
             return executionState
                 .upsertStep(action.name, stepOutput)
                 .setVerdict({ status: FlowRunStatus.PAUSED })
@@ -881,8 +1084,8 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             workerHandlerId: constants.workerHandlerId,
             httpRequestId: constants.httpRequestId,
         })
+        const summary = formatSuccessSummary(flowState)
         if (!isNil(constants.workerHandlerId) && !isNil(constants.httpRequestId)) {
-            const summary = formatSuccessSummary(flowState)
             try {
                 await workerSocket.getWorkerClient().sendFlowResponse({
                     workerHandlerId: constants.workerHandlerId,
@@ -902,6 +1105,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 })
             }
         }
+        await persistSession({ botMessage: summary, terminal: true })
         return executionState.upsertStep(action.name, stepOutput)
     },
 }
