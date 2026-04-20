@@ -174,7 +174,7 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
     app.addHook('onRequest', async (request, reply) => {
         const route = app.hasRoute({
             method: request.method as HTTPMethods,
-            url: request.routeOptions.url!,
+            url: request.routeOptions.url ?? request.url,
         })
         if (!route) {
             return reply.code(404).send({
@@ -345,7 +345,7 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
 
 
 
-export async function getAdapter() {
+export async function getAdapter(): Promise<ReturnType<typeof createAdapter>> {
     const redisConnectionInstance = await redisConnections.useExisting()
     const sub = redisConnectionInstance.duplicate()
     const pub = redisConnectionInstance.duplicate()

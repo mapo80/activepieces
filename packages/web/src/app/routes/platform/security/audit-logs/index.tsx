@@ -518,6 +518,8 @@ function extractEventDetails(event: ApplicationEvent): EventDetailRow[] {
       }
       return rows;
     }
+    default:
+      return [];
   }
 }
 

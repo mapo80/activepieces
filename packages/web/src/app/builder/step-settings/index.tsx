@@ -156,7 +156,7 @@ const StepSettingsContainer = () => {
   useEffect(() => {
     //RHF doesn't automatically trigger validation when the form is rendered, so we need to trigger it manually
     form.trigger();
-  }, []);
+  }, [form]);
 
   const { height, setHeight } = useResizableVerticalPanelsContext();
 

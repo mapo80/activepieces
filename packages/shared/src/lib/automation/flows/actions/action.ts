@@ -187,6 +187,7 @@ const BranchOperatorSingleValueLiterals = [
     z.literal(BranchOperator.LIST_IS_NOT_EMPTY),
 ] as const
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function buildBranchTextConditionValid(addMinLength: boolean) {
     return z.object({
         firstValue: addMinLength ? z.string().min(1) : z.string(),
@@ -196,6 +197,7 @@ function buildBranchTextConditionValid(addMinLength: boolean) {
     })
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function buildBranchNumberConditionValid(addMinLength: boolean) {
     return z.object({
         firstValue: addMinLength ? z.string().min(1) : z.string(),
@@ -204,6 +206,7 @@ function buildBranchNumberConditionValid(addMinLength: boolean) {
     })
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function buildBranchDateConditionValid(addMinLength: boolean) {
     return z.object({
         firstValue: addMinLength ? z.string().min(1) : z.string(),
@@ -212,6 +215,7 @@ function buildBranchDateConditionValid(addMinLength: boolean) {
     })
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function buildBranchSingleValueConditionValid(addMinLength: boolean) {
     return z.object({
         firstValue: addMinLength ? z.string().min(1) : z.string(),
@@ -219,6 +223,7 @@ function buildBranchSingleValueConditionValid(addMinLength: boolean) {
     })
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function buildBranchConditionValid(addMinLength: boolean) {
     return z.union([
         buildBranchTextConditionValid(addMinLength),
@@ -251,6 +256,7 @@ export type BranchSingleValueCondition = z.infer<
 >
 
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export const RouterBranchesSchema = (addMinLength: boolean) =>
     z.array(
         z.union([

@@ -40,7 +40,11 @@ type ValidationResult = {
     cleanInput?: Record<string, unknown>
 }
 
-export const flowVersionValidationUtil = (log: FastifyBaseLogger) => ({
+type FlowVersionValidationUtil = {
+    prepareRequest(params: PrepareRequestParams): Promise<FlowOperationRequest>
+}
+
+export const flowVersionValidationUtil = (log: FastifyBaseLogger): FlowVersionValidationUtil => ({
     async prepareRequest({ platformId, request, userId }: PrepareRequestParams): Promise<FlowOperationRequest> {
         const clonedRequest: FlowOperationRequest = JSON.parse(JSON.stringify(request))
 

@@ -24,7 +24,22 @@ const TOOL_CACHE_TTL_MS = 60_000
 export const mcpGatewaysRepo = repoFactory(McpGatewayEntity)
 const toolListCache = lru<ListMcpGatewayToolsResponse>(TOOL_CACHE_MAX_ENTRIES, TOOL_CACHE_TTL_MS)
 
-export const mcpGatewayService = (log: FastifyBaseLogger) => ({
+type McpGatewayService = {
+    create(params: { platformId: string, request: CreateMcpGatewayRequest }): Promise<McpGatewayWithoutSensitiveData>
+    list(params: { platformId: string }): Promise<McpGatewayWithoutSensitiveData[]>
+    get(params: { id: string, platformId: string }): Promise<McpGatewayWithoutSensitiveData>
+    update(params: { id: string, platformId: string, request: UpdateMcpGatewayRequest }): Promise<McpGatewayWithoutSensitiveData>
+    delete(params: { id: string, platformId: string }): Promise<void>
+    getResolved(params: { id: string, platformId: string }): Promise<McpGateway>
+    listTools(params: { id: string, platformId: string }): Promise<ListMcpGatewayToolsResponse>
+    diffTools(params: {
+        id: string
+        platformId: string
+        tools: ReadonlyArray<{ name: string, snapshot?: unknown }>
+    }): Promise<McpGatewayToolDiffResponse>
+}
+
+export const mcpGatewayService = (log: FastifyBaseLogger): McpGatewayService => ({
     async create({ platformId, request }: { platformId: string, request: CreateMcpGatewayRequest }): Promise<McpGatewayWithoutSensitiveData> {
         await assertNameIsUnique({ platformId, name: request.name })
         const id = apId()

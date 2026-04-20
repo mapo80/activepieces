@@ -87,7 +87,7 @@ export const flowExecutor = {
             await runProgressService.sendUpdate({
                 engineConstants: constants,
                 flowExecutorContext: flowExecutionContext,
-                stepNameToUpdate: previousAction!.name,
+                stepNameToUpdate: (previousAction ?? currentAction).name,
             }).catch(error => {
                 console.error('Error sending update:', error)
             })

@@ -18,7 +18,12 @@ import { projectService } from '../../../project/project-service'
 import { projectMemberService } from '../../projects/project-members/project-member.service'
 import { projectRoleService } from '../../projects/project-role/project-role.service'
 
-export const rbacService = (log: FastifyBaseLogger) => ({
+type RbacService = {
+    assertPrinicpalAccessToProject(params: AssertRoleHasPermissionParams): Promise<void>
+    assertUserHasPermissionToFlow(params: AssertUserHasPermissionToFlowParams): Promise<void>
+}
+
+export const rbacService = (log: FastifyBaseLogger): RbacService => ({
     async assertPrinicpalAccessToProject({ principal, permission, projectId }: AssertRoleHasPermissionParams): Promise<void> {
 
         switch (principal.type) {
