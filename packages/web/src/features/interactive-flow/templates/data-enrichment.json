@@ -1,0 +1,64 @@
+{
+  "name": "data-enrichment",
+  "displayName": "Data Enrichment",
+  "description": "Take a company name, enrich it via MCP, let the user pick one match, attach details.",
+  "greeting": { "en": "Enrich a company record.", "it": "Arricchisci un record aziendale." },
+  "locale": "en",
+  "systemPrompt": "You are a data-enrichment assistant. Prefer exact matches; never invent revenue or employee counts.",
+  "stateFields": [
+    { "name": "companyName", "type": "string", "description": "Company legal name", "extractable": true },
+    { "name": "candidates", "type": "array", "description": "List of potential matches", "extractable": false },
+    { "name": "selectedVatId", "type": "string", "description": "VAT id of the picked candidate", "extractable": true },
+    { "name": "enriched", "type": "object", "description": "Full enriched record", "extractable": false }
+  ],
+  "nodes": [
+    {
+      "id": "ask_company",
+      "name": "ask_company",
+      "displayName": "Ask company name",
+      "nodeType": "USER_INPUT",
+      "stateInputs": [],
+      "stateOutputs": ["companyName"],
+      "render": { "component": "TextInput", "props": { "placeholder": "e.g. ACME S.p.A." } },
+      "message": { "dynamic": true, "fallback": { "en": "What company do you want to enrich?", "it": "Quale azienda vuoi arricchire?" } }
+    },
+    {
+      "id": "search",
+      "name": "search",
+      "displayName": "Search candidates",
+      "nodeType": "TOOL",
+      "stateInputs": ["companyName"],
+      "stateOutputs": ["candidates"],
+      "tool": "enrichment/search_company"
+    },
+    {
+      "id": "pick",
+      "name": "pick",
+      "displayName": "Pick a match",
+      "nodeType": "USER_INPUT",
+      "stateInputs": ["candidates"],
+      "stateOutputs": ["selectedVatId"],
+      "render": { "component": "DataTable", "props": { "columns": [{ "key": "vatId", "label": "VAT" }, { "key": "name", "label": "Name" }], "sourceField": "candidates" } },
+      "message": { "en": "Pick the correct match.", "it": "Seleziona il match corretto." }
+    },
+    {
+      "id": "enrich",
+      "name": "enrich",
+      "displayName": "Fetch full record",
+      "nodeType": "TOOL",
+      "stateInputs": ["selectedVatId"],
+      "stateOutputs": ["enriched"],
+      "tool": "enrichment/get_record"
+    },
+    {
+      "id": "confirm",
+      "name": "confirm",
+      "displayName": "Confirm enrichment",
+      "nodeType": "CONFIRM",
+      "stateInputs": ["enriched"],
+      "stateOutputs": [],
+      "render": { "component": "ConfirmCard", "props": { "title": "Enriched record ready" } },
+      "message": { "en": "Enrichment complete. Confirm?", "it": "Arricchimento completato. Confermi?" }
+    }
+  ]
+}

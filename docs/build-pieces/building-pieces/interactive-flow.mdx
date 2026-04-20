@@ -1,0 +1,137 @@
+---
+title: "Interactive Flow"
+description: "Build conversational banking-style flows with dependency-graph execution, LLM field extraction, dynamic question generation, and a rich canvas."
+icon: "comments"
+---
+
+INTERACTIVE\_FLOW is a fifth action type alongside `CODE`, `PIECE`,
+`LOOP_ON_ITEMS`, and `ROUTER`. Its purpose is to orchestrate a
+conversational session with a user: extract information from free-text
+messages, invoke MCP tools deterministically once their inputs are
+ready, branch on state, pause for structured input or confirmation, and
+resume with the next user turn.
+
+## Why it exists
+
+Traditional automations ship form→action pipelines. Banking-style
+workflows ("extinguish rapporto di Polito at 01/02/2025") are
+fundamentally different:
+
+- The user supplies information in natural language, partially and out
+  of order
+- Tools must run as soon as their inputs are known, regardless of
+  which message they came in on
+- Some steps require UI primitives the user manipulates (DataTable,
+  DatePicker, ConfirmCard) rather than free text
+- Questions the assistant asks should adapt to the state and the
+  downstream UI, not be hard-coded
+
+INTERACTIVE\_FLOW solves this with a hybrid runtime:
+
+1. A **deterministic dependency-graph executor** decides what runs
+   next based on which stateFields are populated.
+2. An **LLM field extractor** translates each incoming user message
+   into a JSON patch against the shared state (only for fields marked
+   `extractable`, never `sensitive`).
+3. A **dynamic question generator** produces locale-aware,
+   style-templated questions at pause-time, with a deterministic
+   fallback chain.
+4. **BRANCH nodes** reuse the `ROUTER` condition engine to pick
+   downstream paths without any new evaluation logic.
+
+## Authoring a flow
+
+Open any flow in the builder and add an **Interactive Flow** action.
+The settings panel has six tabs:
+
+### General
+- Greeting message (per-locale)
+- Default locale override
+- Initial message expression — e.g. `{{trigger.body.message}}`; this
+  is fed to the extractor on the first turn
+
+### Gateway & AI
+- MCP Gateway dropdown (configure gateways under
+  `/platform/setup/mcp-gateways`)
+- Field extractor provider + model (e.g. `openai` +
+  `gpt-4o-mini`). For local E2E/test the **CUSTOM** provider lets you
+  point at any OpenAI-compatible baseUrl.
+
+### System prompt
+A large textarea defining the assistant's role and guardrails. Shared
+across extraction and question generation.
+
+### Conversation style
+- Question-generator provider + model (may differ from the extractor —
+  pick a stronger model here)
+- One of the seven built-in style templates:
+  `banking_formal_it`, `banking_formal_en`, `customer_support_it`,
+  `customer_support_en`, `kyc_strict`, `casual_it`, `casual_en`.
+
+### State fields
+`name`, `type`, `description` (LLM-facing), `extractable` (include in
+the extractor schema), `sensitive` (redact from pause metadata and from
+the extractor/generator prompts).
+
+### Nodes
+Master-detail editor. Four node types:
+
+| Type       | Purpose                            | Runs when                            |
+| ---------- | ---------------------------------- | ------------------------------------ |
+| TOOL       | Invokes an MCP tool                | All its stateInputs are populated    |
+| USER\_INPUT | Pauses for user input             | It is the next unsatisfied node      |
+| CONFIRM    | Pauses to collect confirmation     | It is the next unsatisfied node      |
+| BRANCH     | Routes to one of several paths     | All its stateInputs are populated    |
+
+## Render components
+
+USER\_INPUT and CONFIRM nodes render a UI primitive at pause-time. Six
+components are registered:
+
+- `TextInput`
+- `DataTable`
+- `DatePickerCard`
+- `ConfirmCard`
+- `ClientCard`
+- `DocumentCard`
+
+Each exposes a propsSchema (validated server-side and client-side) and
+a live preview in the node editor so you see the exact UX before
+saving.
+
+## Runtime overlay
+
+During an active run, the builder canvas subscribes to
+`INTERACTIVE_FLOW_NODE_STATE` socket.io events and draws badges on
+each child node: STARTED (blue pulse), COMPLETED (green),
+FAILED (red), PAUSED (yellow pulse), SKIPPED (grey). BRANCH decisions
+are also streamed so the canvas highlights which path was taken.
+
+## Security
+
+- Resume URLs are HMAC-signed with `AP_JWT_SECRET`; tampering returns
+  401.
+- `sensitive: true` state fields are redacted from pause metadata,
+  from extractor payloads, and from question-generator prompts.
+- Tool input snapshots (`toolInputSchemaSnapshot`) are compared
+  against the live `tools/list` via `POST /v1/mcp-gateways/:id/tools/diff`
+  so authors get a drift warning on the canvas card instead of a
+  runtime surprise.
+
+## Reference endpoints
+
+All engine-facing endpoints mount under `/v1/engine/` and require an
+engine principal (`securityAccess.engine()`):
+
+- `POST /v1/engine/interactive-flow-ai/field-extract`
+- `POST /v1/engine/interactive-flow-ai/question-generate`
+- `POST /v1/engine/interactive-flow-events/`
+- `GET /v1/flow-runs/:id/interactive-flow-state`
+- `GET /v1/engine/mcp-gateways/:id/resolve`
+- `POST /v1/mcp-gateways/:id/tools/diff` (platform-admin)
+
+## Audit events
+
+Each run emits: `INTERACTIVE_FLOW_STARTED`, `_PAUSED`, `_RESUMED`,
+`_COMPLETED`, `_FAILED`, `_FIELD_EXTRACTED` (tokens tracked),
+`_QUESTION_GENERATED` (tokens + fallback flag), `_BRANCH_SELECTED`.

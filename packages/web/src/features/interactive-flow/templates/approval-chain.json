@@ -1,0 +1,75 @@
+{
+  "name": "approval-chain",
+  "displayName": "Approval Chain",
+  "description": "Collect amount + justification, branch by amount, dispatch to the right approver, confirm.",
+  "greeting": { "en": "Submit a purchase for approval.", "it": "Invia una richiesta di approvazione." },
+  "locale": "en",
+  "systemPrompt": "You are a procurement assistant. Route requests to the right approver based on the amount.",
+  "stateFields": [
+    { "name": "amount", "type": "number", "description": "Purchase amount in EUR", "extractable": true },
+    { "name": "justification", "type": "string", "description": "Why the purchase is needed", "extractable": true },
+    { "name": "approverId", "type": "string", "description": "Assigned approver id", "extractable": false },
+    { "name": "caseId", "type": "string", "description": "Approval case id", "extractable": false }
+  ],
+  "nodes": [
+    {
+      "id": "ask_details",
+      "name": "ask_details",
+      "displayName": "Ask amount + justification",
+      "nodeType": "USER_INPUT",
+      "stateInputs": [],
+      "stateOutputs": ["amount", "justification"],
+      "render": { "component": "TextInput", "props": { "placeholder": "e.g. 1500 EUR — new laptop", "multiline": true } },
+      "message": { "dynamic": true, "fallback": { "en": "What amount do you need approved and why?", "it": "Quale importo serve approvare e per quale motivo?" } }
+    },
+    {
+      "id": "route_by_amount",
+      "name": "route_by_amount",
+      "displayName": "Route by amount",
+      "nodeType": "BRANCH",
+      "stateInputs": ["amount"],
+      "stateOutputs": [],
+      "branches": [
+        { "id": "lo", "branchName": "under_1000", "branchType": "CONDITION", "conditions": [[{ "operator": "NUMBER_IS_LESS_THAN", "firstValue": "{{amount}}", "secondValue": "1000" }]], "targetNodeIds": ["assign_direct"] },
+        { "id": "hi", "branchName": "director_approval", "branchType": "FALLBACK", "targetNodeIds": ["assign_director"] }
+      ]
+    },
+    {
+      "id": "assign_direct",
+      "name": "assign_direct",
+      "displayName": "Assign to team lead",
+      "nodeType": "TOOL",
+      "stateInputs": ["amount"],
+      "stateOutputs": ["approverId"],
+      "tool": "approvals/assign_lead"
+    },
+    {
+      "id": "assign_director",
+      "name": "assign_director",
+      "displayName": "Assign to director",
+      "nodeType": "TOOL",
+      "stateInputs": ["amount"],
+      "stateOutputs": ["approverId"],
+      "tool": "approvals/assign_director"
+    },
+    {
+      "id": "submit",
+      "name": "submit",
+      "displayName": "Submit case",
+      "nodeType": "TOOL",
+      "stateInputs": ["approverId", "amount", "justification"],
+      "stateOutputs": ["caseId"],
+      "tool": "approvals/submit"
+    },
+    {
+      "id": "confirm",
+      "name": "confirm",
+      "displayName": "Confirm submission",
+      "nodeType": "CONFIRM",
+      "stateInputs": ["caseId"],
+      "stateOutputs": [],
+      "render": { "component": "ConfirmCard", "props": { "title": "Case submitted" } },
+      "message": { "en": "Submitted for approval. Confirm?", "it": "Inviato per approvazione. Confermi?" }
+    }
+  ]
+}

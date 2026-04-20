@@ -1,0 +1,59 @@
+{
+  "name": "customer-onboarding",
+  "displayName": "Customer Onboarding",
+  "description": "Collect customer name, document type, document number, then create the customer via MCP.",
+  "greeting": { "en": "Hello! Let's onboard a new customer.", "it": "Ciao! Iniziamo l'onboarding di un nuovo cliente." },
+  "locale": "en",
+  "systemPrompt": "You are an onboarding assistant for a bank. Only collect information the user explicitly provides; never invent values.",
+  "stateFields": [
+    { "name": "customerName", "type": "string", "description": "Full legal name of the customer", "extractable": true },
+    { "name": "documentType", "type": "string", "description": "Type of identity document (passport, id_card)", "extractable": true },
+    { "name": "documentNumber", "type": "string", "description": "Identity document number", "extractable": true, "sensitive": true },
+    { "name": "customerId", "type": "string", "description": "Created customer id", "extractable": false }
+  ],
+  "nodes": [
+    {
+      "id": "ask_name",
+      "name": "ask_name",
+      "displayName": "Ask customer name",
+      "nodeType": "USER_INPUT",
+      "stateInputs": [],
+      "stateOutputs": ["customerName"],
+      "render": { "component": "TextInput", "props": { "placeholder": "Full name" } },
+      "message": { "dynamic": true, "fallback": { "en": "What is the customer's full name?", "it": "Qual è il nome completo del cliente?" } }
+    },
+    {
+      "id": "ask_document",
+      "name": "ask_document",
+      "displayName": "Ask document",
+      "nodeType": "USER_INPUT",
+      "stateInputs": ["customerName"],
+      "stateOutputs": ["documentType", "documentNumber"],
+      "render": { "component": "TextInput", "props": { "placeholder": "Document type and number" } },
+      "message": { "dynamic": true, "fallback": { "en": "Please provide the document type and number.", "it": "Fornisci il tipo e numero di documento." } }
+    },
+    {
+      "id": "create_customer",
+      "name": "create_customer",
+      "displayName": "Create customer",
+      "nodeType": "TOOL",
+      "stateInputs": ["customerName", "documentType", "documentNumber"],
+      "stateOutputs": ["customerId"],
+      "tool": "banking/create_customer",
+      "toolParams": {
+        "name": { "kind": "state", "field": "customerName" },
+        "document": { "kind": "compose", "fields": ["documentType", "documentNumber"] }
+      }
+    },
+    {
+      "id": "confirm",
+      "name": "confirm",
+      "displayName": "Confirm onboarding",
+      "nodeType": "CONFIRM",
+      "stateInputs": ["customerId"],
+      "stateOutputs": [],
+      "render": { "component": "ConfirmCard", "props": { "title": "Onboarding complete" } },
+      "message": { "en": "Your customer has been created. Confirm?", "it": "Il cliente è stato creato. Confermi?" }
+    }
+  ]
+}
