@@ -25,8 +25,16 @@ const findOneMock = vi.fn()
 const updateMock = vi.fn()
 const deleteMock = vi.fn()
 
+type RepoStub = {
+    insert: typeof insertMock
+    find: typeof findMock
+    findOne: typeof findOneMock
+    update: typeof updateMock
+    delete: typeof deleteMock
+}
+
 vi.mock('../../../../src/app/core/db/repo-factory', () => ({
-    repoFactory: () => () => ({
+    repoFactory: (): () => RepoStub => () => ({
         insert: insertMock,
         find: findMock,
         findOne: findOneMock,
@@ -40,8 +48,8 @@ const decryptObjectMock = vi.fn()
 
 vi.mock('../../../../src/app/helper/encryption', () => ({
     encryptUtils: {
-        encryptObject: (o: unknown) => encryptObjectMock(o),
-        decryptObject: <T>(o: unknown) => decryptObjectMock(o) as Promise<T>,
+        encryptObject: (o: unknown): unknown => encryptObjectMock(o),
+        decryptObject: <T>(o: unknown): Promise<T> => decryptObjectMock(o) as Promise<T>,
     },
     EncryptedObject: {},
 }))
@@ -51,7 +59,7 @@ vi.mock('@activepieces/shared', async () => {
     const actual = await vi.importActual<typeof import('@activepieces/shared')>('@activepieces/shared')
     return {
         ...actual,
-        apId: () => apIdMock(),
+        apId: (): string => apIdMock(),
     }
 })
 
@@ -72,7 +80,7 @@ const GATEWAY_ID = 'qrs234TUV567wxy890ZAB'
 const now = new Date().toISOString()
 const encryptedAuth = { iv: 'iv', data: 'data' }
 
-function record(overrides: Record<string, unknown> = {}) {
+function record(overrides: Record<string, unknown> = {}): Record<string, unknown> {
     return {
         id: GATEWAY_ID,
         created: now,
@@ -283,7 +291,9 @@ describe('mcpGatewayService', () => {
         it('wraps fetch errors as VALIDATION', async () => {
             findOneMock.mockResolvedValue(record({ id: 'unreach1111222233334445' }))
             decryptObjectMock.mockResolvedValue({ type: 'NONE' })
-            globalThis.fetch = (async () => { throw new Error('boom') }) as unknown as typeof fetch
+            globalThis.fetch = (async () => {
+                throw new Error('boom')
+            }) as unknown as typeof fetch
 
             const service = await loadService()
             await expectThrows(() => service.listTools({
@@ -298,7 +308,7 @@ describe('mcpGatewayService', () => {
             globalThis.fetch = (async () => ({
                 ok: false,
                 status: 500,
-                json: async () => ({}),
+                json: async (): Promise<unknown> => ({}),
             })) as unknown as typeof fetch
 
             const service = await loadService()
@@ -314,7 +324,7 @@ describe('mcpGatewayService', () => {
             globalThis.fetch = (async () => ({
                 ok: true,
                 status: 200,
-                json: async () => ({ result: 'not-an-object' }),
+                json: async (): Promise<unknown> => ({ result: 'not-an-object' }),
             })) as unknown as typeof fetch
 
             const service = await loadService()

@@ -3,28 +3,39 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getResolvedMock = vi.fn()
 
+type McpAuthHeaders = { type: string, token?: string, headerName?: string, key?: string, headerValue?: string }
+
 vi.mock('../../../../src/app/mcp-gateway/mcp-gateway.service', () => ({
-    mcpGatewayService: () => ({
+    mcpGatewayService: (): { getResolved: typeof getResolvedMock } => ({
         getResolved: getResolvedMock,
     }),
-    buildRequestHeaders: (auth: { type: string, token?: string, headerName?: string, key?: string, headerValue?: string }) => {
+    buildRequestHeaders: (auth: McpAuthHeaders): Record<string, string> => {
         switch (auth.type) {
-            case 'NONE': return { 'Content-Type': 'application/json' }
-            case 'BEARER': return { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` }
-            case 'API_KEY': return { 'Content-Type': 'application/json', [auth.headerName!]: auth.key! }
-            case 'HEADER': return { 'Content-Type': 'application/json', [auth.headerName!]: auth.headerValue! }
-            default: return { 'Content-Type': 'application/json' }
+            case 'NONE':
+                return { 'Content-Type': 'application/json' }
+            case 'BEARER':
+                return { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` }
+            case 'API_KEY':
+                return { 'Content-Type': 'application/json', [auth.headerName ?? 'X-Api-Key']: auth.key ?? '' }
+            case 'HEADER':
+                return { 'Content-Type': 'application/json', [auth.headerName ?? 'X-Header']: auth.headerValue ?? '' }
+            default:
+                return { 'Content-Type': 'application/json' }
         }
     },
 }))
 
 vi.mock('../../../../src/app/core/security/authorization/fastify-security', () => ({
     securityAccess: {
-        engine: () => ({}),
+        engine: (): Record<string, never> => ({}),
     },
 }))
 
-async function buildRequest(id: string, platformId: string | undefined) {
+async function buildRequest(id: string, platformId: string | undefined): Promise<{
+    params: { id: string }
+    principal: { platform: { id: string } | undefined, projectId: string }
+    log: Record<string, unknown>
+}> {
     return {
         params: { id },
         principal: platformId
@@ -34,11 +45,11 @@ async function buildRequest(id: string, platformId: string | undefined) {
     }
 }
 
-async function runRoute(req: unknown) {
+async function runRoute(req: unknown): Promise<unknown> {
     const { mcpGatewayWorkerController } = await import('../../../../src/app/mcp-gateway/mcp-gateway-worker.controller')
     let handler: ((request: unknown) => Promise<unknown>) | undefined
     const appStub = {
-        get: (_path: string, _opts: unknown, fn: (request: unknown) => Promise<unknown>) => {
+        get: (_path: string, _opts: unknown, fn: (request: unknown) => Promise<unknown>): void => {
             handler = fn
         },
     } as unknown as Parameters<typeof mcpGatewayWorkerController>[0]

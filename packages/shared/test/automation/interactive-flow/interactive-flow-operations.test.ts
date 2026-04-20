@@ -1,8 +1,8 @@
 import { FlowActionType, InteractiveFlowAction } from '../../../src/lib/automation/flows/actions/action'
 import { InteractiveFlowNodeType } from '../../../src/lib/automation/flows/actions/interactive-flow-action'
 import { FlowVersion, FlowVersionState } from '../../../src/lib/automation/flows/flow-version'
-import { FlowTriggerType } from '../../../src/lib/automation/flows/triggers/trigger'
 import { flowOperations, FlowOperationType } from '../../../src/lib/automation/flows/operations'
+import { FlowTriggerType } from '../../../src/lib/automation/flows/triggers/trigger'
 import { flowStructureUtil } from '../../../src/lib/automation/flows/util/flow-structure-util'
 
 const sampleNode = {
