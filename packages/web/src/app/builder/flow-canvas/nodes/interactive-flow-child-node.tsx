@@ -24,6 +24,11 @@ import {
 import React from 'react';
 
 import { useBuilderStateContext } from '@/app/builder/builder-hooks';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { InteractiveFlowNodeStatus } from '@/features/interactive-flow/hooks/interactive-flow-runtime-reducer';
 import { useInteractiveFlowNodeStates } from '@/features/interactive-flow/hooks/use-interactive-flow-node-states';
 import { cn } from '@/lib/utils';
@@ -139,6 +144,7 @@ export function ApInteractiveFlowChildCanvasNode(
   const phaseIndex = phaseColors.getIndex({ phaseId, phases });
   const phaseLabel = phaseColors.getLabel({ phaseId, phases });
   const hasPhase = phaseIndex >= 0;
+  const [popoverOpen, setPopoverOpen] = React.useState(false);
 
   return (
     <>
@@ -147,86 +153,109 @@ export function ApInteractiveFlowChildCanvasNode(
         position={Position.Top}
         style={flowCanvasConsts.HANDLE_STYLING}
       />
-      <div
-        className={cn(
-          'group relative flex h-full flex-col overflow-hidden rounded-md border-2 bg-card shadow-sm transition-colors',
-          status === 'FAILED' && 'border-red-500',
-          status === 'PAUSED' && 'border-yellow-500',
-          status === 'COMPLETED' && 'border-green-500',
-          status === 'SKIPPED' && 'border-gray-300 opacity-60',
-          !status && hasDrift && 'border-amber-500',
-          !status && !hasDrift && hasPhase && colors.border,
-          !status && !hasDrift && !hasPhase && 'border-border',
-        )}
-        style={{
-          width: flowCanvasConsts.AP_NODE_SIZE.INTERACTIVE_FLOW_CHILD.width,
-          height: flowCanvasConsts.AP_NODE_SIZE.INTERACTIVE_FLOW_CHILD.height,
-        }}
-        data-node-id={node.id}
-        data-node-type={node.nodeType}
-        data-phase-id={phaseId ?? ''}
-      >
-        {hasPhase && (
+      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <PopoverTrigger asChild>
           <div
-            className={cn('h-1 w-full rounded-t-sm', colors.ribbon)}
-            data-testid="phase-ribbon"
-          />
-        )}
-
-        <div className="flex flex-1 items-center gap-2 px-2 py-1">
-          <span className="shrink-0">{nodeTypeIcon(node.nodeType)}</span>
-          <span
-            className="flex-1 truncate text-xs font-semibold"
-            data-testid="iflow-node-title"
-            title={node.displayName}
+            onMouseEnter={() => setPopoverOpen(true)}
+            onMouseLeave={() => setPopoverOpen(false)}
+            className={cn(
+              'pointer-events-auto relative flex h-full flex-col overflow-hidden rounded-md border-2 bg-card shadow-sm transition-colors',
+              status === 'FAILED' && 'border-red-500',
+              status === 'PAUSED' && 'border-yellow-500',
+              status === 'COMPLETED' && 'border-green-500',
+              status === 'SKIPPED' && 'border-gray-300 opacity-60',
+              !status && hasDrift && 'border-amber-500',
+              !status && !hasDrift && hasPhase && colors.border,
+              !status && !hasDrift && !hasPhase && 'border-border',
+            )}
+            style={{
+              width: flowCanvasConsts.AP_NODE_SIZE.INTERACTIVE_FLOW_CHILD.width,
+              height:
+                flowCanvasConsts.AP_NODE_SIZE.INTERACTIVE_FLOW_CHILD.height,
+            }}
+            data-node-id={node.id}
+            data-node-type={node.nodeType}
+            data-phase-id={phaseId ?? ''}
           >
-            {node.displayName}
-          </span>
-          <div className="flex shrink-0 items-center gap-1">
-            <TypeBadge node={node} />
-            {hasPhase && phaseLabel && (
-              <span
-                className={cn(
-                  'truncate rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
-                  colors.chip,
-                )}
-                data-testid="phase-chip"
-              >
-                {phaseLabel}
-              </span>
-            )}
-            {isExtractorTarget && (
-              <Zap
-                className="size-3 text-amber-500"
-                aria-label="Extractor target"
+            {hasPhase && (
+              <div
+                className={cn('h-1 w-full rounded-t-sm', colors.ribbon)}
+                data-testid="phase-ribbon"
               />
             )}
-            {hasDrift && (
-              <AlertTriangle
-                className="size-3 text-amber-500"
-                aria-label="Schema drift"
-              />
-            )}
-            {statusIcon(status)}
-          </div>
-        </div>
 
-        <div
-          className={cn(
-            'absolute left-0 right-0 top-full z-20 hidden flex-col gap-1 rounded-b-md border border-t-0 border-border bg-popover p-2 shadow-lg',
-            'group-hover:flex',
-          )}
-          data-testid="iflow-node-expanded-overlay"
+            <div className="flex flex-1 items-center gap-2 px-2 py-1">
+              <span className="shrink-0">{nodeTypeIcon(node.nodeType)}</span>
+              <span
+                className="flex-1 truncate text-xs font-semibold"
+                data-testid="iflow-node-title"
+              >
+                {node.displayName}
+              </span>
+              <div className="flex shrink-0 items-center gap-1">
+                <TypeBadge node={node} />
+                {hasPhase && phaseLabel && (
+                  <span
+                    className={cn(
+                      'truncate rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+                      colors.chip,
+                    )}
+                    data-testid="phase-chip"
+                  >
+                    {phaseLabel}
+                  </span>
+                )}
+                {isExtractorTarget && (
+                  <Zap
+                    className="size-3 text-amber-500"
+                    aria-label="Extractor target"
+                  />
+                )}
+                {hasDrift && (
+                  <AlertTriangle
+                    className="size-3 text-amber-500"
+                    aria-label="Schema drift"
+                  />
+                )}
+                {statusIcon(status)}
+              </div>
+            </div>
+          </div>
+        </PopoverTrigger>
+        <PopoverContent
+          side="bottom"
+          align="center"
+          className="w-auto max-w-xs p-3 text-xs"
+          data-testid="iflow-node-hover-card"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onMouseEnter={() => setPopoverOpen(true)}
+          onMouseLeave={() => setPopoverOpen(false)}
         >
+          <div className="mb-2 flex items-center gap-2">
+            <span className="shrink-0">{nodeTypeIcon(node.nodeType)}</span>
+            <span
+              className="flex-1 font-semibold"
+              data-testid="iflow-node-hover-card-title"
+            >
+              {node.displayName}
+            </span>
+          </div>
           {hasPhase && phaseLabel && (
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div
+              className={cn(
+                'mb-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+                colors.chip,
+              )}
+            >
               {phaseLabel}
             </div>
           )}
-          <FieldPillList label={t('READS')} fields={node.stateInputs} />
-          <FieldPillList label={t('WRITES')} fields={node.stateOutputs} />
-        </div>
-      </div>
+          <div className="flex flex-col gap-1">
+            <FieldPillList label={t('READS')} fields={node.stateInputs} />
+            <FieldPillList label={t('WRITES')} fields={node.stateOutputs} />
+          </div>
+        </PopoverContent>
+      </Popover>
       <Handle
         type="source"
         position={Position.Bottom}
