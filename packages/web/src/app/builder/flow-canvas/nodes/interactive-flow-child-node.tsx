@@ -175,7 +175,11 @@ export function ApInteractiveFlowChildCanvasNode(
 
         <div className="flex flex-1 items-center gap-2 px-2 py-1">
           <span className="shrink-0">{nodeTypeIcon(node.nodeType)}</span>
-          <span className="flex-1 truncate text-xs font-semibold">
+          <span
+            className="flex-1 truncate text-xs font-semibold"
+            data-testid="iflow-node-title"
+            title={node.displayName}
+          >
             {node.displayName}
           </span>
           <div className="flex shrink-0 items-center gap-1">
