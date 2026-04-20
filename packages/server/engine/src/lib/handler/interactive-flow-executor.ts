@@ -17,7 +17,6 @@ import {
     LocalizedString,
     NodeMessage,
     ParamBinding,
-    PauseType,
     ResolveMcpGatewayResponse,
     StepOutputStatus,
 } from '@activepieces/shared'
@@ -733,7 +732,6 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     message = `Please provide ${label ?? nextPauseNode.stateOutputs[0] ?? 'the requested information'}`
                 }
             }
-            const visibleState = redactSensitiveState({ state: flowState, fields })
             const stepOutput = GenericStepOutput.create({
                 type: FlowActionType.INTERACTIVE_FLOW,
                 status: StepOutputStatus.PAUSED,
@@ -752,24 +750,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             })
             return executionState
                 .upsertStep(action.name, stepOutput)
-                .setVerdict({
-                    status: FlowRunStatus.PAUSED,
-                    pauseMetadata: {
-                        type: PauseType.WEBHOOK,
-                        requestId: action.name,
-                        response: {
-                            status: 200,
-                            body: {
-                                message: message ?? '',
-                                render: nextPauseNode.render ?? null,
-                                locale,
-                                interactiveFlowState: visibleState,
-                                nodeId: nextPauseNode.id,
-                            },
-                            headers: {},
-                        },
-                    },
-                })
+                .setVerdict({ status: FlowRunStatus.PAUSED })
         }
 
         const stepOutput = GenericStepOutput.create({
