@@ -1,0 +1,66 @@
+---
+title: "Interactive Flow GA Checklist"
+description: "Pre-GA verification steps for the INTERACTIVE_FLOW action type."
+icon: "list-check"
+---
+
+Running this checklist before flipping INTERACTIVE\_FLOW to GA is a
+hard gate. Every item should be re-verified per release candidate.
+
+## Build & tests
+
+- [ ] `npm run lint-dev` passes with 0 errors in the root, web, server, engine, shared, tests-e2e.
+- [ ] `npx turbo run build` green across all packages.
+- [ ] `cd packages/server/engine && npx vitest run` passes (≥ 290 tests).
+- [ ] `cd packages/server/api && npx vitest run` passes (ignoring pre-existing upstream failures in `flow-version.service.test.ts`).
+- [ ] `cd packages/shared && npx vitest run` passes (≥ 220 tests).
+- [ ] `cd packages/web && npx vitest run` passes (hooks, canvas layout, component registry, templates).
+- [ ] `cd packages/tests-e2e && ../../node_modules/.bin/vitest run fixtures` passes (Claude CLI proxy + mock MCP fixtures).
+
+## Playwright (CE)
+
+- [ ] `cd packages/tests-e2e && npm run test-e2e -- --grep "interactive-flow"` green (after skipping `.describe.skip`).
+- [ ] `real-llm.spec.ts` un-skipped and green against a `claude` CLI that is logged in.
+
+## Feature gates
+
+- [ ] AP\_EDITION=ce: action appears in the flow-builder palette, settings panel renders all 6 tabs.
+- [ ] AP\_EDITION=ee: same as CE; no feature is EE-gated.
+- [ ] Cloud freemium: no additional gating prevents the action from being added.
+
+## Security
+
+- [ ] Resume URL with a valid HMAC signature: 200.
+- [ ] Resume URL with an altered signature: 401.
+- [ ] State fields marked `sensitive: true` never appear in:
+  - pause-metadata response body
+  - `_FIELD_EXTRACTED` audit event payload
+  - question-generator prompt (visible by inspecting the provider request)
+- [ ] Encryption at rest: `aiProviderAuth` decrypts only server-side.
+
+## Observability
+
+- [ ] Audit events emitted for: STARTED / PAUSED / RESUMED / COMPLETED / FAILED / FIELD\_EXTRACTED / QUESTION\_GENERATED / BRANCH\_SELECTED.
+- [ ] `tokensUsed` populated on FIELD\_EXTRACTED and QUESTION\_GENERATED.
+
+## Load test
+
+- [ ] k6 script (`packages/tests-e2e/fixtures/load-test-interactive-flow.js`) executed against a staging instance with a real AI provider.
+- [ ] p95 field-extract latency < 4s at 100 concurrent sessions.
+- [ ] Error rate < 1% during steady-state.
+- [ ] Report archived under the release ticket.
+
+## Documentation
+
+- [ ] `docs/build-pieces/building-pieces/interactive-flow.mdx` linked from the sidebar.
+- [ ] Three seed templates loadable via the "From template" button.
+- [ ] README includes a screenshot or gif of the canvas + settings panel.
+
+## Upstream sign-off
+
+- [ ] Open a PR against upstream with labels `feature` and (if any piece changes are included) `pieces`.
+- [ ] Maintainer sign-off on:
+  - introduction of `LocalizedString` as the shared i18n pattern
+  - new node type `BRANCH` reusing the ROUTER condition engine
+  - worker endpoints for AI provider resolve + field-extract + question-generate
+  - new `INTERACTIVE_FLOW_NODE_STATE` websocket event
