@@ -183,7 +183,7 @@ describe('interactiveFlowAiController — /question-generate', () => {
         expect(generateArgs.prompt).toContain('<STYLE>')
         expect(generateArgs.prompt).toContain('banking_formal_it')
         expect(generateArgs.prompt).toContain('<CONVERSATION_HISTORY>')
-        expect(generateArgs.prompt).toContain('<CURRENT_STATE>')
+        expect(generateArgs.prompt).toContain('<CURRENT_STATE_CONTEXT>')
         expect(generateArgs.prompt).toContain('<TASK>')
         expect(generateArgs.prompt).toContain('<GUARDRAILS>')
     })
@@ -206,6 +206,6 @@ describe('interactiveFlowAiController — /question-generate', () => {
         const prompt = generateTextMock.mock.calls[0][0].prompt as string
         expect(prompt).toContain('conversational assistant')
         expect(prompt).not.toContain('<CONVERSATION_HISTORY>')
-        expect(prompt).not.toContain('<CURRENT_STATE>')
+        expect(prompt).not.toContain('<CURRENT_STATE_CONTEXT>')
     })
 })

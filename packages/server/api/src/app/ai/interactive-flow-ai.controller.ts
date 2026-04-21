@@ -17,6 +17,9 @@ import { PendingInteraction, pendingInteractionResolver } from './pending-intera
 import { preParser, PreParserMatch } from './pre-parser'
 import { reasonResolver } from './reason-resolver'
 
+const LLM_EXTRACT_TIMEOUT_MS = Number.parseInt(process.env.AP_LLM_EXTRACT_TIMEOUT_MS ?? '20000', 10)
+const LLM_QUESTION_TIMEOUT_MS = Number.parseInt(process.env.AP_LLM_QUESTION_TIMEOUT_MS ?? '20000', 10)
+
 const StateFieldRequestSchema = z.object({
     name: z.string().min(1),
     type: z.enum(['string', 'number', 'boolean', 'object', 'array', 'date']),
@@ -246,7 +249,10 @@ function resolveReasonIfText({
     if (!Array.isArray(list) || list.length === 0) return { action: 'drop' }
     const closureReasons = list.map(item => {
         const obj = item as Record<string, unknown>
-        return { codice: String(obj[reasonField.enumValueField!] ?? ''), descr: String(obj.descr ?? obj.description ?? '') }
+        return {
+            codice: String(obj[reasonField.enumValueField!] ?? ''),
+            descr: String(obj.descr ?? obj.description ?? obj.label ?? ''),
+        }
     })
     const resolution = reasonResolver.resolve({ reasonText: String(candidate.value), closureReasons })
     if (resolution.resolution === 'unique') {
@@ -348,7 +354,16 @@ export const interactiveFlowAiController: FastifyPluginAsyncZod = async (app) =>
         const remainingEligible = new Set([...eligibleFields].filter(f => !alreadyResolved.has(f)))
         let tokensUsed = 0
 
-        if (remainingEligible.size > 0) {
+        const nodeOutputs = new Set(body.currentNode?.stateOutputs ?? [])
+        const remainingNodeOutputs = [...remainingEligible].filter(f => nodeOutputs.has(f))
+        const shouldSkipLlm = nodeOutputs.size > 0
+            && remainingNodeOutputs.length === 0
+            && !body.pendingInteraction
+        if (shouldSkipLlm) {
+            logEvents.push({ stage: 'llm:skipped', data: { reason: 'all-node-outputs-resolved-by-pre-parser' } })
+        }
+
+        if (remainingEligible.size > 0 && !shouldSkipLlm) {
             const extendedEligible = new Set(remainingEligible)
             extendedEligible.add('closureReasonText')
             const schemaObject = buildExtractionSchemaFromFields({
@@ -378,20 +393,32 @@ export const interactiveFlowAiController: FastifyPluginAsyncZod = async (app) =>
                     inputSchema: jsonSchema(schemaObject),
                     execute: async (data) => data,
                 })
-                const result = await generateText({
+                const llmPromise = generateText({
                     model,
                     system: systemPrompt,
                     tools: { extract: extractionTool },
                     toolChoice: 'auto',
                     messages: [{ role: 'user', content: body.message }],
+                }).catch((e) => {
+                    logEvents.push({ stage: 'llm:error', data: { error: (e as Error).message?.slice(0, 160) } })
+                    return null
                 })
-                tokensUsed = result.usage?.totalTokens ?? 0
-                const toolCalls = result.toolCalls
-                const rawExtracted = toolCalls && toolCalls.length > 0 ? (toolCalls[0].input as Record<string, unknown>) : {}
-                for (const [k, v] of Object.entries(rawExtracted)) {
-                    if (isNil(v) || v === '') continue
-                    candidates.push({ field: k, value: v, intent: 'set', source: 'llm' })
-                    logEvents.push({ stage: 'llm:candidate', data: { field: k } })
+                const timeoutPromise = new Promise<null>((resolve) => {
+                    setTimeout(() => resolve(null), LLM_EXTRACT_TIMEOUT_MS)
+                })
+                const result = await Promise.race([llmPromise, timeoutPromise])
+                if (result === null) {
+                    logEvents.push({ stage: 'llm:timeout', data: { ms: LLM_EXTRACT_TIMEOUT_MS } })
+                }
+                else {
+                    tokensUsed = result.usage?.totalTokens ?? 0
+                    const toolCalls = result.toolCalls
+                    const rawExtracted = toolCalls && toolCalls.length > 0 ? (toolCalls[0].input as Record<string, unknown>) : {}
+                    for (const [k, v] of Object.entries(rawExtracted)) {
+                        if (isNil(v) || v === '') continue
+                        candidates.push({ field: k, value: v, intent: 'set', source: 'llm' })
+                        logEvents.push({ stage: 'llm:candidate', data: { field: k } })
+                    }
                 }
             }
         }
@@ -403,7 +430,7 @@ export const interactiveFlowAiController: FastifyPluginAsyncZod = async (app) =>
             currentNode: admissibilityNode,
             identityFields,
             userMessage: body.message,
-            pendingInteractionActive: !!body.pendingInteraction,
+            pendingInteractionType: body.pendingInteraction ? (body.pendingInteraction as { type?: string }).type : undefined,
             currentNodeType: body.currentNode?.nodeType,
             logEvents,
         })
@@ -434,9 +461,27 @@ export const interactiveFlowAiController: FastifyPluginAsyncZod = async (app) =>
 
         const preRendered = body.preRenderedContent
         const prompt = buildQuestionPrompt({ ...body, preRendered })
-        const result = await generateText({ model, prompt, maxOutputTokens: body.maxOutputTokens ?? 256 })
-        let text = result.text
+        const qgPromise = generateText({ model, prompt, maxOutputTokens: body.maxOutputTokens ?? 256 }).catch(() => null)
+        const qgTimeoutPromise = new Promise<null>((resolve) => {
+            setTimeout(() => resolve(null), LLM_QUESTION_TIMEOUT_MS)
+        })
+        const qgResult = await Promise.race([qgPromise, qgTimeoutPromise])
+        let text: string
         let safetyNetAppended = false
+        let qgTimedOut = false
+        if (qgResult === null) {
+            qgTimedOut = true
+            const firstTarget = body.targetFields[0]
+            const label = firstTarget?.label ?? firstTarget?.name ?? 'information'
+            text = body.locale.startsWith('it')
+                ? `Per procedere, indicami **${label}**.`
+                : `To continue, please provide **${label}**.`
+            safetyNetAppended = true
+        }
+        else {
+            text = qgResult.text
+        }
+        void qgTimedOut
 
         if (preRendered && preRendered.length > 0) {
             const preHeader = preRendered.split('\n')[0]
@@ -449,6 +494,21 @@ export const interactiveFlowAiController: FastifyPluginAsyncZod = async (app) =>
         const bannedPhrases = /\b(clicca|seleziona dalla tabella|compila il form|dal menu a tendina|nel form|sul pulsante)\b/i
         if (bannedPhrases.test(text)) {
             text = text.replace(bannedPhrases, 'digita la risposta')
+        }
+
+        const jsonBlockRe = /```json[\s\S]*?```/g
+        if (jsonBlockRe.test(text)) {
+            text = text.replace(jsonBlockRe, '').trim()
+            safetyNetAppended = true
+        }
+        const naturalTrailingRe = /^\s*\{[\s\S]*?\}\s*$/
+        if (naturalTrailingRe.test(text)) {
+            const firstTarget = body.targetFields[0]
+            const label = firstTarget?.label ?? firstTarget?.name ?? 'information'
+            text = body.locale.startsWith('it')
+                ? `Per procedere, indicami **${label}**.`
+                : `To continue, please provide **${label}**.`
+            safetyNetAppended = true
         }
 
         const primaryTarget = body.targetFields[0]?.name
@@ -464,7 +524,7 @@ export const interactiveFlowAiController: FastifyPluginAsyncZod = async (app) =>
 
         return {
             text,
-            tokensUsed: result.usage?.totalTokens ?? 0,
+            tokensUsed: qgResult?.usage?.totalTokens ?? 0,
             safetyNetAppended,
         }
     })
@@ -477,7 +537,7 @@ function applyVerificationPipeline({
     currentNode,
     identityFields,
     userMessage,
-    pendingInteractionActive,
+    pendingInteractionType,
     currentNodeType,
     logEvents,
 }: {
@@ -487,7 +547,7 @@ function applyVerificationPipeline({
     currentNode: NodeAdmissibilityDescriptor
     identityFields: string[]
     userMessage: string
-    pendingInteractionActive: boolean
+    pendingInteractionType?: string
     currentNodeType: 'USER_INPUT' | 'CONFIRM' | 'TOOL' | 'BRANCH' | undefined
     logEvents: Array<{ stage: string; data?: Record<string, unknown> }>
 }): {
@@ -512,9 +572,10 @@ function applyVerificationPipeline({
 
     for (const [field, fieldCandidates] of perFieldCandidates) {
         if (field === 'turnAffirmed') {
+            const pendingAllowsPromotion = pendingInteractionType === 'confirm_binary' || pendingInteractionType === 'pending_overwrite'
             if (overwritePolicy.shouldPromoteTurnAffirmed({
                 currentNodeType,
-                pendingOverwriteActive: pendingInteractionActive,
+                pendingOverwriteActive: pendingAllowsPromotion,
             })) {
                 acceptedFields['confirmed'] = true
                 turnAffirmed = true
@@ -676,7 +737,11 @@ function buildQuestionPrompt({
         sections.push('<CONVERSATION_HISTORY>\n' + turns + '\n</CONVERSATION_HISTORY>')
     }
     if (!isNil(state) && Object.keys(state).length > 0) {
-        sections.push('<CURRENT_STATE>\n' + JSON.stringify(state) + '\n</CURRENT_STATE>')
+        const stateLines = Object.entries(state)
+            .filter(([, v]) => v !== null && v !== undefined && v !== '')
+            .map(([k, v]) => `- ${k}: ${typeof v === 'object' ? `(${Array.isArray(v) ? `${v.length} items` : 'object'})` : String(v).slice(0, 80)}`)
+            .join('\n')
+        sections.push('<CURRENT_STATE_CONTEXT>\nThis is the conversation state for YOUR reference only — DO NOT echo it back to the user, DO NOT output JSON, DO NOT output code blocks. Ask a natural-language question.\n' + stateLines + '\n</CURRENT_STATE_CONTEXT>')
     }
     if (preRendered) {
         sections.push(`<TABLE_PRERENDERED>\n${preRendered}\n</TABLE_PRERENDERED>`)
@@ -694,7 +759,7 @@ function buildQuestionPrompt({
     }
     task += '\n</TASK>'
     sections.push(task)
-    sections.push('<GUARDRAILS>\n- Do not invent data or promises.\n- Ask one question at a time.\n- No greetings or sign-offs; question only.\n- Match the locale exactly.\n</GUARDRAILS>')
+    sections.push('<GUARDRAILS>\n- Do not invent data or promises.\n- Ask one question at a time.\n- No greetings or sign-offs; question only.\n- Match the locale exactly.\n- OUTPUT MUST BE natural-language prose. NEVER output JSON, code blocks, backticks, or field name dumps. NEVER echo the conversation state back to the user.\n</GUARDRAILS>')
     if (systemPromptAddendum) {
         sections.push('<ADDENDUM>\n' + systemPromptAddendum + '\n</ADDENDUM>')
     }
