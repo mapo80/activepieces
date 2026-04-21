@@ -729,9 +729,12 @@ function buildQuestionPrompt({
     renderHint,
     preRendered,
 }: z.infer<typeof QuestionGenerateRequestSchema> & { preRendered?: string }): string {
+    const localeOn = (process.env.AP_PROMPT_LOCALIZATION ?? 'on').toLowerCase() !== 'off'
+    const strings = localeOn && locale.startsWith('it') ? PROMPT_STRINGS.it : PROMPT_STRINGS.en
     const sections: string[] = []
-    sections.push('<ROLE>\n' + (systemPrompt ?? 'You are a conversational assistant.') + '\n</ROLE>')
-    sections.push('<STYLE>\nLocale: ' + locale + (styleTemplate ? '\nTemplate: ' + styleTemplate : '') + '\nRespond in ' + locale + ' only. Be concise.\n</STYLE>')
+    sections.push('<LANGUAGE>\n' + strings.languageLock(locale) + '\n</LANGUAGE>')
+    sections.push('<ROLE>\n' + (systemPrompt ?? strings.defaultRole) + '\n</ROLE>')
+    sections.push('<STYLE>\nLocale: ' + locale + (styleTemplate ? '\nTemplate: ' + styleTemplate : '') + '\n' + strings.styleRespond(locale) + '\n</STYLE>')
     if (history && history.length > 0) {
         const turns = history.slice(-10).map(t => `${t.role}: ${t.text}`).join('\n')
         sections.push('<CONVERSATION_HISTORY>\n' + turns + '\n</CONVERSATION_HISTORY>')
@@ -741,7 +744,7 @@ function buildQuestionPrompt({
             .filter(([, v]) => v !== null && v !== undefined && v !== '')
             .map(([k, v]) => `- ${k}: ${typeof v === 'object' ? `(${Array.isArray(v) ? `${v.length} items` : 'object'})` : String(v).slice(0, 80)}`)
             .join('\n')
-        sections.push('<CURRENT_STATE_CONTEXT>\nThis is the conversation state for YOUR reference only — DO NOT echo it back to the user, DO NOT output JSON, DO NOT output code blocks. Ask a natural-language question.\n' + stateLines + '\n</CURRENT_STATE_CONTEXT>')
+        sections.push('<CURRENT_STATE_CONTEXT>\n' + strings.stateContextHeader + '\n' + stateLines + '\n</CURRENT_STATE_CONTEXT>')
     }
     if (preRendered) {
         sections.push(`<TABLE_PRERENDERED>\n${preRendered}\n</TABLE_PRERENDERED>`)
@@ -753,17 +756,50 @@ function buildQuestionPrompt({
         if (f.format) parts.push(`format: ${f.format}`)
         return parts.join(' | ')
     })
-    let task = '<TASK>\nAsk the user for the following information, one single clear question.\n' + taskLines.join('\n')
+    let task = '<TASK>\n' + strings.taskHeader + '\n' + taskLines.join('\n')
     if (renderHint) {
-        task += `\nThe user will answer via a UI component: ${renderHint.component}${renderHint.props ? ` ${JSON.stringify(renderHint.props)}` : ''}. Guide them accordingly.`
+        task += '\n' + strings.taskRenderHint(renderHint.component, renderHint.props ? ` ${JSON.stringify(renderHint.props)}` : '')
     }
     task += '\n</TASK>'
     sections.push(task)
-    sections.push('<GUARDRAILS>\n- Do not invent data or promises.\n- Ask one question at a time.\n- No greetings or sign-offs; question only.\n- Match the locale exactly.\n- OUTPUT MUST BE natural-language prose. NEVER output JSON, code blocks, backticks, or field name dumps. NEVER echo the conversation state back to the user.\n</GUARDRAILS>')
+    sections.push('<GUARDRAILS>\n' + strings.guardrails.join('\n') + '\n</GUARDRAILS>')
     if (systemPromptAddendum) {
         sections.push('<ADDENDUM>\n' + systemPromptAddendum + '\n</ADDENDUM>')
     }
     return sections.join('\n\n')
+}
+
+const PROMPT_STRINGS = {
+    en: {
+        defaultRole: 'You are a conversational assistant.',
+        styleRespond: (l: string) => `Respond in ${l} only. Be concise.`,
+        stateContextHeader: 'This is the conversation state for YOUR reference only — DO NOT echo it back to the user, DO NOT output JSON, DO NOT output code blocks. Ask a natural-language question.',
+        taskHeader: 'Ask the user for the following information, one single clear question.',
+        taskRenderHint: (component: string, propsTxt: string) => `The user will answer via a UI component: ${component}${propsTxt}. Guide them accordingly.`,
+        guardrails: [
+            '- Do not invent data or promises.',
+            '- Ask one question at a time.',
+            '- No greetings or sign-offs; question only.',
+            '- Match the locale exactly.',
+            '- OUTPUT MUST BE natural-language prose. NEVER output JSON, code blocks, backticks, or field name dumps. NEVER echo the conversation state back to the user.',
+        ],
+        languageLock: (l: string) => `Respond in ${l}. Match the user's language signals.`,
+    },
+    it: {
+        defaultRole: 'Sei un assistente conversazionale.',
+        styleRespond: (_l: string) => 'Rispondi ESCLUSIVAMENTE in italiano. Sii conciso.',
+        stateContextHeader: 'Questo è lo stato della conversazione, solo per tuo riferimento — NON ripeterlo all\'utente, NON emettere JSON, NON usare code block. Poni una domanda in linguaggio naturale.',
+        taskHeader: 'Chiedi all\'utente le seguenti informazioni con una sola domanda chiara.',
+        taskRenderHint: (component: string, propsTxt: string) => `L'utente risponderà tramite il componente UI: ${component}${propsTxt}. Guidalo di conseguenza.`,
+        guardrails: [
+            '- Non inventare dati né promesse.',
+            '- Una sola domanda per turno.',
+            '- Niente saluti o chiusure estranei al compito; solo la domanda (o presentazione breve se l\'addendum lo richiede).',
+            '- Rispetta esattamente il locale dell\'utente (italiano).',
+            '- L\'OUTPUT DEVE essere prosa in linguaggio naturale. MAI JSON, MAI code block, MAI backtick, MAI dump di campi tecnici. MAI ripetere lo stato della conversazione all\'utente.',
+        ],
+        languageLock: (_l: string) => 'Rispondi SEMPRE in italiano. Non usare mai inglese.',
+    },
 }
 
 const FieldExtractRoute = {

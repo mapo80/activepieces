@@ -389,29 +389,58 @@ function findNextUserOrConfirmNode({ nodes, state, executedNodeIds, skippedNodeI
     )) ?? null
 }
 
-function orderMissingByDependency({ missing, nodes }: {
+export function orderMissingByDependency({ missing, nodes }: {
     missing: string[]
     nodes: InteractiveFlowNode[]
 }): string[] {
     const missingSet = new Set(missing)
-    const hasNodeProducingThatDependsOnMissing = (field: string): boolean => {
+    const hasUpstreamMissing = (field: string, visited: Set<string> = new Set()): boolean => {
+        if (visited.has(field)) return false
+        visited.add(field)
         for (const node of nodes) {
             if (!(node.stateOutputs ?? []).includes(field)) continue
             for (const inp of node.stateInputs ?? []) {
                 if (missingSet.has(inp)) return true
+                if (hasUpstreamMissing(inp, visited)) return true
             }
         }
         return false
     }
-    const rootFields = missing.filter(f => !hasNodeProducingThatDependsOnMissing(f))
+    const rootFields = missing.filter(f => !hasUpstreamMissing(f))
     if (rootFields.length === 0) return missing
     const firstNodeOrder = (field: string): number => {
         for (let i = 0; i < nodes.length; i++) {
             if ((nodes[i].stateOutputs ?? []).includes(field)) return i
         }
-        return Number.MAX_SAFE_INTEGER
+        return -1
     }
     return rootFields.slice().sort((a, b) => firstNodeOrder(a) - firstNodeOrder(b))
+}
+
+export function buildVirtualNodeAddendum({ primaryField, primaryLabel, primaryDesc, flowLabel, locale }: {
+    primaryField: string
+    primaryLabel: string
+    primaryDesc: string | undefined
+    flowLabel: string
+    locale: string
+}): string {
+    const descParen = primaryDesc ? ` (${primaryDesc})` : ''
+    if (locale.startsWith('it')) {
+        return [
+            `Sei all'inizio della conversazione. L'utente ha appena aperto la chat.`,
+            `Compito: presenta brevemente il servizio ("${flowLabel}") con tono professionale-bancario italiano e chiedi esclusivamente **${primaryLabel}**${descParen}.`,
+            `NON saltare a campi successivi (es. date, motivazioni). NON chiedere più di un'informazione.`,
+            `Formato: 2-3 frasi in italiano, cordiale ma sobrio, includi un esempio concreto se utile.`,
+            `Campo tecnico da raccogliere: \`${primaryField}\`.`,
+        ].join(' ')
+    }
+    return [
+        `Conversation just started. The user has just opened the chat.`,
+        `Task: briefly introduce the "${flowLabel}" task in a professional banking tone and ask only for **${primaryLabel}**${descParen}.`,
+        `Do not skip ahead. Do not ask more than one piece of information.`,
+        `Format: 2-3 sentences, warm but concise, in ${locale}. Include a concrete example if useful.`,
+        `Technical field: \`${primaryField}\`.`,
+    ].join(' ')
 }
 
 function buildRejectionHint({ policyDecisions, stateFields, locale }: {
@@ -1182,6 +1211,25 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     nodes,
                 })
                 const primaryField = primaryMissing[0] ?? missingListRaw[0]
+                const primaryFieldDef = fields.find(f => f.name === primaryField)
+                const primaryLabel = (primaryFieldDef?.label
+                    ? resolveLocalizedString({ value: primaryFieldDef.label, locale })
+                    : undefined) ?? primaryFieldDef?.name ?? primaryField
+                const primaryDesc = primaryFieldDef?.description
+                const resolvedFlowLabel = (settings.flowLabel
+                    ? resolveLocalizedString({ value: settings.flowLabel, locale })
+                    : undefined)
+                    ?? action.displayName
+                    ?? (locale.startsWith('it') ? 'la pratica' : 'the procedure')
+                const virtualNodeAddendum = buildVirtualNodeAddendum({
+                    primaryField,
+                    primaryLabel,
+                    primaryDesc,
+                    flowLabel: resolvedFlowLabel,
+                    locale,
+                })
+                const fallbackIt = `Per procedere con ${resolvedFlowLabel}, può indicarmi **${primaryLabel}**?${primaryDesc ? ` (${primaryDesc})` : ''}`
+                const fallbackEn = `To continue with ${resolvedFlowLabel}, please provide **${primaryLabel}**.${primaryDesc ? ` (${primaryDesc})` : ''}`
                 const virtualNode: InteractiveFlowUserInputNode = {
                     id: '__insufficient_info__',
                     name: 'insufficient_info',
@@ -1192,8 +1240,8 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     render: { component: 'TextInput', props: {} },
                     message: {
                         dynamic: true,
-                        fallback: { [locale]: 'Per proseguire ho bisogno di qualche informazione in più. Puoi fornirmela?' },
-                        systemPromptAddendum: `L'utente non ha ancora fornito le informazioni iniziali. Il campo richiesto in questo turno è **${primaryField}** (primo step del flusso). NON saltare a campi successivi (es. date, motivazioni): chiedi esclusivamente di **${primaryField}**. Se il messaggio dell'utente era off-topic o un saluto, riporta cortesemente la conversazione al compito in corso chiedendo ${primaryField}.`,
+                        fallback: { [locale]: locale.startsWith('it') ? fallbackIt : fallbackEn },
+                        systemPromptAddendum: virtualNodeAddendum,
                     },
                 }
                 const missingList = primaryMissing.length > 0 ? primaryMissing : missingListRaw

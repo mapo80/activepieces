@@ -208,4 +208,78 @@ describe('interactiveFlowAiController — /question-generate', () => {
         expect(prompt).not.toContain('<CONVERSATION_HISTORY>')
         expect(prompt).not.toContain('<CURRENT_STATE_CONTEXT>')
     })
+
+    it('locale=it produces an IT-localized scaffolding with <LANGUAGE> lock first', async () => {
+        generateTextMock.mockResolvedValue({ text: 'ok', usage: { totalTokens: 1 } })
+        await runRoute({
+            path: '/question-generate',
+            request: {
+                principal: { platform: { id: PLATFORM_ID } },
+                log: STUB_LOG,
+                body: {
+                    provider: AIProviderName.OPENAI,
+                    model: 'gpt-4o',
+                    locale: 'it',
+                    targetFields: [{ name: 'customerName', label: 'Nome cliente' }],
+                },
+            },
+        })
+        const prompt = generateTextMock.mock.calls[0][0].prompt as string
+        expect(prompt.indexOf('<LANGUAGE>')).toBe(0)
+        expect(prompt).toContain('Rispondi SEMPRE in italiano')
+        expect(prompt).toContain('Rispondi ESCLUSIVAMENTE in italiano')
+        expect(prompt).toContain('Chiedi all\'utente')
+        expect(prompt).toContain('Niente saluti o chiusure')
+        expect(prompt).not.toContain('Ask the user for the following information')
+        expect(prompt).not.toContain('Do not invent data or promises')
+    })
+
+    it('locale=en keeps the English scaffolding (default behaviour)', async () => {
+        generateTextMock.mockResolvedValue({ text: 'ok', usage: { totalTokens: 1 } })
+        await runRoute({
+            path: '/question-generate',
+            request: {
+                principal: { platform: { id: PLATFORM_ID } },
+                log: STUB_LOG,
+                body: {
+                    provider: AIProviderName.OPENAI,
+                    model: 'gpt-4o',
+                    locale: 'en',
+                    targetFields: [{ name: 'x' }],
+                },
+            },
+        })
+        const prompt = generateTextMock.mock.calls[0][0].prompt as string
+        expect(prompt).toContain('Ask the user for the following information')
+        expect(prompt).toContain('Do not invent data or promises')
+        expect(prompt).not.toContain('Rispondi SEMPRE in italiano')
+    })
+
+    it('AP_PROMPT_LOCALIZATION=off forces English scaffolding even for locale=it', async () => {
+        const prev = process.env.AP_PROMPT_LOCALIZATION
+        process.env.AP_PROMPT_LOCALIZATION = 'off'
+        try {
+            generateTextMock.mockResolvedValue({ text: 'ok', usage: { totalTokens: 1 } })
+            await runRoute({
+                path: '/question-generate',
+                request: {
+                    principal: { platform: { id: PLATFORM_ID } },
+                    log: STUB_LOG,
+                    body: {
+                        provider: AIProviderName.OPENAI,
+                        model: 'gpt-4o',
+                        locale: 'it',
+                        targetFields: [{ name: 'x' }],
+                    },
+                },
+            })
+            const prompt = generateTextMock.mock.calls[0][0].prompt as string
+            expect(prompt).toContain('Ask the user for the following information')
+            expect(prompt).not.toContain('Rispondi ESCLUSIVAMENTE')
+        }
+        finally {
+            if (prev === undefined) delete process.env.AP_PROMPT_LOCALIZATION
+            else process.env.AP_PROMPT_LOCALIZATION = prev
+        }
+    })
 })

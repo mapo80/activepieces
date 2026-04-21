@@ -223,6 +223,7 @@ export const InteractiveFlowActionSettings = z.object({
     stateFields: z.array(InteractiveFlowStateFieldSchema),
     phases: z.array(InteractiveFlowPhaseSchema).optional(),
     greeting: LocalizedStringSchema.optional(),
+    flowLabel: LocalizedStringSchema.optional(),
     mcpGatewayId: z.string().optional(),
     systemPrompt: z.string().optional(),
     fieldExtractor: FieldExtractorConfigSchema.optional(),
