@@ -5,7 +5,7 @@ import { logger } from '../config/logger'
 export const LATEST_CACHE_VERSION = 'v11'
 
 function resolveCacheRoot(): string {
-    const envOverride = process.env.AP_CACHE_DIR
+    const envOverride = process.env['AP_CACHE_DIR']
     if (envOverride && envOverride.length > 0) {
         return path.resolve(envOverride)
     }
