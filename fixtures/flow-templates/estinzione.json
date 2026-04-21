@@ -140,6 +140,7 @@
                 "render": {
                   "component": "DataTable",
                   "props": {
+                    "layout": "table",
                     "sourceField": "accounts",
                     "columns": [
                       { "key": "codiceRapportoNonNumerico", "header": "Rapporto" },

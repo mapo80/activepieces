@@ -142,6 +142,98 @@ describe('interactive-flow executor — blocks-v1 emit for pick_from_list', () =
         })
     })
 
+    it('emits blocks-v1 with data-list layout="table" + columns + fields when render.props.layout is "table"', async () => {
+        const sendSpy = installSyncCaller()
+        const accounts = [
+            { codiceRapportoNonNumerico: '01-034-00392400', descrizioneCategSottocateg: 'Conto corrente', tipoOperativita: 'Titolare' },
+            { codiceRapportoNonNumerico: '02-078-00511239', descrizioneCategSottocateg: 'Libretto', tipoOperativita: 'Cointestatario' },
+        ]
+        installFetchMock({
+            extractorReturns: { accounts },
+            questionText: 'Quale rapporto vuoi estinguere?',
+        })
+
+        const action = buildInteractiveFlowAction({
+            name: 'interactive_flow',
+            nodes: [
+                {
+                    id: 'pick_rapporto',
+                    name: 'pick_rapporto',
+                    displayName: 'Pick rapporto',
+                    nodeType: InteractiveFlowNodeType.USER_INPUT,
+                    stateInputs: ['accounts'],
+                    stateOutputs: ['rapportoId'],
+                    render: {
+                        component: 'DataTable',
+                        props: {
+                            layout: 'table',
+                            sourceField: 'accounts',
+                            columns: [
+                                { key: 'codiceRapportoNonNumerico', header: 'Rapporto' },
+                                { key: 'descrizioneCategSottocateg', header: 'Tipologia' },
+                                { key: 'tipoOperativita', header: 'Ruolo' },
+                            ],
+                        },
+                    },
+                    message: { dynamic: true },
+                },
+            ],
+            stateFields: [
+                { name: 'accounts', type: 'array', extractable: false },
+                { name: 'rapportoId', type: 'string', extractable: true },
+            ],
+            mcpGatewayId: 'gw1234567890123456789A',
+            fieldExtractor: { aiProviderId: 'openai', model: 'gpt-4o-mini' },
+            questionGenerator: { aiProviderId: 'openai', model: 'gpt-4o' },
+        })
+        action.settings.sessionIdInput = '{{trigger.sessionId}}'
+        action.settings.messageInput = '{{trigger.message}}'
+
+        const executionState = FlowExecutorContext.empty().upsertStep('trigger', {
+            type: 'PIECE_TRIGGER' as never,
+            status: StepOutputStatus.SUCCEEDED,
+            input: {},
+            output: { sessionId: 'sid-table', message: 'cerca' },
+        } as never)
+
+        await flowExecutor.execute({
+            action,
+            executionState,
+            constants: generateMockEngineConstants(EXECUTOR_CONSTANTS_SYNC),
+        })
+
+        const call = sendSpy.mock.calls[0][0] as SendFlowResponseCall
+        const body = call.runResponse.body as BlocksV1Payload
+        expect(body.type).toBe('blocks-v1')
+        const dataList = body.blocks.find(b => b.type === 'data-list') as Extract<typeof body.blocks[number], { type: 'data-list' }>
+        expect(dataList).toBeDefined()
+        expect(dataList.layout).toBe('table')
+        expect(dataList.columns).toEqual([
+            { key: 'codiceRapportoNonNumerico', header: 'Rapporto' },
+            { key: 'descrizioneCategSottocateg', header: 'Tipologia' },
+            { key: 'tipoOperativita', header: 'Ruolo' },
+        ])
+        expect(dataList.items).toHaveLength(2)
+        expect(dataList.items[0]).toEqual({
+            primary: '01-034-00392400',
+            payload: '01-034-00392400',
+            fields: {
+                codiceRapportoNonNumerico: '01-034-00392400',
+                descrizioneCategSottocateg: 'Conto corrente',
+                tipoOperativita: 'Titolare',
+            },
+        })
+        expect(dataList.items[1]).toEqual({
+            primary: '02-078-00511239',
+            payload: '02-078-00511239',
+            fields: {
+                codiceRapportoNonNumerico: '02-078-00511239',
+                descrizioneCategSottocateg: 'Libretto',
+                tipoOperativita: 'Cointestatario',
+            },
+        })
+    })
+
     it('falls back to markdown payload when pendingInteraction is open_text (no pick_from_list)', async () => {
         const sendSpy = installSyncCaller()
         installFetchMock({

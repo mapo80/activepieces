@@ -5,11 +5,18 @@ const MarkdownBlockSchema = z.object({
     value: z.string(),
 })
 
+const DataListColumnSchema = z.object({
+    key: z.string(),
+    header: z.string(),
+    align: z.enum(['left', 'right', 'center']).optional(),
+})
+
 const DataListItemSchema = z.object({
     primary: z.string(),
-    title: z.string(),
+    title: z.string().optional(),
     subtitle: z.string().optional(),
     metadata: z.array(z.object({ label: z.string(), value: z.string() })).optional(),
+    fields: z.record(z.string(), z.string()).optional(),
     payload: z.string(),
     disabled: z.boolean().optional(),
 })
@@ -17,6 +24,8 @@ const DataListItemSchema = z.object({
 const DataListBlockSchema = z.object({
     type: z.literal('data-list'),
     selectMode: z.enum(['single', 'multi']).default('single'),
+    layout: z.enum(['cards', 'table']).default('cards'),
+    columns: z.array(DataListColumnSchema).optional(),
     items: z.array(DataListItemSchema).min(1),
 })
 
@@ -54,6 +63,7 @@ export const BubblePayloadSchema = z.discriminatedUnion('type', [
 ])
 
 export type MarkdownBlock = z.infer<typeof MarkdownBlockSchema>
+export type DataListColumn = z.infer<typeof DataListColumnSchema>
 export type DataListItem = z.infer<typeof DataListItemSchema>
 export type DataListBlock = z.infer<typeof DataListBlockSchema>
 export type QuickReplyItem = z.infer<typeof QuickReplyItemSchema>

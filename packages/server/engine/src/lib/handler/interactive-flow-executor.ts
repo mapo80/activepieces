@@ -530,33 +530,40 @@ function buildPauseBody({ message, pendingInteraction, node, state }: {
             ? state[sourceField] as Array<Record<string, unknown>>
             : []
         const columns = Array.isArray(renderProps.columns)
-            ? renderProps.columns as Array<{ key: string, header: string }>
+            ? renderProps.columns as Array<{ key: string, header: string, align?: 'left' | 'right' | 'center' }>
             : []
+        const requestedLayout = renderProps.layout === 'table' ? 'table' : 'cards'
+        const layout: 'cards' | 'table' = requestedLayout === 'table' && columns.length > 0 ? 'table' : 'cards'
+        const primaryKey = columns[0]?.key
         const titleKey = columns[1]?.key
         const subtitleKey = columns[2]?.key
-        const items: Block = {
-            type: 'data-list',
-            selectMode: 'single',
-            items: pendingInteraction.options.map((opt) => {
-                const valueStr = String(opt.value)
-                const row = sourceArray.find((r) => {
-                    const primaryKey = columns[0]?.key
-                    return primaryKey && String(r[primaryKey]) === valueStr
-                })
-                const title = row && titleKey ? String(row[titleKey] ?? opt.label) : opt.label
-                const subtitle = row && subtitleKey ? String(row[subtitleKey] ?? '') : undefined
-                return {
-                    primary: valueStr,
-                    title,
-                    subtitle: subtitle || undefined,
-                    payload: valueStr,
+        const items = pendingInteraction.options.map((opt) => {
+            const valueStr = String(opt.value)
+            const row = sourceArray.find(r => primaryKey && String(r[primaryKey]) === valueStr)
+            if (layout === 'table') {
+                const fields: Record<string, string> = {}
+                for (const col of columns) {
+                    const raw = row?.[col.key]
+                    fields[col.key] = raw == null ? '' : String(raw)
                 }
-            }),
-        }
+                return { primary: valueStr, payload: valueStr, fields }
+            }
+            const title = row && titleKey ? String(row[titleKey] ?? opt.label) : opt.label
+            const subtitle = row && subtitleKey ? String(row[subtitleKey] ?? '') : undefined
+            return {
+                primary: valueStr,
+                title,
+                subtitle: subtitle || undefined,
+                payload: valueStr,
+            }
+        })
+        const dataList: Block = layout === 'table'
+            ? { type: 'data-list', selectMode: 'single', layout, columns, items }
+            : { type: 'data-list', selectMode: 'single', layout, items }
         const blocks: Block[] = []
         const cleanedMessage = stripMarkdownTable(message)
         if (cleanedMessage.trim().length > 0) blocks.push({ type: 'text', value: cleanedMessage })
-        blocks.push(items)
+        blocks.push(dataList)
         return { type: 'blocks-v1', blocks }
     }
     return { type: 'markdown', value: message, files: [] }
@@ -614,13 +621,25 @@ function computePendingInteraction({ node, state }: {
     const sourceField = typeof renderProps.sourceField === 'string' ? renderProps.sourceField : undefined
     if (!isNil(sourceField) && Array.isArray(state[sourceField])) {
         const raw = state[sourceField] as unknown[]
-        if (raw.length > 0 && raw.length <= 10) {
+        if (raw.length > 0) {
+            const columns = Array.isArray(renderProps.columns)
+                ? renderProps.columns as Array<{ key: string, header?: string }>
+                : []
+            const primaryKey = typeof renderProps.valueKey === 'string'
+                ? renderProps.valueKey
+                : (typeof renderProps.optionValueField === 'string' ? renderProps.optionValueField : columns[0]?.key)
+            const labelKey = typeof renderProps.optionLabelField === 'string'
+                ? renderProps.optionLabelField
+                : columns[1]?.key
             const options = raw.map((item, idx) => {
                 const rec = (item ?? {}) as Record<string, unknown>
-                const valueKey = typeof renderProps.optionValueField === 'string' ? renderProps.optionValueField : 'value'
-                const labelKey = typeof renderProps.optionLabelField === 'string' ? renderProps.optionLabelField : 'label'
-                const value = rec[valueKey] ?? rec.id ?? rec.ndg ?? rec.codice ?? item
-                const label = String(rec[labelKey] ?? rec.name ?? rec.label ?? rec.descrizione ?? rec.tipo ?? String(value))
+                const value = primaryKey
+                    ? rec[primaryKey] ?? rec.id ?? rec.ndg ?? rec.codice ?? item
+                    : rec.id ?? rec.ndg ?? rec.codice ?? rec.code ?? item
+                const label = String(
+                    (labelKey ? rec[labelKey] : undefined)
+                    ?? rec.name ?? rec.label ?? rec.descrizione ?? rec.denominazione ?? rec.tipo ?? String(value),
+                )
                 return { ordinal: idx + 1, label, value }
             })
             return {
