@@ -66,6 +66,7 @@
                 "description": "Data di efficacia in formato ISO YYYY-MM-DD. Se l'utente scrive 'il 20 aprile 2026', normalizza a '2026-04-20'. NON estrarre date relative (domani, fine mese)." },
               { "name": "moduleBase64", "type": "string", "extractable": false },
               { "name": "confirmed", "type": "boolean", "extractable": true,
+                "extractionScope": "node-local",
                 "description": "Conferma finale esplicita dell'utente (sì/confermo/procedi). Sarà accettato SOLO al nodo CONFIRM; in altri nodi il server lo tratta come turnAffirmed effimero." },
               { "name": "caseId", "type": "string", "extractable": false }
             ],
@@ -172,7 +173,6 @@
                 "nodeType": "USER_INPUT",
                 "stateInputs": ["closureReasons"],
                 "stateOutputs": ["closureReasonCode"],
-                "allowedExtraFields": ["closureReasonText", "closureDate"],
                 "render": {
                   "component": "DataTable",
                   "props": {
@@ -197,7 +197,6 @@
                 "nodeType": "USER_INPUT",
                 "stateInputs": ["closureReasons"],
                 "stateOutputs": ["closureDate"],
-                "allowedExtraFields": ["closureReasonCode", "closureReasonText"],
                 "render": {
                   "component": "DatePickerCard",
                   "props": { "format": "YYYY-MM-DD", "minDate": "today" }

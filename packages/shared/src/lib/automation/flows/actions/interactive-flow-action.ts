@@ -38,6 +38,7 @@ export const InteractiveFlowStateFieldSchema = z.object({
     description: z.string().optional(),
     format: z.string().optional(),
     extractable: z.boolean().optional(),
+    extractionScope: z.enum(['global', 'node-local']).optional(),
     sensitive: z.boolean().optional(),
     internal: z.boolean().optional(),
     minLength: z.number().int().min(1).max(200).optional(),

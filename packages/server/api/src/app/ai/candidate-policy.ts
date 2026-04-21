@@ -109,12 +109,19 @@ function verifyDomain({ field, value, state, fieldSpec }: {
     return { ok: true }
 }
 
-function verifyFieldAdmissibility({ field, currentNode, identityFields = [] }: {
+function verifyFieldAdmissibility({ field, currentNode, identityFields = [], fieldSpec }: {
     field: string
     currentNode: NodeAdmissibilityDescriptor
     identityFields?: string[]
+    fieldSpec?: { extractable?: boolean, extractionScope?: 'global' | 'node-local' }
 }): { ok: true } | { ok: false, reason: string } {
     if (field === 'turnAffirmed') return { ok: true }
+    // Global admissibility (default): extractable data fields are accepted at any node.
+    // Trigger fields (e.g. `confirmed` committing a submit) opt-in to restriction via
+    // extractionScope='node-local' and fall through to the per-node checks below.
+    if (fieldSpec?.extractable === true && fieldSpec.extractionScope !== 'node-local') {
+        return { ok: true }
+    }
     if (currentNode.stateOutputs?.includes(field)) return { ok: true }
     if (identityFields.includes(field)) return { ok: true }
     if (currentNode.allowedExtraFields?.includes(field)) return { ok: true }

@@ -243,3 +243,54 @@ describe('candidatePolicy.verifyFieldAdmissibility', () => {
         expect(r.ok).toBe(false)
     })
 })
+
+describe('candidatePolicy.verifyFieldAdmissibility — extractionScope', () => {
+    it('admits extractable data field at ANY node when extractionScope is undefined (default global)', () => {
+        const r = candidatePolicy.verifyFieldAdmissibility({
+            field: 'closureDate',
+            currentNode: { nodeId: 'pick_ndg', stateOutputs: ['ndg'] },
+            fieldSpec: { extractable: true },
+        })
+        expect(r.ok).toBe(true)
+    })
+    it('admits extractable data field at ANY node when extractionScope=global explicit', () => {
+        const r = candidatePolicy.verifyFieldAdmissibility({
+            field: 'closureDate',
+            currentNode: { nodeId: 'pick_ndg', stateOutputs: ['ndg'] },
+            fieldSpec: { extractable: true, extractionScope: 'global' },
+        })
+        expect(r.ok).toBe(true)
+    })
+    it('admits node-local field ONLY when in currentNode.stateOutputs', () => {
+        const r = candidatePolicy.verifyFieldAdmissibility({
+            field: 'confirmed',
+            currentNode: { nodeId: 'confirm_closure', stateOutputs: ['confirmed'] },
+            fieldSpec: { extractable: true, extractionScope: 'node-local' },
+        })
+        expect(r.ok).toBe(true)
+    })
+    it('admits node-local field when in currentNode.allowedExtraFields', () => {
+        const r = candidatePolicy.verifyFieldAdmissibility({
+            field: 'confirmed',
+            currentNode: { nodeId: 'x', stateOutputs: ['y'], allowedExtraFields: ['confirmed'] },
+            fieldSpec: { extractable: true, extractionScope: 'node-local' },
+        })
+        expect(r.ok).toBe(true)
+    })
+    it('rejects node-local field outside both stateOutputs and allowedExtraFields', () => {
+        const r = candidatePolicy.verifyFieldAdmissibility({
+            field: 'confirmed',
+            currentNode: { nodeId: 'pick_ndg', stateOutputs: ['ndg'] },
+            fieldSpec: { extractable: true, extractionScope: 'node-local' },
+        })
+        expect(r.ok).toBe(false)
+    })
+    it('falls back to node-local path when fieldSpec.extractable is not true', () => {
+        const r = candidatePolicy.verifyFieldAdmissibility({
+            field: 'profile',
+            currentNode: { nodeId: 'pick_ndg', stateOutputs: ['ndg'] },
+            fieldSpec: { extractable: false },
+        })
+        expect(r.ok).toBe(false)
+    })
+})

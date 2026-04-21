@@ -591,10 +591,12 @@ function applyVerificationPipeline({
             continue
         }
 
+        const fieldSpecAdmit = stateFields.find(f => f.name === field)
         const admissibility = candidatePolicy.verifyFieldAdmissibility({
             field,
             currentNode,
             identityFields,
+            fieldSpec: fieldSpecAdmit,
         })
         if (!admissibility.ok) {
             policyDecisions.push({ field, action: 'reject', reason: admissibility.reason })

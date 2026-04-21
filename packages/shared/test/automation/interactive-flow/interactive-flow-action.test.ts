@@ -51,6 +51,21 @@ describe('InteractiveFlowStateFieldSchema', () => {
     it('rejects unknown type', () => {
         expect(() => InteractiveFlowStateFieldSchema.parse({ name: 'x', type: 'blob' })).toThrow()
     })
+    it('accepts extractionScope=global', () => {
+        const parsed = InteractiveFlowStateFieldSchema.parse({ name: 'ndg', type: 'string', extractable: true, extractionScope: 'global' })
+        expect(parsed.extractionScope).toBe('global')
+    })
+    it('accepts extractionScope=node-local', () => {
+        const parsed = InteractiveFlowStateFieldSchema.parse({ name: 'confirmed', type: 'boolean', extractable: true, extractionScope: 'node-local' })
+        expect(parsed.extractionScope).toBe('node-local')
+    })
+    it('defaults extractionScope to undefined (policy layer treats as global)', () => {
+        const parsed = InteractiveFlowStateFieldSchema.parse({ name: 'x', type: 'string', extractable: true })
+        expect(parsed.extractionScope).toBeUndefined()
+    })
+    it('rejects invalid extractionScope', () => {
+        expect(() => InteractiveFlowStateFieldSchema.parse({ name: 'x', type: 'string', extractable: true, extractionScope: 'bogus' })).toThrow()
+    })
 })
 
 describe('ParamBindingSchema', () => {
