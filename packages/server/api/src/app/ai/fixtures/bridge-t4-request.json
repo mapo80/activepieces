@@ -1,0 +1,17 @@
+{
+  "model": "claude-cli",
+  "messages": [{"role": "user", "content": "il mio NDG è abc123"}],
+  "tools": [{
+    "type": "function",
+    "function": {
+      "name": "extract",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ndg": {"type": "string", "pattern": "^\\d{6,10}$", "description": "NDG 6-10 digits only"}
+        }
+      }
+    }
+  }],
+  "tool_choice": "auto"
+}

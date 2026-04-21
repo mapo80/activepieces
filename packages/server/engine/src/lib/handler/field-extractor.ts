@@ -3,7 +3,7 @@ import { EngineConstants } from './context/engine-constants'
 
 type FieldExtractorConfig = { aiProviderId: string, model: string }
 
-async function extract({ constants, config, message, stateFields, currentState, systemPrompt, locale }: {
+async function extract({ constants, config, message, stateFields, currentState, systemPrompt, locale, currentNode, identityFields, pendingInteraction, flowLabel }: {
     constants: EngineConstants
     config: FieldExtractorConfig
     message: string
@@ -11,6 +11,19 @@ async function extract({ constants, config, message, stateFields, currentState, 
     currentState: Record<string, unknown>
     systemPrompt?: string
     locale?: string
+    currentNode?: {
+        nodeId: string
+        nodeType?: 'USER_INPUT' | 'CONFIRM' | 'TOOL' | 'BRANCH'
+        displayName?: string
+        stateOutputs?: string[]
+        allowedExtraFields?: string[]
+        prompt?: string
+        displayField?: string
+        nextMissingField?: string
+    }
+    identityFields?: string[]
+    pendingInteraction?: unknown
+    flowLabel?: string
 }): Promise<Record<string, unknown>> {
     const extractable = stateFields.filter(f => f.extractable !== false && f.sensitive !== true)
     if (extractable.length === 0 || message.trim().length === 0) {
@@ -31,7 +44,18 @@ async function extract({ constants, config, message, stateFields, currentState, 
             description: f.description,
             format: f.format,
             required: false,
+            extractable: f.extractable,
+            minLength: f.minLength,
+            maxLength: f.maxLength,
+            pattern: f.pattern,
+            enumFrom: f.enumFrom,
+            enumValueField: f.enumValueField,
+            parser: f.parser,
         })),
+        currentNode,
+        identityFields,
+        pendingInteraction,
+        flowLabel,
     }
 
     let response: Response

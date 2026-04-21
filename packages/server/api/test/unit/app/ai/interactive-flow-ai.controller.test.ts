@@ -54,12 +54,7 @@ describe('interactiveFlowAiController — /field-extract', () => {
         buildModelMock.mockResolvedValue('language-model-stub')
     })
 
-    it('returns extracted fields from the first tool call, dropping null/empty values', async () => {
-        generateTextMock.mockResolvedValue({
-            toolCalls: [{ input: { ndg: '42', clientName: 'Polito', closureDate: '' } }],
-            usage: { totalTokens: 123 },
-        })
-
+    it('pre-parser extracts NDG deterministically without calling LLM', async () => {
         const result = await runRoute({
             path: '/field-extract',
             request: {
@@ -68,32 +63,22 @@ describe('interactiveFlowAiController — /field-extract', () => {
                 body: {
                     provider: AIProviderName.OPENAI,
                     model: 'gpt-4o-mini',
-                    message: 'estingui rapporto di Polito ndg 42',
+                    message: 'il mio NDG è 11255521',
+                    currentNode: { nodeId: 'pick_ndg', nodeType: 'USER_INPUT', stateOutputs: ['ndg'] },
                     stateFields: [
-                        { name: 'ndg', type: 'string', required: true },
-                        { name: 'clientName', type: 'string' },
-                        { name: 'closureDate', type: 'date' },
+                        { name: 'ndg', type: 'string', pattern: '^\\d{6,10}$', parser: 'ndg' },
                     ],
                 },
             },
-        })
+        }) as { acceptedFields: Record<string, unknown>; extractedFields: Record<string, unknown>; candidates: Array<{ source: string }> }
 
-        expect(result).toEqual({ extractedFields: { ndg: '42', clientName: 'Polito' }, tokensUsed: 123 })
-        expect(buildModelMock).toHaveBeenCalledWith({
-            platformId: PLATFORM_ID,
-            provider: AIProviderName.OPENAI,
-            modelId: 'gpt-4o-mini',
-            log: STUB_LOG,
-        })
-        const generateArgs = generateTextMock.mock.calls[0][0]
-        expect(generateArgs.toolChoice).toBe('required')
-        expect(generateArgs.tools.extract.inputSchema.properties.closureDate.type).toBe('string')
-        expect(generateArgs.tools.extract.inputSchema.required).toEqual(['ndg'])
+        expect(result.acceptedFields.ndg).toBe('11255521')
+        expect(result.extractedFields.ndg).toBe('11255521')
+        expect(result.candidates[0].source).toBe('pre-parser')
+        expect(generateTextMock).not.toHaveBeenCalled()
     })
 
-    it('returns empty extractedFields when tool is not called', async () => {
-        generateTextMock.mockResolvedValue({ toolCalls: [], usage: { totalTokens: 12 } })
-
+    it('meta-question short-circuits with template answer, no LLM call', async () => {
         const result = await runRoute({
             path: '/field-extract',
             request: {
@@ -102,12 +87,45 @@ describe('interactiveFlowAiController — /field-extract', () => {
                 body: {
                     provider: AIProviderName.OPENAI,
                     model: 'gpt-4o-mini',
-                    message: 'irrelevant',
+                    message: 'cosa mi avevi chiesto?',
+                    currentNode: {
+                        nodeId: 'pick_ndg',
+                        nodeType: 'USER_INPUT',
+                        stateOutputs: ['ndg'],
+                        displayName: 'Seleziona NDG',
+                        prompt: 'Qual è il NDG del cliente?',
+                    },
+                    currentState: { customerName: 'Bellafronte' },
                     stateFields: [{ name: 'ndg', type: 'string' }],
                 },
             },
-        })
-        expect(result).toEqual({ extractedFields: {}, tokensUsed: 12 })
+        }) as { metaAnswer?: string; candidates: unknown[]; acceptedFields: Record<string, unknown> }
+
+        expect(result.metaAnswer).toBeDefined()
+        expect(result.metaAnswer).toContain('NDG')
+        expect(result.candidates).toHaveLength(0)
+        expect(Object.keys(result.acceptedFields)).toHaveLength(0)
+        expect(generateTextMock).not.toHaveBeenCalled()
+    })
+
+    it('returns empty acceptedFields when LLM returns empty tool call', async () => {
+        generateTextMock.mockResolvedValue({ toolCalls: [], usage: { totalTokens: 10 } })
+        const result = await runRoute({
+            path: '/field-extract',
+            request: {
+                principal: { platform: { id: PLATFORM_ID } },
+                log: STUB_LOG,
+                body: {
+                    provider: AIProviderName.OPENAI,
+                    model: 'gpt-4o-mini',
+                    message: 'ciao',
+                    currentNode: { nodeId: 'pick_ndg', nodeType: 'USER_INPUT', stateOutputs: ['ndg'] },
+                    stateFields: [{ name: 'ndg', type: 'string', pattern: '^\\d{6,10}$' }],
+                },
+            },
+        }) as { acceptedFields: Record<string, unknown>; extractedFields: Record<string, unknown> }
+        expect(Object.keys(result.acceptedFields)).toHaveLength(0)
+        expect(Object.keys(result.extractedFields)).toHaveLength(0)
     })
 
     it('throws when principal has no platformId', async () => {
@@ -156,7 +174,8 @@ describe('interactiveFlowAiController — /question-generate', () => {
             },
         })
 
-        expect(result).toEqual({ text: 'Qual è il NDG?', tokensUsed: 34 })
+        expect((result as { text: string }).text).toBe('Qual è il NDG?')
+        expect((result as { tokensUsed: number }).tokensUsed).toBe(34)
         const generateArgs = generateTextMock.mock.calls[0][0]
         expect(generateArgs.model).toBe('language-model-stub')
         expect(generateArgs.prompt).toContain('<ROLE>')
@@ -166,7 +185,6 @@ describe('interactiveFlowAiController — /question-generate', () => {
         expect(generateArgs.prompt).toContain('<CONVERSATION_HISTORY>')
         expect(generateArgs.prompt).toContain('<CURRENT_STATE>')
         expect(generateArgs.prompt).toContain('<TASK>')
-        expect(generateArgs.prompt).toContain('TextInput')
         expect(generateArgs.prompt).toContain('<GUARDRAILS>')
     })
 

@@ -1,0 +1,24 @@
+{
+  "model": "claude-cli",
+  "messages": [{"role": "user", "content": "voglio motivazione 20"}],
+  "tools": [{
+    "type": "function",
+    "function": {
+      "name": "extract",
+      "description": "Extract state fields from the message",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "closureReasonCode": {
+            "type": "string",
+            "enum": ["01", "02", "03", "04", "05"],
+            "description": "Reason code from catalog"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    }
+  }],
+  "tool_choice": "auto"
+}

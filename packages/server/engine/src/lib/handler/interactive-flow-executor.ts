@@ -614,6 +614,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 userMessagePreview: userMessage?.slice(0, 80),
             })
             if (!isNil(userMessage) && !isNil(settings.fieldExtractor)) {
+                const pauseHint = findNextUserOrConfirmNode({ nodes, state: flowState, executedNodeIds, skippedNodeIds })
                 const extracted = await fieldExtractor.extract({
                     constants,
                     config: settings.fieldExtractor,
@@ -622,6 +623,13 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     currentState: flowState,
                     systemPrompt: settings.systemPrompt,
                     locale: resolveLocale({ constants, settings }),
+                    currentNode: pauseHint ? {
+                        nodeId: pauseHint.id,
+                        nodeType: pauseHint.nodeType === 'CONFIRM' ? 'CONFIRM' : 'USER_INPUT',
+                        displayName: pauseHint.displayName,
+                        stateOutputs: pauseHint.stateOutputs,
+                    } : undefined,
+                    identityFields: ['customerName'],
                 })
                 ifDebug('handle:resume:extracted', { extractedKeys: Object.keys(extracted) })
                 const coercedExtracted = coerceIncomingState({ incoming: extracted, fields })
@@ -654,6 +662,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             if (!isNil(userMessage) && userMessage.trim().length > 0) {
                 history = sessionStore.appendHistory({ history, role: 'user', text: userMessage, historyMaxTurns })
                 try {
+                    const pauseHint = findNextUserOrConfirmNode({ nodes, state: flowState, executedNodeIds, skippedNodeIds })
                     const extracted = await fieldExtractor.extract({
                         constants,
                         config: settings.fieldExtractor,
@@ -662,6 +671,13 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                         currentState: flowState,
                         systemPrompt: settings.systemPrompt,
                         locale: resolveLocale({ constants, settings }),
+                        currentNode: pauseHint ? {
+                            nodeId: pauseHint.id,
+                            nodeType: pauseHint.nodeType === 'CONFIRM' ? 'CONFIRM' : 'USER_INPUT',
+                            displayName: pauseHint.displayName,
+                            stateOutputs: pauseHint.stateOutputs,
+                        } : undefined,
+                        identityFields: ['customerName'],
                     })
                     ifDebug('handle:first-turn:extracted', {
                         extractedKeys: Object.keys(extracted),

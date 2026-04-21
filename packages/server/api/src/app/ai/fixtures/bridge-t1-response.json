@@ -1,0 +1,1 @@
+{"id":"chatcmpl_0f76bbb33f7b40c196bbaabf152b2c1f","object":"chat.completion","created":1776727381,"model":"claude-cli","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call_8c47c1314a05463e9a88955b","type":"function","function":{"name":"extract","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}

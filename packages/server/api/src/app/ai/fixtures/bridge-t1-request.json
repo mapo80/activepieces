@@ -1,0 +1,20 @@
+{
+  "model": "claude-cli",
+  "messages": [{"role": "user", "content": "ciao"}],
+  "tools": [{
+    "type": "function",
+    "function": {
+      "name": "extract",
+      "description": "Extract state fields from the message",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "customerName": {"type": "string", "description": "Customer name"}
+        },
+        "required": [],
+        "additionalProperties": false
+      }
+    }
+  }],
+  "tool_choice": "auto"
+}

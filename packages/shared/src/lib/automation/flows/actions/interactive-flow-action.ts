@@ -40,6 +40,12 @@ export const InteractiveFlowStateFieldSchema = z.object({
     extractable: z.boolean().optional(),
     sensitive: z.boolean().optional(),
     internal: z.boolean().optional(),
+    minLength: z.number().int().min(1).max(200).optional(),
+    maxLength: z.number().int().min(1).max(1000).optional(),
+    pattern: z.string().optional(),
+    enumFrom: z.string().optional(),
+    enumValueField: z.string().optional(),
+    parser: z.enum(['ndg', 'rapportoId', 'absolute-date', 'reason-code-cued', 'confirmation-keyword', 'ner-name']).optional(),
 })
 export type InteractiveFlowStateField = z.infer<typeof InteractiveFlowStateFieldSchema>
 
