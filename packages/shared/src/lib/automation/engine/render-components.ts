@@ -1,0 +1,6 @@
+export const RENDER_COMPONENT_DATA_TABLE = 'DataTable'
+export const RENDER_COMPONENT_TEXT_INPUT = 'TextInput'
+export const RENDER_COMPONENT_DATE_PICKER = 'DatePickerCard'
+export const RENDER_COMPONENT_CONFIRM_CARD = 'ConfirmCard'
+export const RENDER_COMPONENT_CLIENT_CARD = 'ClientCard'
+export const RENDER_COMPONENT_DOCUMENT_CARD = 'DocumentCard'

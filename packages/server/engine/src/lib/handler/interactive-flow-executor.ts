@@ -21,6 +21,8 @@ import {
     NodeMessage,
     ParamBinding,
     PendingInteraction,
+    RENDER_COMPONENT_CONFIRM_CARD,
+    RENDER_COMPONENT_DATE_PICKER,
     ResolveMcpGatewayResponse,
     StepOutputStatus,
 } from '@activepieces/shared'
@@ -517,12 +519,58 @@ function stripMarkdownTable(text: string): string {
     return withoutTables.replace(/\n{3,}/g, '\n\n').trim()
 }
 
-function buildPauseBody({ message, pendingInteraction, node, state }: {
+function buildPauseBody({ message, pendingInteraction, node, state, locale }: {
     message: string
     pendingInteraction: PendingInteraction | null
     node: InteractiveFlowUserInputNode | InteractiveFlowConfirmNode
     state: InteractiveFlowState
+    locale?: string
 }): BubblePayload {
+    if (isUserInputNode(node) && node.render?.component === RENDER_COMPONENT_DATE_PICKER) {
+        const renderProps = (node.render?.props ?? {}) as Record<string, unknown>
+        const rawFormat = typeof renderProps.format === 'string' ? renderProps.format : 'YYYY-MM-DD'
+        const format: 'YYYY-MM-DD' | 'DD/MM/YYYY' | 'ISO' =
+            rawFormat === 'DD/MM/YYYY' || rawFormat === 'ISO' ? rawFormat : 'YYYY-MM-DD'
+        const minDate = typeof renderProps.minDate === 'string' ? renderProps.minDate : undefined
+        const maxDate = typeof renderProps.maxDate === 'string' ? renderProps.maxDate : undefined
+        const title = typeof renderProps.title === 'string' ? renderProps.title : undefined
+        const blocks: Block[] = []
+        const cleanedMessage = message.trim()
+        if (cleanedMessage.length > 0) blocks.push({ type: 'text', value: cleanedMessage })
+        blocks.push({
+            type: 'date-picker',
+            format,
+            minDate,
+            maxDate,
+            locale: locale ?? 'it',
+            title,
+        })
+        return { type: 'blocks-v1', blocks }
+    }
+    if (isConfirmNode(node) && node.render?.component === RENDER_COMPONENT_CONFIRM_CARD) {
+        const renderProps = (node.render?.props ?? {}) as Record<string, unknown>
+        const sourceField = typeof renderProps.sourceField === 'string' ? renderProps.sourceField : undefined
+        const base64 = sourceField ? String(state[sourceField] ?? '') : ''
+        const blocks: Block[] = []
+        const cleanedMessage = message.trim()
+        if (cleanedMessage.length > 0) blocks.push({ type: 'text', value: cleanedMessage })
+        if (base64.length > 0) {
+            blocks.push({
+                type: 'pdf-viewer',
+                base64,
+                fileName: 'modulo-estinzione.pdf',
+                title: 'Modulo di richiesta',
+            })
+        }
+        blocks.push({
+            type: 'quick-replies',
+            replies: [
+                { label: 'Confermo invio', payload: 'sì confermo invio', style: 'primary' },
+                { label: 'Annulla', payload: 'no annulla', style: 'destructive' },
+            ],
+        })
+        return { type: 'blocks-v1', blocks }
+    }
     if (pendingInteraction?.type === 'pick_from_list' && pendingInteraction.options.length > 0) {
         const renderProps = (node.render?.props ?? {}) as Record<string, unknown>
         const sourceField = typeof renderProps.sourceField === 'string' ? renderProps.sourceField : undefined
@@ -1451,6 +1499,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 pendingInteraction: pendingInteractionForPause,
                 node: nextPauseNode,
                 state: flowState,
+                locale,
             })
             // If this flow was triggered via a sync webhook (AP chat UI,
             // sync forms, or any sync HTTP caller), push the bot's

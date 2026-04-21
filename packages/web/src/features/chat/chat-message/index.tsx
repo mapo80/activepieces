@@ -1,11 +1,18 @@
 import { Block, FileResponseInterface } from '@activepieces/shared';
-import React from 'react';
+import React, { Suspense } from 'react';
 
 import { DataListBlock } from './blocks/data-list-block';
+import { DatePickerBlock } from './blocks/date-picker-block';
 import { QuickRepliesBlock } from './blocks/quick-replies-block';
 import { FileMessage } from './file-message';
 import { ImageMessage } from './image-message';
 import { TextMessage } from './text-message';
+
+const PdfViewerBlockLazy = React.lazy(() =>
+  import('./blocks/pdf-viewer-block').then((m) => ({
+    default: m.PdfViewerBlock,
+  })),
+);
 
 interface MultiMediaMessageProps {
   textContent?: string;
@@ -84,6 +91,20 @@ const BlockRenderer: React.FC<{
       return <DataListBlock block={block} onPick={onPick} />;
     case 'quick-replies':
       return <QuickRepliesBlock block={block} onPick={onPick} />;
+    case 'date-picker':
+      return <DatePickerBlock block={block} onPick={onPick} />;
+    case 'pdf-viewer':
+      return (
+        <Suspense
+          fallback={
+            <div className="text-sm text-muted-foreground">
+              Caricamento documento…
+            </div>
+          }
+        >
+          <PdfViewerBlockLazy block={block} />
+        </Suspense>
+      );
     default:
       return null;
   }

@@ -4,6 +4,7 @@ export * from './requests'
 export * from './engine-constants'
 export * from './execution-errors'
 export * from './bubble-payload'
+export * from './render-components'
 
 export enum ExecutionMode {
     SANDBOX_PROCESS = 'SANDBOX_PROCESS',

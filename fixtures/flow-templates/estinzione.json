@@ -200,7 +200,7 @@
                 "allowedExtraFields": ["closureReasonCode", "closureReasonText"],
                 "render": {
                   "component": "DatePickerCard",
-                  "props": { "format": "YYYY-MM-DD" }
+                  "props": { "format": "YYYY-MM-DD", "minDate": "today" }
                 },
                 "message": {
                   "dynamic": true,
