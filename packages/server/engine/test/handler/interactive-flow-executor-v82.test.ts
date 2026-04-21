@@ -329,6 +329,38 @@ describe('interactive-flow executor — pendingInteraction lifecycle', () => {
         })
     })
 
+    it('prepends rejection hint to the next pause bubble (date-in-past)', async () => {
+        const sendSpy = installSyncCaller()
+        installStoreAndFetchMock({
+            extractorResponse: {
+                extractedFields: {},
+                turnAffirmed: false,
+                policyDecisions: [
+                    { field: 'closureDate', action: 'reject', reason: 'date-in-past', value: '2025-01-15' },
+                ],
+            },
+            questionText: 'Indica la data di efficacia.',
+        })
+        const action = buildPickNdgAction()
+        action.settings.locale = 'it'
+        const executionState = FlowExecutorContext.empty().upsertStep('trigger', {
+            type: 'PIECE_TRIGGER' as never,
+            status: StepOutputStatus.SUCCEEDED,
+            input: {},
+            output: { sessionId: 'sid-past-date', message: 'estinzione il 15 gennaio 2025' },
+        } as never)
+
+        await flowExecutor.execute({
+            action,
+            executionState,
+            constants: generateMockEngineConstants(EXECUTOR_CONSTANTS_SYNC),
+        })
+        const callArgs = (sendSpy.mock.calls[0]?.[0] ?? {}) as { runResponse: { body: { value: string } } }
+        const body = callArgs.runResponse.body.value
+        expect(body).toMatch(/passato/i)
+        expect(body).toMatch(/2025-01-15/)
+    })
+
     it('does not pass pendingInteraction on the very first turn (no prior session)', async () => {
         installSyncCaller()
         const store = installStoreAndFetchMock({

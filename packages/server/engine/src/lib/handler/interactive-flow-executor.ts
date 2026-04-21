@@ -414,6 +414,71 @@ function orderMissingByDependency({ missing, nodes }: {
     return rootFields.slice().sort((a, b) => firstNodeOrder(a) - firstNodeOrder(b))
 }
 
+function buildRejectionHint({ policyDecisions, stateFields, locale }: {
+    policyDecisions: Array<{ field: string; action: string; reason?: string; value?: unknown }>
+    stateFields: InteractiveFlowStateField[]
+    locale: string
+}): string | null {
+    const rejections = policyDecisions.filter(d => d.action === 'reject' && d.reason)
+    if (rejections.length === 0) return null
+    const fieldsByName = new Map(stateFields.map(f => [f.name, f]))
+    const labelFor = (field: string): string => {
+        const def = fieldsByName.get(field)
+        if (def?.label && typeof def.label === 'object') {
+            return def.label[locale] ?? def.label.en ?? field
+        }
+        return field
+    }
+    const it = locale.startsWith('it')
+    const lines: string[] = []
+    for (const d of rejections) {
+        const reason = String(d.reason ?? '')
+        const label = labelFor(d.field)
+        const raw = d.value !== undefined ? ` ("${String(d.value).slice(0, 60)}")` : ''
+        let line: string
+        if (reason === 'date-in-past') {
+            line = it
+                ? `La data${raw} è nel passato. Inserisci una data da oggi in poi (formato YYYY-MM-DD).`
+                : `The date${raw} is in the past. Please provide a date from today onwards (YYYY-MM-DD).`
+        }
+        else if (reason === 'date-too-far') {
+            line = it
+                ? `La data${raw} è oltre i 5 anni consentiti. Indica una data entro 5 anni.`
+                : `The date${raw} is beyond the allowed 5-year horizon.`
+        }
+        else if (reason === 'date-not-parseable' || reason === 'date-not-string') {
+            line = it
+                ? `Non ho compreso la data${raw}. Usa il formato YYYY-MM-DD o GG/MM/AAAA.`
+                : `I didn't understand the date${raw}. Please use YYYY-MM-DD or DD/MM/YYYY.`
+        }
+        else if (reason === 'reason-not-resolved' || reason === 'ambiguous-reason-clarify') {
+            line = it
+                ? `Non ho riconosciuto la motivazione${raw}. Indicami il codice a 2 cifre dal catalogo.`
+                : `I couldn't resolve the reason${raw}. Please provide the 2-digit code from the catalog.`
+        }
+        else if (reason.startsWith('plausibility-failed')) {
+            line = it
+                ? `Il valore fornito per ${label}${raw} non sembra valido. Riprova.`
+                : `The value provided for ${label}${raw} looks invalid. Please try again.`
+        }
+        else if (reason === 'evidence-not-found' || reason.startsWith('evidence-')) {
+            continue
+        }
+        else if (reason === 'explicit-user-reject' || reason.startsWith('field-not-admissible')) {
+            continue
+        }
+        else {
+            line = it
+                ? `Il valore per ${label}${raw} è stato respinto (${reason}). Riprova.`
+                : `The value for ${label}${raw} was rejected (${reason}). Please try again.`
+        }
+        lines.push(`- ${line}`)
+    }
+    if (lines.length === 0) return null
+    const header = it ? 'Ho trovato un problema con l\'ultima risposta:' : 'There is an issue with the previous answer:'
+    return `${header}\n${lines.join('\n')}`
+}
+
 function pendingOverwriteFromPolicyDecisions({ policyDecisions, nodeId }: {
     policyDecisions: Array<{ field: string; action: string; reason?: string; pendingOverwrite?: { field: string; oldValue: unknown; newValue: unknown } }>
     nodeId: string
@@ -667,6 +732,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
         let history: HistoryEntry[] = []
         let previousPendingInteraction: PendingInteraction | null = null
         let pendingOverwriteSignal: PendingInteraction | null = null
+        let rejectionHint: string | null = null
         if (!isNil(sessionKey)) {
             try {
                 const loaded = await sessionStore.load({
@@ -743,10 +809,16 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     policyDecisions: extractResult.policyDecisions,
                     nodeId: pauseHint?.id ?? '__pending_overwrite__',
                 }) ?? null
+                rejectionHint = buildRejectionHint({
+                    policyDecisions: extractResult.policyDecisions,
+                    stateFields: fields,
+                    locale: resolveLocale({ constants, settings }),
+                })
                 ifDebug('handle:resume:extracted', {
                     extractedKeys: Object.keys(extractResult.extractedFields),
                     turnAffirmed: extractResult.turnAffirmed,
                     pendingOverwriteSignal: pendingOverwriteSignal?.type ?? null,
+                    hasRejectionHint: !isNil(rejectionHint),
                 })
                 const coercedExtracted = coerceIncomingState({ incoming: extractResult.extractedFields, fields })
                 const applied = sessionStore.applyStateOverwriteWithTopicChange({
@@ -813,10 +885,16 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                         policyDecisions: extractResult.policyDecisions,
                         nodeId: pauseHint?.id ?? '__pending_overwrite__',
                     }) ?? null
+                    rejectionHint = buildRejectionHint({
+                        policyDecisions: extractResult.policyDecisions,
+                        stateFields: fields,
+                        locale: resolveLocale({ constants, settings }),
+                    })
                     ifDebug('handle:first-turn:extracted', {
                         extractedKeys: Object.keys(extractResult.extractedFields),
                         turnAffirmed: extractResult.turnAffirmed,
                         pendingOverwriteSignal: pendingOverwriteSignal?.type ?? null,
+                        hasRejectionHint: !isNil(rejectionHint),
                     })
                     const coercedExtracted = coerceIncomingState({ incoming: extractResult.extractedFields, fields })
                     const applied = sessionStore.applyStateOverwriteWithTopicChange({
@@ -1138,9 +1216,13 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     prompt = resolveNodeMessage({ message: virtualNode.message, locale })
                         ?? 'Per proseguire ho bisogno di qualche informazione in più.'
                 }
+                if (!isNil(rejectionHint)) {
+                    prompt = `${rejectionHint}\n\n${prompt}`
+                }
                 ifDebug('handle:insufficient-info:message', {
                     missing: missingList,
                     messagePreview: prompt.slice(0, 140),
+                    prependedRejectionHint: !isNil(rejectionHint),
                 })
                 if (!isNil(constants.workerHandlerId) && !isNil(constants.httpRequestId)) {
                     try {
@@ -1215,10 +1297,14 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     message = `Please provide ${label ?? nextPauseNode.stateOutputs[0] ?? 'the requested information'}`
                 }
             }
+            if (!isNil(rejectionHint) && !isNil(message)) {
+                message = `${rejectionHint}\n\n${message}`
+            }
             ifDebug('handle:pause:message', {
                 nodeId: nextPauseNode.id,
                 messagePreview: (message ?? '').slice(0, 120),
                 generatedFromLlm: isDynamicMessage && !isNil(settings.questionGenerator),
+                prependedRejectionHint: !isNil(rejectionHint),
             })
             const stepOutput = GenericStepOutput.create({
                 type: FlowActionType.INTERACTIVE_FLOW,
