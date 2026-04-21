@@ -35,8 +35,43 @@ export const TextMessage: React.FC<TextMessageProps> = React.memo(
       <>
         <Markdown
           remarkPlugins={[remarkGfm]}
-          className="bg-inherit"
+          className="bg-inherit prose-chat"
           components={{
+            table({ children }) {
+              return (
+                <div className="my-3 overflow-x-auto rounded-md border border-border">
+                  <table className="w-full border-collapse text-sm">
+                    {children}
+                  </table>
+                </div>
+              );
+            },
+            thead({ children }) {
+              return <thead className="bg-muted/60">{children}</thead>;
+            },
+            tbody({ children }) {
+              return <tbody className="divide-y divide-border">{children}</tbody>;
+            },
+            tr({ children }) {
+              return <tr className="even:bg-muted/20">{children}</tr>;
+            },
+            th({ children, style }) {
+              return (
+                <th
+                  className="border-b border-border px-3 py-2 text-left font-medium text-foreground"
+                  style={style}
+                >
+                  {children}
+                </th>
+              );
+            },
+            td({ children, style }) {
+              return (
+                <td className="px-3 py-2 align-top" style={style}>
+                  {children}
+                </td>
+              );
+            },
             code({ node: _node, inline, className, children, ...props }: any) {
               if (role === 'user') {
                 return <div className="font-mono text-sm">{children}</div>;
