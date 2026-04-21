@@ -1,6 +1,6 @@
 function renderMarkdownTable({ rows, columns, maxRows = 50, overflowText }: {
     rows: Array<Record<string, unknown>>
-    columns: Array<{ key: string; header: string; format?: 'eur' | 'date' | 'uppercase' | 'text' }>
+    columns: Array<{ key: string, header: string, format?: 'eur' | 'date' | 'uppercase' | 'text' }>
     maxRows?: number
     overflowText?: string
 }): string {
@@ -29,8 +29,8 @@ function renderMarkdownTable({ rows, columns, maxRows = 50, overflowText }: {
 }
 
 function renderBulletList({ items, format }: {
-    items: Array<{ label: string; value?: unknown; description?: string }>
-    format?: (item: { label: string; value?: unknown; description?: string }) => string
+    items: Array<{ label: string, value?: unknown, description?: string }>
+    format?: (item: { label: string, value?: unknown, description?: string }) => string
 }): string {
     if (items.length === 0) return '_(nessun elemento da mostrare)_'
     return items.map(item => {
@@ -43,7 +43,7 @@ function renderBulletList({ items, format }: {
 
 function renderConfirmSummary({ state, summary }: {
     state: Record<string, unknown>
-    summary: Array<{ field: string; label: string; format?: 'eur' | 'date' | 'uppercase' | 'text' }>
+    summary: Array<{ field: string, label: string, format?: 'eur' | 'date' | 'uppercase' | 'text' }>
 }): string {
     const rows = summary
         .map(s => {
@@ -58,7 +58,7 @@ function renderConfirmSummary({ state, summary }: {
         '',
         body,
         '',
-        "Confermi l'invio? Rispondi **sì** per procedere o **no** per interrompere.",
+        'Confermi l\'invio? Rispondi **sì** per procedere o **no** per interrompere.',
     ].join('\n')
 }
 
@@ -74,7 +74,7 @@ function renderPendingOverwriteConfirm({ field, oldValue, newValue }: {
     ].join('\n')
 }
 
-function formatCell({ value, format }: { value: unknown; format?: 'eur' | 'date' | 'uppercase' | 'text' }): string {
+function formatCell({ value, format }: { value: unknown, format?: 'eur' | 'date' | 'uppercase' | 'text' }): string {
     if (value === null || value === undefined) return ''
     if (format === 'eur') {
         const n = typeof value === 'number' ? value : parseFloat(String(value))

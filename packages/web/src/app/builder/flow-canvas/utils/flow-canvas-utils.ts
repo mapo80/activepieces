@@ -224,9 +224,7 @@ const calculateGraphBoundingBox = (graph: ApGraph) => {
       (node) => node.position.x + flowCanvasConsts.AP_NODE_SIZE.STEP.width,
     ),
   );
-  const maxY = Math.max(
-    ...heightAffectingNodes.map((node) => node.position.y),
-  );
+  const maxY = Math.max(...heightAffectingNodes.map((node) => node.position.y));
   const width = maxX - minX;
   const height = maxY - minY;
 

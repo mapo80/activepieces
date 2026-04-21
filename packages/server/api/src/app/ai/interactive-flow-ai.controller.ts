@@ -11,7 +11,7 @@ import { z } from 'zod'
 import { securityAccess } from '../core/security/authorization/fastify-security'
 import { candidatePolicy, NodeAdmissibilityDescriptor } from './candidate-policy'
 import { interactiveFlowModelFactory } from './interactive-flow-model-factory'
-import { metaQuestionHandler, CurrentNodeDescriptor as MetaNode } from './meta-question-handler'
+import { CurrentNodeDescriptor as MetaNode, metaQuestionHandler } from './meta-question-handler'
 import { overwritePolicy } from './overwrite-policy'
 import { PendingInteraction, pendingInteractionResolver } from './pending-interaction-resolver'
 import { preParser, PreParserMatch } from './pre-parser'
@@ -160,8 +160,9 @@ function buildExtractionSchemaFromFields({ stateFields, currentState, eligibleFi
         if (field.enumFrom && field.enumValueField) {
             const list = currentState[field.enumFrom]
             if (Array.isArray(list) && list.length > 0) {
+                const enumValueField = field.enumValueField
                 const values = list
-                    .map(item => (item && typeof item === 'object' ? (item as Record<string, unknown>)[field.enumValueField!] : undefined))
+                    .map(item => (item && typeof item === 'object' ? (item as Record<string, unknown>)[enumValueField] : undefined))
                     .filter(v => v !== undefined)
                 if (values.length > 0) {
                     prop.enum = values
@@ -207,7 +208,7 @@ function previewValue(value: unknown): string {
     return String(value)
 }
 
-function runPreParserForEligibleFields({ message, stateFields, eligibleFields }: {
+function runPreParserForEligibleFields({ message, eligibleFields }: {
     message: string
     stateFields: z.infer<typeof StateFieldRequestSchema>[]
     eligibleFields: Set<string>
@@ -238,19 +239,20 @@ function resolveReasonIfText({
     currentState,
     stateFields,
 }: {
-    candidate: { field: string; value: unknown; evidence?: string }
+    candidate: { field: string, value: unknown, evidence?: string }
     currentState: Record<string, unknown>
     stateFields: z.infer<typeof StateFieldRequestSchema>[]
-}): { action: 'keep' | 'drop' | 'ambiguous'; resolvedValue?: unknown; matches?: Array<{ code: string; descr: string }> } {
+}): { action: 'keep' | 'drop' | 'ambiguous', resolvedValue?: unknown, matches?: Array<{ code: string, descr: string }> } {
     if (candidate.field !== 'closureReasonText') return { action: 'keep' }
     const reasonField = stateFields.find(f => f.name === 'closureReasonCode')
     if (!reasonField?.enumFrom || !reasonField?.enumValueField) return { action: 'keep' }
+    const enumValueField = reasonField.enumValueField
     const list = currentState[reasonField.enumFrom]
     if (!Array.isArray(list) || list.length === 0) return { action: 'drop' }
     const closureReasons = list.map(item => {
         const obj = item as Record<string, unknown>
         return {
-            codice: String(obj[reasonField.enumValueField!] ?? ''),
+            codice: String(obj[enumValueField] ?? ''),
             descr: String(obj.descr ?? obj.description ?? obj.label ?? ''),
         }
     })
@@ -269,7 +271,7 @@ export const interactiveFlowAiController: FastifyPluginAsyncZod = async (app) =>
         const enginePrincipal = request.principal as EnginePrincipal
         assertNotNullOrUndefined(enginePrincipal.platform?.id, 'platformId')
         const body = request.body
-        const logEvents: Array<{ stage: string; data?: Record<string, unknown> }> = []
+        const logEvents: Array<{ stage: string, data?: Record<string, unknown> }> = []
         const currentState = body.currentState ?? {}
 
         const metaCurrentNode: MetaNode = body.currentNode
@@ -517,7 +519,7 @@ export const interactiveFlowAiController: FastifyPluginAsyncZod = async (app) =>
                 ? /\b(cliente|nome|customer|bellafronte|rossi|titolare|anagrafic)/i.test(text)
                 : true
             if (!mentionsPrimary) {
-                text = `Ciao! Per procedere, indicami il nome del cliente (o NDG) su cui operare.`
+                text = 'Ciao! Per procedere, indicami il nome del cliente (o NDG) su cui operare.'
                 safetyNetAppended = true
             }
         }
@@ -541,7 +543,7 @@ function applyVerificationPipeline({
     currentNodeType,
     logEvents,
 }: {
-    candidates: Array<{ field: string; value: unknown; intent?: 'set' | 'correct' | 'confirm' | 'reject'; evidence?: string; source: 'pre-parser' | 'pending-interaction' | 'llm' }>
+    candidates: Array<{ field: string, value: unknown, intent?: 'set' | 'correct' | 'confirm' | 'reject', evidence?: string, source: 'pre-parser' | 'pending-interaction' | 'llm' }>
     currentState: Record<string, unknown>
     stateFields: z.infer<typeof StateFieldRequestSchema>[]
     currentNode: NodeAdmissibilityDescriptor
@@ -549,18 +551,18 @@ function applyVerificationPipeline({
     userMessage: string
     pendingInteractionType?: string
     currentNodeType: 'USER_INPUT' | 'CONFIRM' | 'TOOL' | 'BRANCH' | undefined
-    logEvents: Array<{ stage: string; data?: Record<string, unknown> }>
+    logEvents: Array<{ stage: string, data?: Record<string, unknown> }>
 }): {
-    acceptedFields: Record<string, unknown>
-    policyDecisions: Array<{ field: string; action: 'accept' | 'reject' | 'confirm'; reason: string; value?: unknown; pendingOverwrite?: { field: string; oldValue: unknown; newValue: unknown } }>
-    turnAffirmed: boolean
-    clarifyReason?: { matches: Array<{ code: string; descr: string }> }
-    extractedFields: Record<string, unknown>
-} {
+        acceptedFields: Record<string, unknown>
+        policyDecisions: Array<{ field: string, action: 'accept' | 'reject' | 'confirm', reason: string, value?: unknown, pendingOverwrite?: { field: string, oldValue: unknown, newValue: unknown } }>
+        turnAffirmed: boolean
+        clarifyReason?: { matches: Array<{ code: string, descr: string }> }
+        extractedFields: Record<string, unknown>
+    } {
     const acceptedFields: Record<string, unknown> = {}
-    const policyDecisions: Array<{ field: string; action: 'accept' | 'reject' | 'confirm'; reason: string; value?: unknown; pendingOverwrite?: { field: string; oldValue: unknown; newValue: unknown } }> = []
+    const policyDecisions: Array<{ field: string, action: 'accept' | 'reject' | 'confirm', reason: string, value?: unknown, pendingOverwrite?: { field: string, oldValue: unknown, newValue: unknown } }> = []
     let turnAffirmed = false
-    let clarifyReason: { matches: Array<{ code: string; descr: string }> } | undefined
+    let clarifyReason: { matches: Array<{ code: string, descr: string }> } | undefined
 
     const cueDetection = overwritePolicy.detectCueOfCorrection({ message: userMessage })
     const perFieldCandidates = new Map<string, Array<typeof candidates[number]>>()
@@ -703,8 +705,18 @@ function applyVerificationPipeline({
 
 function buildEmptyResponse({ metaAnswer, logEvents }: {
     metaAnswer?: string
-    logEvents: Array<{ stage: string; data?: Record<string, unknown> }>
-}) {
+    logEvents: Array<{ stage: string, data?: Record<string, unknown> }>
+}): {
+        candidates: Array<never>
+        policyDecisions: Array<never>
+        acceptedFields: Record<string, unknown>
+        turnAffirmed: boolean
+        metaAnswer?: string
+        clarifyReason: undefined
+        tokensUsed: number
+        logEvents: Array<{ stage: string, data?: Record<string, unknown> }>
+        extractedFields: Record<string, unknown>
+    } {
     return {
         candidates: [],
         policyDecisions: [],
@@ -769,13 +781,22 @@ function buildQuestionPrompt({
     return sections.join('\n\n')
 }
 
-const PROMPT_STRINGS = {
+type PromptStrings = {
+    defaultRole: string
+    styleRespond: (l: string) => string
+    stateContextHeader: string
+    taskHeader: string
+    taskRenderHint: (component: string, propsTxt: string) => string
+    guardrails: string[]
+    languageLock: (l: string) => string
+}
+const PROMPT_STRINGS: Record<'en' | 'it', PromptStrings> = {
     en: {
         defaultRole: 'You are a conversational assistant.',
-        styleRespond: (l: string) => `Respond in ${l} only. Be concise.`,
+        styleRespond: (l: string): string => `Respond in ${l} only. Be concise.`,
         stateContextHeader: 'This is the conversation state for YOUR reference only — DO NOT echo it back to the user, DO NOT output JSON, DO NOT output code blocks. Ask a natural-language question.',
         taskHeader: 'Ask the user for the following information, one single clear question.',
-        taskRenderHint: (component: string, propsTxt: string) => `The user will answer via a UI component: ${component}${propsTxt}. Guide them accordingly.`,
+        taskRenderHint: (component: string, propsTxt: string): string => `The user will answer via a UI component: ${component}${propsTxt}. Guide them accordingly.`,
         guardrails: [
             '- Do not invent data or promises.',
             '- Ask one question at a time.',
@@ -783,14 +804,14 @@ const PROMPT_STRINGS = {
             '- Match the locale exactly.',
             '- OUTPUT MUST BE natural-language prose. NEVER output JSON, code blocks, backticks, or field name dumps. NEVER echo the conversation state back to the user.',
         ],
-        languageLock: (l: string) => `Respond in ${l}. Match the user's language signals.`,
+        languageLock: (l: string): string => `Respond in ${l}. Match the user's language signals.`,
     },
     it: {
         defaultRole: 'Sei un assistente conversazionale.',
-        styleRespond: (_l: string) => 'Rispondi ESCLUSIVAMENTE in italiano. Sii conciso.',
+        styleRespond: (): string => 'Rispondi ESCLUSIVAMENTE in italiano. Sii conciso.',
         stateContextHeader: 'Questo è lo stato della conversazione, solo per tuo riferimento — NON ripeterlo all\'utente, NON emettere JSON, NON usare code block. Poni una domanda in linguaggio naturale.',
         taskHeader: 'Chiedi all\'utente le seguenti informazioni con una sola domanda chiara.',
-        taskRenderHint: (component: string, propsTxt: string) => `L'utente risponderà tramite il componente UI: ${component}${propsTxt}. Guidalo di conseguenza.`,
+        taskRenderHint: (component: string, propsTxt: string): string => `L'utente risponderà tramite il componente UI: ${component}${propsTxt}. Guidalo di conseguenza.`,
         guardrails: [
             '- Non inventare dati né promesse.',
             '- Una sola domanda per turno.',
@@ -798,7 +819,7 @@ const PROMPT_STRINGS = {
             '- Rispetta esattamente il locale dell\'utente (italiano).',
             '- L\'OUTPUT DEVE essere prosa in linguaggio naturale. MAI JSON, MAI code block, MAI backtick, MAI dump di campi tecnici. MAI ripetere lo stato della conversazione all\'utente.',
         ],
-        languageLock: (_l: string) => 'Rispondi SEMPRE in italiano. Non usare mai inglese.',
+        languageLock: (): string => 'Rispondi SEMPRE in italiano. Non usare mai inglese.',
     },
 }
 

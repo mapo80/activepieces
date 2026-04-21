@@ -19,7 +19,7 @@ const CONVERSATIONAL_BLOCKLIST_NAME = new Set([
 function verifyEvidence({ evidence, userMessage }: {
     evidence: string | undefined
     userMessage: string
-}): { ok: true } | { ok: false; reason: string } {
+}): { ok: true } | { ok: false, reason: string } {
     if (!evidence || evidence.trim().length < 2) {
         return { ok: false, reason: 'evidence-too-short-or-missing' }
     }
@@ -35,7 +35,7 @@ function verifyFieldPlausibility({ field, value, rules }: {
     field: string
     value: unknown
     rules?: FieldPlausibilityRules
-}): { ok: true } | { ok: false; reason: string } {
+}): { ok: true } | { ok: false, reason: string } {
     if (value === null || value === undefined) return { ok: false, reason: 'nil-value' }
 
     if (field === 'customerName') {
@@ -79,8 +79,8 @@ function verifyDomain({ field, value, state, fieldSpec }: {
     field: string
     value: unknown
     state: Record<string, unknown>
-    fieldSpec?: { enumFrom?: string; enumValueField?: string }
-}): { ok: true } | { ok: false; reason: string } {
+    fieldSpec?: { enumFrom?: string, enumValueField?: string }
+}): { ok: true } | { ok: false, reason: string } {
     if (field === 'closureDate') {
         if (typeof value !== 'string') return { ok: false, reason: 'date-not-string' }
         const date = new Date(value)
@@ -96,7 +96,7 @@ function verifyDomain({ field, value, state, fieldSpec }: {
     if (fieldSpec?.enumFrom && fieldSpec?.enumValueField) {
         const list = state[fieldSpec.enumFrom]
         if (!Array.isArray(list) || list.length === 0) {
-            return { ok: false, reason: `enum-unavailable-in-state` }
+            return { ok: false, reason: 'enum-unavailable-in-state' }
         }
         const valueField = fieldSpec.enumValueField
         const allowed = list
@@ -113,7 +113,7 @@ function verifyFieldAdmissibility({ field, currentNode, identityFields = [] }: {
     field: string
     currentNode: NodeAdmissibilityDescriptor
     identityFields?: string[]
-}): { ok: true } | { ok: false; reason: string } {
+}): { ok: true } | { ok: false, reason: string } {
     if (field === 'turnAffirmed') return { ok: true }
     if (currentNode.stateOutputs?.includes(field)) return { ok: true }
     if (identityFields.includes(field)) return { ok: true }

@@ -98,7 +98,7 @@ export type PolicyDecision = {
     action: 'accept' | 'reject' | 'confirm'
     reason: string
     value?: unknown
-    pendingOverwrite?: { field: string; oldValue: unknown; newValue: unknown }
+    pendingOverwrite?: { field: string, oldValue: unknown, newValue: unknown }
 }
 
 export type ExtractResult = {

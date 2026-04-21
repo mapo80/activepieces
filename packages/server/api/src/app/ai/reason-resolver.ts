@@ -58,7 +58,7 @@ function resolve({ reasonText, closureReasons }: {
 function computeTokenOverlapScores({ text, reasons }: {
     text: string
     reasons: ClosureReason[]
-}): Array<{ code: string; descr: string; score: number }> {
+}): Array<{ code: string, descr: string, score: number }> {
     const userTokens = new Set(text.split(/\s+/).filter(t => t.length >= 3))
     return reasons.map(r => {
         const reasonTokens = new Set(normalization.normalize(r.descr).split(/\s+/).filter(t => t.length >= 3))
@@ -80,7 +80,7 @@ export type ClosureReason = {
 }
 
 export type ResolutionResult =
-    | { resolution: 'unique'; code: string; matchedBy: 'exact-code' | 'exact-descr' | 'substring' | 'token-overlap' }
+    | { resolution: 'unique', code: string, matchedBy: 'exact-code' | 'exact-descr' | 'substring' | 'token-overlap' }
     | { resolution: 'none' }
-    | { resolution: 'vague-rejected'; reason: string }
-    | { resolution: 'ambiguous'; matches: Array<{ code: string; descr: string }> }
+    | { resolution: 'vague-rejected', reason: string }
+    | { resolution: 'ambiguous', matches: Array<{ code: string, descr: string }> }

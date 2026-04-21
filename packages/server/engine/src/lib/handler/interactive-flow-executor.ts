@@ -427,24 +427,24 @@ export function buildVirtualNodeAddendum({ primaryField, primaryLabel, primaryDe
     const descParen = primaryDesc ? ` (${primaryDesc})` : ''
     if (locale.startsWith('it')) {
         return [
-            `Sei all'inizio della conversazione. L'utente ha appena aperto la chat.`,
+            'Sei all\'inizio della conversazione. L\'utente ha appena aperto la chat.',
             `Compito: presenta brevemente il servizio ("${flowLabel}") con tono professionale-bancario italiano e chiedi esclusivamente **${primaryLabel}**${descParen}.`,
-            `NON saltare a campi successivi (es. date, motivazioni). NON chiedere più di un'informazione.`,
-            `Formato: 2-3 frasi in italiano, cordiale ma sobrio, includi un esempio concreto se utile.`,
+            'NON saltare a campi successivi (es. date, motivazioni). NON chiedere più di un\'informazione.',
+            'Formato: 2-3 frasi in italiano, cordiale ma sobrio, includi un esempio concreto se utile.',
             `Campo tecnico da raccogliere: \`${primaryField}\`.`,
         ].join(' ')
     }
     return [
-        `Conversation just started. The user has just opened the chat.`,
+        'Conversation just started. The user has just opened the chat.',
         `Task: briefly introduce the "${flowLabel}" task in a professional banking tone and ask only for **${primaryLabel}**${descParen}.`,
-        `Do not skip ahead. Do not ask more than one piece of information.`,
+        'Do not skip ahead. Do not ask more than one piece of information.',
         `Format: 2-3 sentences, warm but concise, in ${locale}. Include a concrete example if useful.`,
         `Technical field: \`${primaryField}\`.`,
     ].join(' ')
 }
 
 function buildRejectionHint({ policyDecisions, stateFields, locale }: {
-    policyDecisions: Array<{ field: string; action: string; reason?: string; value?: unknown }>
+    policyDecisions: Array<{ field: string, action: string, reason?: string, value?: unknown }>
     stateFields: InteractiveFlowStateField[]
     locale: string
 }): string | null {
@@ -509,7 +509,7 @@ function buildRejectionHint({ policyDecisions, stateFields, locale }: {
 }
 
 function pendingOverwriteFromPolicyDecisions({ policyDecisions, nodeId }: {
-    policyDecisions: Array<{ field: string; action: string; reason?: string; pendingOverwrite?: { field: string; oldValue: unknown; newValue: unknown } }>
+    policyDecisions: Array<{ field: string, action: string, reason?: string, pendingOverwrite?: { field: string, oldValue: unknown, newValue: unknown } }>
     nodeId: string
 }): PendingInteraction | null {
     for (const dec of policyDecisions) {

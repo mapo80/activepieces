@@ -3,7 +3,7 @@ function normalize(text: string): string {
     return text
         .normalize('NFKD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[\u2018\u2019\u0060\u00b4]/g, "'")
+        .replace(/[\u2018\u2019\u0060\u00b4]/g, '\'')
         .replace(/[\u2013\u2014]/g, '-')
         .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
         .replace(/\s+/g, ' ')
@@ -20,7 +20,7 @@ function normalizePreservingSpans(text: string): NormalizedText {
     }
 }
 
-function buildPositionMap({ original, normalized }: { original: string; normalized: string }): number[] {
+function buildPositionMap({ original, normalized }: { original: string, normalized: string }): number[] {
     const map: number[] = []
     let normalizedIdx = 0
     for (let i = 0; i < original.length; i++) {
@@ -51,7 +51,7 @@ function locateEvidence({ evidence, normalized }: {
     return { matched: true, normalizedSpan: { start: idx, end: idx + needle.length } }
 }
 
-function spansOverlap({ a, b }: { a: Span; b: Span }): boolean {
+function spansOverlap({ a, b }: { a: Span, b: Span }): boolean {
     return a.start < b.end && b.start < a.end
 }
 
@@ -111,5 +111,5 @@ export type NormalizedText = {
 }
 
 export type LocatedEvidence =
-    | { matched: true; normalizedSpan: Span }
-    | { matched: false; reason: 'evidence-too-short' | 'not-substring' }
+    | { matched: true, normalizedSpan: Span }
+    | { matched: false, reason: 'evidence-too-short' | 'not-substring' }

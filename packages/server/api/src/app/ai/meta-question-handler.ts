@@ -35,7 +35,7 @@ function renderMetaAnswer({ intent, state, currentNode, flowLabel }: {
             return [
                 `Provo a spiegarmi meglio: ho bisogno di ${pendingField}.`,
                 knownFields ? `Fin qui ho: ${knownFields}.` : null,
-                `Scrivi la tua risposta o 'annulla' per interrompere.`,
+                'Scrivi la tua risposta o \'annulla\' per interrompere.',
             ].filter(Boolean).join(' ')
         case 'ask-progress':
             return [
@@ -47,10 +47,10 @@ function renderMetaAnswer({ intent, state, currentNode, flowLabel }: {
             return [
                 `Sto guidando${flowPhrase}. Ti farò una domanda alla volta.`,
                 `Al momento mi serve: ${pendingField}.`,
-                `Rispondi digitando la risposta o 'annulla' per interrompere.`,
+                'Rispondi digitando la risposta o \'annulla\' per interrompere.',
             ].filter(Boolean).join(' ')
         case 'ask-cancel':
-            return `Operazione interrotta su tua richiesta. Se vuoi ricominciare, invia un nuovo messaggio.`
+            return 'Operazione interrotta su tua richiesta. Se vuoi ricominciare, invia un nuovo messaggio.'
     }
 }
 

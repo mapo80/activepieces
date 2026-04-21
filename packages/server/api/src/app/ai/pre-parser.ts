@@ -1,6 +1,6 @@
 import { normalization } from './normalization'
 
-type Span = { start: number; end: number; kind?: string }
+type Span = { start: number, end: number, kind?: string }
 
 function parseNdg({ message }: { message: string }): PreParserMatch[] {
     const matches: PreParserMatch[] = []
@@ -166,7 +166,7 @@ function runPreParser({ message }: { message: string }): PreParserResult {
     }
 }
 
-function isValidCalendarDate({ year, month, day }: { year: number; month: number; day: number }): boolean {
+function isValidCalendarDate({ year, month, day }: { year: number, month: number, day: number }): boolean {
     if (month < 1 || month > 12) return false
     if (day < 1 || day > 31) return false
     if (year < 1900 || year > 2100) return false
@@ -174,7 +174,7 @@ function isValidCalendarDate({ year, month, day }: { year: number; month: number
     return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
 }
 
-function isSpanInsideReserved({ span, reservedSpans }: { span: Span; reservedSpans: Span[] }): boolean {
+function isSpanInsideReserved({ span, reservedSpans }: { span: Span, reservedSpans: Span[] }): boolean {
     return reservedSpans.some(r => span.start >= r.start && span.end <= r.end)
 }
 

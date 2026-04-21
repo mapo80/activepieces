@@ -512,20 +512,20 @@ class ActivepiecesEmbedded {
     return str.startsWith('/') ? str.slice(1) : str;
   }
   /**Adds a grace period before executing the method depending on the condition */
-  private _addGracePeriodBeforeMethod({
+  private _addGracePeriodBeforeMethod<T>({
     method,
     condition,
     errorMessage,
   }: {
-    method: () => Promise<any> | void;
+    method: () => T;
     condition: () => boolean;
     /**Error message to show when grace period passes */
     errorMessage: string;
-  }) {
-    return new Promise((resolve, reject) => {
+  }): Promise<Awaited<T>> {
+    return new Promise<Awaited<T>>((resolve, reject) => {
       let checkCounter = 0;
       if (condition()) {
-        resolve(method());
+        Promise.resolve(method()).then(resolve, reject);
         return;
       }
       const checker = setInterval(() => {
@@ -537,14 +537,14 @@ class ActivepiecesEmbedded {
         checkCounter++;
         if (condition()) {
           clearInterval(checker);
-          resolve(method());
+          Promise.resolve(method()).then(resolve, reject);
         }
       }, this._HUNDRED_MILLISECONDS);
-    },);
+    });
   }
 
   
-  private _errorCreator(message: string,...args:any[]): never {
+  private _errorCreator(message: string,...args:unknown[]): never {
     this._logger().error(message,...args)
     throw new Error(`Activepieces: ${message}`,);
   }
@@ -562,13 +562,13 @@ class ActivepiecesEmbedded {
   }
   private _logger() {
     return{
-      log: (message: string, ...args: any[]) => {
+      log: (message: string, ...args: unknown[]) => {
         console.log(`Activepieces: ${message}`, ...args)
       },
-      error: (message: string, ...args: any[]) => {
+      error: (message: string, ...args: unknown[]) => {
         console.error(`Activepieces: ${message}`, ...args)
       },
-      warn: (message: string, ...args: any[]) => {
+      warn: (message: string, ...args: unknown[]) => {
         console.warn(`Activepieces: ${message}`, ...args)
       }
     }
@@ -616,5 +616,12 @@ class ActivepiecesEmbedded {
 }
 
 
-(window as any).activepieces = new ActivepiecesEmbedded();
-(window as any).ActivepiecesEmbedded = ActivepiecesEmbedded;
+declare global {
+  interface Window {
+    activepieces: ActivepiecesEmbedded;
+    ActivepiecesEmbedded: typeof ActivepiecesEmbedded;
+  }
+}
+
+window.activepieces = new ActivepiecesEmbedded();
+window.ActivepiecesEmbedded = ActivepiecesEmbedded;

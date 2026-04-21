@@ -27,7 +27,6 @@ test.describe('Piece isolation — EE', () => {
       },
     });
 
-    const { Readable } = await import('node:stream');
     const tar = await import('tar-stream');
     const zlib = await import('node:zlib');
 

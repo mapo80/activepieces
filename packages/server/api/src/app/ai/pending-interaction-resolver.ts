@@ -125,13 +125,13 @@ function escapeRegExp(text: string): string {
     return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function firstMatchText({ regex, normalized, original }: { regex: RegExp; normalized: string; original: string }): string {
+function firstMatchText({ regex, normalized, original }: { regex: RegExp, normalized: string, original: string }): string {
     const m = regex.exec(normalized)
     if (!m) return original.slice(0, 40)
     return m[0]
 }
 
-function extractOrdinalText({ ordinal, normalized, original }: { ordinal: number; normalized: string; original: string }): string {
+function extractOrdinalText({ ordinal }: { ordinal: number, normalized: string, original: string }): string {
     if (ordinal === -1) return 'ultimo'
     const word = Object.entries(ORDINAL_IT_MAP).find(([, n]) => n === ordinal)?.[0]
     if (word) return word
@@ -146,7 +146,7 @@ export const pendingInteractionResolver = {
 export type { PendingInteraction } from '@activepieces/shared'
 
 export type PendingResolutionResult =
-    | { outcome: 'accept'; field: string; value: unknown; evidence: string }
-    | { outcome: 'reject'; field: string; evidence: string }
+    | { outcome: 'accept', field: string, value: unknown, evidence: string }
+    | { outcome: 'reject', field: string, evidence: string }
     | { outcome: 'out-of-range' }
     | { outcome: 'no-match' }

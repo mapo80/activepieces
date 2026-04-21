@@ -91,12 +91,19 @@
                 "stateOutputs": ["ndg"],
                 "render": {
                   "component": "DataTable",
-                  "props": { "sourceField": "customerMatches" }
+                  "props": {
+                    "sourceField": "customerMatches",
+                    "columns": [
+                      { "key": "ndg", "header": "NDG" },
+                      { "key": "denominazione", "header": "Denominazione" },
+                      { "key": "tipologia", "header": "Tipologia" }
+                    ]
+                  }
                 },
                 "message": {
                   "dynamic": true,
                   "fallback": { "it": "Seleziona il NDG del cliente dalla lista." },
-                  "systemPromptAddendum": "Saluta brevemente e mostra quanti clienti sono stati trovati, citando i nomi e gli NDG dallo state `customerMatches`. Chiedi di selezionare un NDG per procedere. 1-2 frasi, italiano, tono bancario professionale. Non inventare dati."
+                  "systemPromptAddendum": "Saluta brevemente e mostra quanti clienti sono stati trovati, citando i nomi e gli NDG dallo state `customerMatches`. Chiedi di selezionare un NDG per procedere. 1-2 frasi, italiano, tono bancario professionale. Non inventare dati. La tabella sottostante verrà allegata automaticamente dal server: fai riferimento ad essa con 'come mostrato qui sotto' invece di descrivere i dati campo-per-campo."
                 }
               },
               {
@@ -132,7 +139,14 @@
                 "stateOutputs": ["rapportoId"],
                 "render": {
                   "component": "DataTable",
-                  "props": { "sourceField": "accounts" }
+                  "props": {
+                    "sourceField": "accounts",
+                    "columns": [
+                      { "key": "codiceRapportoNonNumerico", "header": "Rapporto" },
+                      { "key": "descrizioneCategSottocateg", "header": "Tipologia" },
+                      { "key": "tipoOperativita", "header": "Ruolo" }
+                    ]
+                  }
                 },
                 "message": {
                   "dynamic": true,
@@ -159,7 +173,13 @@
                 "stateOutputs": ["closureReasonCode", "closureDate"],
                 "render": {
                   "component": "ClosureReasonPicker",
-                  "props": { "sourceField": "closureReasons" }
+                  "props": {
+                    "sourceField": "closureReasons",
+                    "columns": [
+                      { "key": "code", "header": "Codice" },
+                      { "key": "label", "header": "Motivazione" }
+                    ]
+                  }
                 },
                 "message": {
                   "dynamic": true,

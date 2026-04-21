@@ -44,7 +44,7 @@ function isEmpty(value: unknown): boolean {
     return false
 }
 
-function valuesEqual({ a, b }: { a: unknown; b: unknown }): boolean {
+function valuesEqual({ a, b }: { a: unknown, b: unknown }): boolean {
     if (a === b) return true
     if (typeof a === 'string' && typeof b === 'string') {
         return normalization.normalize(a) === normalization.normalize(b)
@@ -74,9 +74,9 @@ export const overwritePolicy = {
     shouldPromoteTurnAffirmed,
 }
 
-export type CueDetection = { present: true; cue: string } | { present: false }
+export type CueDetection = { present: true, cue: string } | { present: false }
 
 export type OverwriteDecision =
-    | { action: 'accept'; reason: string }
-    | { action: 'reject'; reason: string }
-    | { action: 'confirm'; reason: string; pendingOverwrite: { field: string; oldValue: unknown; newValue: unknown } }
+    | { action: 'accept', reason: string }
+    | { action: 'reject', reason: string }
+    | { action: 'confirm', reason: string, pendingOverwrite: { field: string, oldValue: unknown, newValue: unknown } }

@@ -302,8 +302,7 @@ describe('buildInteractiveFlowChildGraph — new layer-based layout', () => {
     );
     const iflowStepName = 'iflow_test';
     const straightFromIflow = graph.edges.filter(
-      (e) =>
-        e.type === ApEdgeType.STRAIGHT_LINE && e.source === iflowStepName,
+      (e) => e.type === ApEdgeType.STRAIGHT_LINE && e.source === iflowStepName,
     );
     expect(straightFromIflow).toHaveLength(0);
     const startEdges = graph.edges.filter(
@@ -458,7 +457,9 @@ describe('buildInteractiveFlowChildGraph — new layer-based layout', () => {
     );
     const childrenTop = Math.min(...children.map((c) => c.position.y));
     const childrenBottom = Math.max(
-      ...children.map((c) => c.position.y + FLOW_CANVAS_INTERACTIVE_FLOW_CHILD_HEIGHT),
+      ...children.map(
+        (c) => c.position.y + FLOW_CANVAS_INTERACTIVE_FLOW_CHILD_HEIGHT,
+      ),
     );
     const childrenHeight = childrenBottom - childrenTop;
     // Container should roughly equal childrenHeight + 2*padding (no End area).
