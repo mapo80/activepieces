@@ -18,6 +18,7 @@ import {
     LocalizedString,
     NodeMessage,
     ParamBinding,
+    PendingInteraction,
     ResolveMcpGatewayResponse,
     StepOutputStatus,
 } from '@activepieces/shared'
@@ -388,6 +389,108 @@ function findNextUserOrConfirmNode({ nodes, state, executedNodeIds, skippedNodeI
     )) ?? null
 }
 
+function orderMissingByDependency({ missing, nodes }: {
+    missing: string[]
+    nodes: InteractiveFlowNode[]
+}): string[] {
+    const missingSet = new Set(missing)
+    const hasNodeProducingThatDependsOnMissing = (field: string): boolean => {
+        for (const node of nodes) {
+            if (!(node.stateOutputs ?? []).includes(field)) continue
+            for (const inp of node.stateInputs ?? []) {
+                if (missingSet.has(inp)) return true
+            }
+        }
+        return false
+    }
+    const rootFields = missing.filter(f => !hasNodeProducingThatDependsOnMissing(f))
+    if (rootFields.length === 0) return missing
+    const firstNodeOrder = (field: string): number => {
+        for (let i = 0; i < nodes.length; i++) {
+            if ((nodes[i].stateOutputs ?? []).includes(field)) return i
+        }
+        return Number.MAX_SAFE_INTEGER
+    }
+    return rootFields.slice().sort((a, b) => firstNodeOrder(a) - firstNodeOrder(b))
+}
+
+function pendingOverwriteFromPolicyDecisions({ policyDecisions, nodeId }: {
+    policyDecisions: Array<{ field: string; action: string; reason?: string; pendingOverwrite?: { field: string; oldValue: unknown; newValue: unknown } }>
+    nodeId: string
+}): PendingInteraction | null {
+    for (const dec of policyDecisions) {
+        if (dec.action === 'confirm' && dec.pendingOverwrite) {
+            return {
+                type: 'pending_overwrite',
+                field: dec.pendingOverwrite.field,
+                oldValue: dec.pendingOverwrite.oldValue,
+                newValue: dec.pendingOverwrite.newValue,
+                nodeId,
+            }
+        }
+    }
+    return null
+}
+
+function renderPendingOverwriteBubble({ pending }: { pending: PendingInteraction }): string {
+    if (pending.type !== 'pending_overwrite') return ''
+    const fmt = (v: unknown): string => {
+        if (v === null || v === undefined) return ''
+        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v)
+        return JSON.stringify(v)
+    }
+    return [
+        `Ho capito che ora vuoi cambiare **${pending.field}** da **${fmt(pending.oldValue)}** a **${fmt(pending.newValue)}**.`,
+        '',
+        'Confermi il cambiamento? Rispondi **sì** per applicare o **no** per mantenere il valore precedente.',
+    ].join('\n')
+}
+
+function computePendingInteraction({ node, state }: {
+    node: InteractiveFlowUserInputNode | InteractiveFlowConfirmNode
+    state: InteractiveFlowState
+}): PendingInteraction | null {
+    const targetField = node.stateOutputs.find(f => isNil(state[f])) ?? node.stateOutputs[0]
+    if (isNil(targetField)) return null
+
+    if (isConfirmNode(node)) {
+        return {
+            type: 'confirm_binary',
+            field: targetField,
+            target: true,
+            nodeId: node.id,
+        }
+    }
+
+    const renderProps = (node.render?.props ?? {}) as Record<string, unknown>
+    const sourceField = typeof renderProps.sourceField === 'string' ? renderProps.sourceField : undefined
+    if (!isNil(sourceField) && Array.isArray(state[sourceField])) {
+        const raw = state[sourceField] as unknown[]
+        if (raw.length > 0 && raw.length <= 10) {
+            const options = raw.map((item, idx) => {
+                const rec = (item ?? {}) as Record<string, unknown>
+                const valueKey = typeof renderProps.optionValueField === 'string' ? renderProps.optionValueField : 'value'
+                const labelKey = typeof renderProps.optionLabelField === 'string' ? renderProps.optionLabelField : 'label'
+                const value = rec[valueKey] ?? rec.id ?? rec.ndg ?? rec.codice ?? item
+                const label = String(rec[labelKey] ?? rec.name ?? rec.label ?? rec.descrizione ?? rec.tipo ?? String(value))
+                return { ordinal: idx + 1, label, value }
+            })
+            return {
+                type: 'pick_from_list',
+                field: targetField,
+                options,
+                nodeId: node.id,
+            }
+        }
+    }
+
+    return {
+        type: 'open_text',
+        field: targetField,
+        nodeId: node.id,
+    }
+}
+
 function evaluateBranchSimply({ branch, state }: {
     branch: InteractiveFlowBranchNode['branches'][number]
     state: InteractiveFlowState
@@ -562,6 +665,8 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             : undefined
         const historyMaxTurns = settings.historyMaxTurns ?? DEFAULT_HISTORY_MAX_TURNS
         let history: HistoryEntry[] = []
+        let previousPendingInteraction: PendingInteraction | null = null
+        let pendingOverwriteSignal: PendingInteraction | null = null
         if (!isNil(sessionKey)) {
             try {
                 const loaded = await sessionStore.load({
@@ -576,10 +681,12 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                         }
                     }
                     history = [...loaded.record.history]
+                    previousPendingInteraction = loaded.record.pendingInteraction ?? null
                     ifDebug('handle:session:loaded', {
                         sessionId,
                         stateKeys: Object.keys(loaded.record.state),
                         historyLen: loaded.record.history.length,
+                        pendingInteractionType: previousPendingInteraction?.type ?? null,
                     })
                 }
                 else if (!isNil(loaded.record) && loaded.versionMismatch) {
@@ -615,7 +722,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             })
             if (!isNil(userMessage) && !isNil(settings.fieldExtractor)) {
                 const pauseHint = findNextUserOrConfirmNode({ nodes, state: flowState, executedNodeIds, skippedNodeIds })
-                const extracted = await fieldExtractor.extract({
+                const extractResult = await fieldExtractor.extractWithPolicy({
                     constants,
                     config: settings.fieldExtractor,
                     message: userMessage,
@@ -630,18 +737,40 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                         stateOutputs: pauseHint.stateOutputs,
                     } : undefined,
                     identityFields: ['customerName'],
+                    pendingInteraction: previousPendingInteraction ?? undefined,
                 })
-                ifDebug('handle:resume:extracted', { extractedKeys: Object.keys(extracted) })
-                const coercedExtracted = coerceIncomingState({ incoming: extracted, fields })
+                pendingOverwriteSignal = pendingOverwriteFromPolicyDecisions({
+                    policyDecisions: extractResult.policyDecisions,
+                    nodeId: pauseHint?.id ?? '__pending_overwrite__',
+                }) ?? null
+                ifDebug('handle:resume:extracted', {
+                    extractedKeys: Object.keys(extractResult.extractedFields),
+                    turnAffirmed: extractResult.turnAffirmed,
+                    pendingOverwriteSignal: pendingOverwriteSignal?.type ?? null,
+                })
+                const coercedExtracted = coerceIncomingState({ incoming: extractResult.extractedFields, fields })
                 const applied = sessionStore.applyStateOverwriteWithTopicChange({
                     flowState,
                     incoming: coercedExtracted,
                     fields,
+                    nodes,
                 })
                 if (applied.topicChanged) {
-                    executedNodeIds.clear()
-                    skippedNodeIds.clear()
-                    ifDebug('handle:session:topic-change', { stateKeys: Object.keys(flowState) })
+                    for (const stale of applied.clearedKeys) {
+                        for (const nodeId of Array.from(executedNodeIds)) {
+                            const executedNode = nodes.find(n => n.id === nodeId)
+                            if (executedNode && (executedNode.stateOutputs ?? []).includes(stale)) {
+                                executedNodeIds.delete(nodeId)
+                            }
+                        }
+                        for (const nodeId of Array.from(skippedNodeIds)) {
+                            const skippedNode = nodes.find(n => n.id === nodeId)
+                            if (skippedNode && (skippedNode.stateOutputs ?? []).includes(stale)) {
+                                skippedNodeIds.delete(nodeId)
+                            }
+                        }
+                    }
+                    ifDebug('handle:session:topic-change', { stateKeys: Object.keys(flowState), clearedKeys: applied.clearedKeys })
                 }
             }
         }
@@ -663,7 +792,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 history = sessionStore.appendHistory({ history, role: 'user', text: userMessage, historyMaxTurns })
                 try {
                     const pauseHint = findNextUserOrConfirmNode({ nodes, state: flowState, executedNodeIds, skippedNodeIds })
-                    const extracted = await fieldExtractor.extract({
+                    const extractResult = await fieldExtractor.extractWithPolicy({
                         constants,
                         config: settings.fieldExtractor,
                         message: userMessage,
@@ -678,20 +807,40 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                             stateOutputs: pauseHint.stateOutputs,
                         } : undefined,
                         identityFields: ['customerName'],
+                        pendingInteraction: previousPendingInteraction ?? undefined,
                     })
+                    pendingOverwriteSignal = pendingOverwriteFromPolicyDecisions({
+                        policyDecisions: extractResult.policyDecisions,
+                        nodeId: pauseHint?.id ?? '__pending_overwrite__',
+                    }) ?? null
                     ifDebug('handle:first-turn:extracted', {
-                        extractedKeys: Object.keys(extracted),
+                        extractedKeys: Object.keys(extractResult.extractedFields),
+                        turnAffirmed: extractResult.turnAffirmed,
+                        pendingOverwriteSignal: pendingOverwriteSignal?.type ?? null,
                     })
-                    const coercedExtracted = coerceIncomingState({ incoming: extracted, fields })
+                    const coercedExtracted = coerceIncomingState({ incoming: extractResult.extractedFields, fields })
                     const applied = sessionStore.applyStateOverwriteWithTopicChange({
                         flowState,
                         incoming: coercedExtracted,
                         fields,
+                        nodes,
                     })
                     if (applied.topicChanged) {
-                        executedNodeIds.clear()
-                        skippedNodeIds.clear()
-                        ifDebug('handle:session:topic-change', { stateKeys: Object.keys(flowState) })
+                        for (const stale of applied.clearedKeys) {
+                            for (const nodeId of Array.from(executedNodeIds)) {
+                                const executedNode = nodes.find(n => n.id === nodeId)
+                                if (executedNode && (executedNode.stateOutputs ?? []).includes(stale)) {
+                                    executedNodeIds.delete(nodeId)
+                                }
+                            }
+                            for (const nodeId of Array.from(skippedNodeIds)) {
+                                const skippedNode = nodes.find(n => n.id === nodeId)
+                                if (skippedNode && (skippedNode.stateOutputs ?? []).includes(stale)) {
+                                    skippedNodeIds.delete(nodeId)
+                                }
+                            }
+                        }
+                        ifDebug('handle:session:topic-change', { stateKeys: Object.keys(flowState), clearedKeys: applied.clearedKeys })
                     }
                 }
                 catch (e) {
@@ -701,7 +850,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             }
         }
 
-        const persistSession = async (opts: { botMessage?: string, terminal?: boolean }): Promise<void> => {
+        const persistSession = async (opts: { botMessage?: string, terminal?: boolean, pendingInteraction?: PendingInteraction | null }): Promise<void> => {
             if (isNil(sessionKey)) return
             try {
                 const withBot = !isNil(opts.botMessage) && opts.botMessage.trim().length > 0
@@ -720,17 +869,56 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     history: withBot,
                     flowVersionId: constants.flowVersionId,
                     historyMaxTurns,
+                    pendingInteraction: opts.pendingInteraction ?? null,
                 })
                 ifDebug('handle:session:saved', {
                     sessionId,
                     bytes: saved.bytes,
                     historyLen: withBot.length,
                     truncated: saved.truncated,
+                    pendingInteractionType: opts.pendingInteraction?.type ?? null,
                 })
             }
             catch (e) {
                 ifDebug('handle:session:save-error', { error: (e as Error).message })
             }
+        }
+
+        if (!isNil(pendingOverwriteSignal)) {
+            const overwriteBubble = renderPendingOverwriteBubble({ pending: pendingOverwriteSignal })
+            ifDebug('handle:pending-overwrite:emit', {
+                field: pendingOverwriteSignal.field,
+                nodeId: pendingOverwriteSignal.nodeId,
+            })
+            if (!isNil(constants.workerHandlerId) && !isNil(constants.httpRequestId)) {
+                try {
+                    await workerSocket.getWorkerClient().sendFlowResponse({
+                        workerHandlerId: constants.workerHandlerId,
+                        httpRequestId: constants.httpRequestId,
+                        runResponse: {
+                            status: 200,
+                            body: { type: 'markdown', value: overwriteBubble, files: [] },
+                            headers: {},
+                        },
+                    })
+                }
+                catch (e) {
+                    ifDebug('handle:pending-overwrite:sendFlowResponse:error', { error: (e as Error).message })
+                }
+            }
+            await persistSession({ botMessage: overwriteBubble, pendingInteraction: pendingOverwriteSignal })
+            const overwriteStepOutput = GenericStepOutput.create({
+                type: FlowActionType.INTERACTIVE_FLOW,
+                status: StepOutputStatus.SUCCEEDED,
+                input: {},
+                output: {
+                    state: flowState,
+                    executedNodeIds: Array.from(executedNodeIds),
+                    skippedNodeIds: Array.from(skippedNodeIds),
+                    selectedBranches,
+                },
+            })
+            return executionState.upsertStep(action.name, overwriteStepOutput)
         }
 
         // Nodes with outputs already satisfied = already executed (e.g. field extractor pre-filled them)
@@ -910,21 +1098,27 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 stateKeys: Object.keys(flowState),
             })
             if (!hasNonExtractableMissing && missingExtractable.size > 0) {
-                const missingList = Array.from(missingExtractable)
+                const missingListRaw = Array.from(missingExtractable)
+                const primaryMissing = orderMissingByDependency({
+                    missing: missingListRaw,
+                    nodes,
+                })
+                const primaryField = primaryMissing[0] ?? missingListRaw[0]
                 const virtualNode: InteractiveFlowUserInputNode = {
                     id: '__insufficient_info__',
                     name: 'insufficient_info',
                     displayName: 'Ask for missing info',
                     nodeType: InteractiveFlowNodeType.USER_INPUT,
                     stateInputs: [],
-                    stateOutputs: missingList,
+                    stateOutputs: [primaryField],
                     render: { component: 'TextInput', props: {} },
                     message: {
                         dynamic: true,
                         fallback: { [locale]: 'Per proseguire ho bisogno di qualche informazione in più. Puoi fornirmela?' },
-                        systemPromptAddendum: `L'utente non ha ancora fornito: ${missingList.join(', ')}. Chiedi in modo naturale uno o due di questi (il primo è il più prioritario) senza elencare tutti i campi tecnici. Se il messaggio dell'utente era off-topic, riporta cortesemente la conversazione al compito in corso.`,
+                        systemPromptAddendum: `L'utente non ha ancora fornito le informazioni iniziali. Il campo richiesto in questo turno è **${primaryField}** (primo step del flusso). NON saltare a campi successivi (es. date, motivazioni): chiedi esclusivamente di **${primaryField}**. Se il messaggio dell'utente era off-topic o un saluto, riporta cortesemente la conversazione al compito in corso chiedendo ${primaryField}.`,
                     },
                 }
+                const missingList = primaryMissing.length > 0 ? primaryMissing : missingListRaw
                 let prompt: string | undefined
                 if (!isNil(settings.questionGenerator)) {
                     const generated = await questionGenerator.generate({
@@ -968,7 +1162,10 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                         })
                     }
                 }
-                await persistSession({ botMessage: prompt })
+                const pendingForInsufficient: PendingInteraction | null = missingList.length > 0
+                    ? { type: 'open_text', field: missingList[0], nodeId: '__insufficient_info__' }
+                    : null
+                await persistSession({ botMessage: prompt, pendingInteraction: pendingForInsufficient })
                 const stepOutput = GenericStepOutput.create({
                     type: FlowActionType.INTERACTIVE_FLOW,
                     status: StepOutputStatus.SUCCEEDED,
@@ -1074,7 +1271,11 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     })
                 }
             }
-            await persistSession({ botMessage: message ?? undefined })
+            const pendingInteractionForPause = computePendingInteraction({ node: nextPauseNode, state: flowState })
+            await persistSession({
+                botMessage: message ?? undefined,
+                pendingInteraction: pendingInteractionForPause,
+            })
             return executionState
                 .upsertStep(action.name, stepOutput)
                 .setVerdict({ status: FlowRunStatus.PAUSED })

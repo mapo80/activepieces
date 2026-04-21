@@ -1,5 +1,5 @@
 import { Store, StoreScope } from '@activepieces/pieces-framework'
-import { InteractiveFlowStateField, isNil } from '@activepieces/shared'
+import { InteractiveFlowNode, InteractiveFlowStateField, isNil, PendingInteraction } from '@activepieces/shared'
 import { createContextStore } from '../piece-context/store'
 import { EngineConstants } from './context/engine-constants'
 
@@ -36,13 +36,14 @@ async function load({ key, constants, currentFlowVersionId }: {
     return { record: raw, versionMismatch: false }
 }
 
-async function save({ key, constants, state, history, flowVersionId, historyMaxTurns }: {
+async function save({ key, constants, state, history, flowVersionId, historyMaxTurns, pendingInteraction }: {
     key: string
     constants: EngineConstants
     state: Record<string, unknown>
     history: HistoryEntry[]
     flowVersionId: string
     historyMaxTurns: number
+    pendingInteraction?: PendingInteraction | null
 }): Promise<{ bytes: number, truncated: boolean }> {
     const store = buildStore({ constants })
     const cappedHistory = history.slice(-historyMaxTurns)
@@ -51,6 +52,9 @@ async function save({ key, constants, state, history, flowVersionId, historyMaxT
         history: cappedHistory,
         flowVersionId,
         lastTurnAt: new Date().toISOString(),
+    }
+    if (!isNil(pendingInteraction)) {
+        payload.pendingInteraction = pendingInteraction
     }
     let bytes = Buffer.byteLength(JSON.stringify(payload), 'utf8')
     let truncated = false
@@ -91,26 +95,117 @@ function detectTopicChange({ previousState, incoming, fields }: {
     return false
 }
 
-function applyStateOverwriteWithTopicChange({ flowState, incoming, fields }: {
+function applyStateOverwriteWithTopicChange({ flowState, incoming, fields, nodes }: {
     flowState: Record<string, unknown>
     incoming: Record<string, unknown>
     fields: InteractiveFlowStateField[]
-}): { topicChanged: boolean, appliedKeys: string[] } {
+    nodes?: InteractiveFlowNode[]
+}): { topicChanged: boolean, appliedKeys: string[], clearedKeys: string[] } {
     const appliedKeys: string[] = []
-    const topicChanged = detectTopicChange({ previousState: flowState, incoming, fields })
+    const clearedKeys: string[] = []
+    const changedExtractableFields = collectChangedExtractableFields({
+        previousState: flowState,
+        incoming,
+        fields,
+    })
+    const topicChanged = changedExtractableFields.length > 0
+
+    if (topicChanged && nodes && nodes.length > 0) {
+        const depGraph = buildDependencyGraph({ nodes })
+        const staleFields = new Set<string>()
+        for (const changed of changedExtractableFields) {
+            const downstream = depGraph.get(changed)
+            if (!downstream) continue
+            for (const d of downstream) staleFields.add(d)
+        }
+        for (const incomingKey of Object.keys(incoming)) {
+            staleFields.delete(incomingKey)
+        }
+        for (const stale of staleFields) {
+            if (stale in flowState) {
+                Reflect.deleteProperty(flowState, stale)
+                clearedKeys.push(stale)
+            }
+        }
+    }
+
     for (const [k, v] of Object.entries(incoming)) {
         if (isNil(v)) continue
         flowState[k] = v
         appliedKeys.push(k)
     }
-    if (topicChanged) {
+
+    if (topicChanged && (!nodes || nodes.length === 0)) {
         for (const f of fields) {
             if (f.extractable === false && f.name in flowState) {
                 Reflect.deleteProperty(flowState, f.name)
+                clearedKeys.push(f.name)
             }
         }
     }
-    return { topicChanged, appliedKeys }
+
+    return { topicChanged, appliedKeys, clearedKeys }
+}
+
+function collectChangedExtractableFields({ previousState, incoming, fields }: {
+    previousState: Record<string, unknown>
+    incoming: Record<string, unknown>
+    fields: InteractiveFlowStateField[]
+}): string[] {
+    const extractableByName = new Set(
+        fields
+            .filter(f => f.extractable !== false)
+            .map(f => f.name),
+    )
+    const changed: string[] = []
+    for (const [k, v] of Object.entries(incoming)) {
+        if (isNil(v)) continue
+        if (!extractableByName.has(k)) continue
+        const prev = previousState[k]
+        if (isNil(prev)) continue
+        if (!isEqualValue(prev, v)) changed.push(k)
+    }
+    return changed
+}
+
+function buildDependencyGraph({ nodes }: {
+    nodes: InteractiveFlowNode[]
+}): Map<string, Set<string>> {
+    const directDependents = new Map<string, Set<string>>()
+    for (const node of nodes) {
+        const inputs = node.stateInputs ?? []
+        const outputs = node.stateOutputs ?? []
+        if (inputs.length === 0 || outputs.length === 0) continue
+        for (const input of inputs) {
+            let dependents = directDependents.get(input)
+            if (!dependents) {
+                dependents = new Set<string>()
+                directDependents.set(input, dependents)
+            }
+            for (const output of outputs) {
+                if (output === input) continue
+                dependents.add(output)
+            }
+        }
+    }
+    const transitive = new Map<string, Set<string>>()
+    for (const source of directDependents.keys()) {
+        const visited = new Set<string>()
+        const queue: string[] = [source]
+        while (queue.length > 0) {
+            const cur = queue.shift() as string
+            const direct = directDependents.get(cur)
+            if (!direct) continue
+            for (const d of direct) {
+                if (d === source) continue
+                if (visited.has(d)) continue
+                visited.add(d)
+                queue.push(d)
+            }
+        }
+        transitive.set(source, visited)
+    }
+    return transitive
 }
 
 function appendHistory({ history, role, text, historyMaxTurns }: {
@@ -141,6 +236,7 @@ export const sessionStore = {
     detectTopicChange,
     applyStateOverwriteWithTopicChange,
     appendHistory,
+    buildDependencyGraph,
 }
 
 export const DEFAULT_HISTORY_MAX_TURNS = 20
@@ -157,4 +253,5 @@ export type SessionRecord = {
     history: HistoryEntry[]
     flowVersionId: string
     lastTurnAt: string
+    pendingInteraction?: PendingInteraction
 }

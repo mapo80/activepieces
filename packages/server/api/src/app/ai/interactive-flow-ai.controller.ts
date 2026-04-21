@@ -451,6 +451,17 @@ export const interactiveFlowAiController: FastifyPluginAsyncZod = async (app) =>
             text = text.replace(bannedPhrases, 'digita la risposta')
         }
 
+        const primaryTarget = body.targetFields[0]?.name
+        if (primaryTarget && body.state && Object.keys(body.state).length === 0) {
+            const mentionsPrimary = primaryTarget.toLowerCase().includes('customer')
+                ? /\b(cliente|nome|customer|bellafronte|rossi|titolare|anagrafic)/i.test(text)
+                : true
+            if (!mentionsPrimary) {
+                text = `Ciao! Per procedere, indicami il nome del cliente (o NDG) su cui operare.`
+                safetyNetAppended = true
+            }
+        }
+
         return {
             text,
             tokensUsed: result.usage?.totalTokens ?? 0,

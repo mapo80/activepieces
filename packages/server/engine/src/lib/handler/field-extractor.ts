@@ -3,31 +3,15 @@ import { EngineConstants } from './context/engine-constants'
 
 type FieldExtractorConfig = { aiProviderId: string, model: string }
 
-async function extract({ constants, config, message, stateFields, currentState, systemPrompt, locale, currentNode, identityFields, pendingInteraction, flowLabel }: {
-    constants: EngineConstants
-    config: FieldExtractorConfig
-    message: string
-    stateFields: InteractiveFlowStateField[]
-    currentState: Record<string, unknown>
-    systemPrompt?: string
-    locale?: string
-    currentNode?: {
-        nodeId: string
-        nodeType?: 'USER_INPUT' | 'CONFIRM' | 'TOOL' | 'BRANCH'
-        displayName?: string
-        stateOutputs?: string[]
-        allowedExtraFields?: string[]
-        prompt?: string
-        displayField?: string
-        nextMissingField?: string
-    }
-    identityFields?: string[]
-    pendingInteraction?: unknown
-    flowLabel?: string
-}): Promise<Record<string, unknown>> {
+async function extract({ constants, config, message, stateFields, currentState, systemPrompt, locale, currentNode, identityFields, pendingInteraction, flowLabel }: ExtractArgs): Promise<Record<string, unknown>> {
+    const full = await extractWithPolicy({ constants, config, message, stateFields, currentState, systemPrompt, locale, currentNode, identityFields, pendingInteraction, flowLabel })
+    return full.extractedFields
+}
+
+async function extractWithPolicy({ constants, config, message, stateFields, currentState, systemPrompt, locale, currentNode, identityFields, pendingInteraction, flowLabel }: ExtractArgs): Promise<ExtractResult> {
     const extractable = stateFields.filter(f => f.extractable !== false && f.sensitive !== true)
     if (extractable.length === 0 || message.trim().length === 0) {
-        return {}
+        return { extractedFields: {}, turnAffirmed: false, policyDecisions: [] }
     }
 
     const url = `${constants.internalApiUrl}v1/engine/interactive-flow-ai/field-extract`
@@ -70,13 +54,25 @@ async function extract({ constants, config, message, stateFields, currentState, 
         })
     }
     catch {
-        return {}
+        return { extractedFields: {}, turnAffirmed: false, policyDecisions: [] }
     }
     if (!response.ok) {
-        return {}
+        return { extractedFields: {}, turnAffirmed: false, policyDecisions: [] }
     }
-    const body = await response.json().catch(() => null) as { extractedFields?: Record<string, unknown> } | null
-    return body?.extractedFields ?? {}
+    const body = await response.json().catch(() => null) as {
+        extractedFields?: Record<string, unknown>
+        turnAffirmed?: boolean
+        policyDecisions?: PolicyDecision[]
+        metaAnswer?: string
+        clarifyReason?: unknown
+    } | null
+    return {
+        extractedFields: body?.extractedFields ?? {},
+        turnAffirmed: body?.turnAffirmed === true,
+        policyDecisions: body?.policyDecisions ?? [],
+        metaAnswer: body?.metaAnswer,
+        clarifyReason: body?.clarifyReason,
+    }
 }
 
 function redactSensitive({ state, fields }: {
@@ -94,4 +90,44 @@ function redactSensitive({ state, fields }: {
 
 export const fieldExtractor = {
     extract,
+    extractWithPolicy,
+}
+
+export type PolicyDecision = {
+    field: string
+    action: 'accept' | 'reject' | 'confirm'
+    reason: string
+    value?: unknown
+    pendingOverwrite?: { field: string; oldValue: unknown; newValue: unknown }
+}
+
+export type ExtractResult = {
+    extractedFields: Record<string, unknown>
+    turnAffirmed: boolean
+    policyDecisions: PolicyDecision[]
+    metaAnswer?: string
+    clarifyReason?: unknown
+}
+
+type ExtractArgs = {
+    constants: EngineConstants
+    config: FieldExtractorConfig
+    message: string
+    stateFields: InteractiveFlowStateField[]
+    currentState: Record<string, unknown>
+    systemPrompt?: string
+    locale?: string
+    currentNode?: {
+        nodeId: string
+        nodeType?: 'USER_INPUT' | 'CONFIRM' | 'TOOL' | 'BRANCH'
+        displayName?: string
+        stateOutputs?: string[]
+        allowedExtraFields?: string[]
+        prompt?: string
+        displayField?: string
+        nextMissingField?: string
+    }
+    identityFields?: string[]
+    pendingInteraction?: unknown
+    flowLabel?: string
 }

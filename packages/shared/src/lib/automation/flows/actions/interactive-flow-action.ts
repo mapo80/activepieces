@@ -184,6 +184,38 @@ export const QuestionGeneratorConfigSchema = z.object({
 })
 export type QuestionGeneratorConfig = z.infer<typeof QuestionGeneratorConfigSchema>
 
+export const PendingInteractionSchema = z.discriminatedUnion('type', [
+    z.object({
+        type: z.literal('confirm_binary'),
+        field: z.string().min(1),
+        target: z.unknown(),
+        nodeId: z.string().min(1),
+    }),
+    z.object({
+        type: z.literal('pick_from_list'),
+        field: z.string().min(1),
+        options: z.array(z.object({
+            ordinal: z.number().int().min(1),
+            label: z.string().min(1),
+            value: z.unknown(),
+        })).min(1),
+        nodeId: z.string().min(1),
+    }),
+    z.object({
+        type: z.literal('pending_overwrite'),
+        field: z.string().min(1),
+        oldValue: z.unknown(),
+        newValue: z.unknown(),
+        nodeId: z.string().min(1),
+    }),
+    z.object({
+        type: z.literal('open_text'),
+        field: z.string().min(1),
+        nodeId: z.string().min(1),
+    }),
+])
+export type PendingInteraction = z.infer<typeof PendingInteractionSchema>
+
 export const InteractiveFlowActionSettings = z.object({
     sampleData: SampleDataSetting.optional(),
     customLogoUrl: z.string().optional(),

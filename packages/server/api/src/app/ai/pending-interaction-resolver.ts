@@ -1,3 +1,4 @@
+import { PendingInteraction } from '@activepieces/shared'
 import { normalization } from './normalization'
 
 const CONFIRM_KEYWORDS_RE = /\b(si confermo|confermo|si procedi|procedi|va bene|d ?accordo|accetto|ok|si|yes|confirmed|confirm|affermativo)\b/
@@ -142,11 +143,7 @@ export const pendingInteractionResolver = {
     resolve: resolveFromPendingInteraction,
 }
 
-export type PendingInteraction =
-    | { type: 'confirm_binary'; field: string; target: unknown; nodeId: string }
-    | { type: 'pick_from_list'; field: string; options: Array<{ ordinal: number; label: string; value: unknown }>; nodeId: string }
-    | { type: 'pending_overwrite'; field: string; oldValue: unknown; newValue: unknown; nodeId: string }
-    | { type: 'open_text'; field: string; nodeId: string }
+export type { PendingInteraction } from '@activepieces/shared'
 
 export type PendingResolutionResult =
     | { outcome: 'accept'; field: string; value: unknown; evidence: string }

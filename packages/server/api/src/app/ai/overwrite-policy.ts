@@ -1,6 +1,6 @@
 import { normalization } from './normalization'
 
-const CORRECTION_CUE_RE = /\b(scusa|invece|anzi|non era|non volevo|cercavo|volevo|piuttosto|in effetti|i meant|meant to say|instead|sorry|actually)\b/
+const CORRECTION_CUE_RE = /\b(scusa|invece|anzi|non era|non volevo|cercavo|volevo|piuttosto|in effetti|aspetta|correggo|rettifico|i meant|meant to say|instead|sorry|actually|wait)\b/
 
 function detectCueOfCorrection({ message }: { message: string }): CueDetection {
     const normalized = normalization.normalize(message)
