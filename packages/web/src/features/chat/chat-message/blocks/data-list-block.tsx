@@ -57,8 +57,7 @@ const CardsLayout: React.FC<LayoutProps> = ({ block, selected, onPick }) => (
   >
     {block.items.map((item) => {
       const isSelected = selected === item.payload;
-      const isDisabled =
-        item.disabled || (selected !== null && !isSelected);
+      const isDisabled = item.disabled || (selected !== null && !isSelected);
       return (
         <button
           key={item.payload}

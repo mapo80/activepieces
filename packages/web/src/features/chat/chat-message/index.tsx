@@ -33,7 +33,12 @@ export const MultiMediaMessage: React.FC<MultiMediaMessageProps> = ({
       {blocks && blocks.length > 0 && (
         <div className="flex flex-col gap-2">
           {blocks.map((block, index) => (
-            <BlockRenderer key={index} block={block} role={role} onPick={onPick} />
+            <BlockRenderer
+              key={index}
+              block={block}
+              role={role}
+              onPick={onPick}
+            />
           ))}
         </div>
       )}

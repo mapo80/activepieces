@@ -166,15 +166,17 @@
                 "toolParams": {}
               },
               {
-                "id": "collect_reason_and_date",
-                "name": "collect_reason_and_date",
-                "displayName": "Motivazione e data",
+                "id": "collect_reason",
+                "name": "collect_reason",
+                "displayName": "Motivazione",
                 "nodeType": "USER_INPUT",
                 "stateInputs": ["closureReasons"],
-                "stateOutputs": ["closureReasonCode", "closureDate"],
+                "stateOutputs": ["closureReasonCode"],
+                "allowedExtraFields": ["closureReasonText", "closureDate"],
                 "render": {
-                  "component": "ClosureReasonPicker",
+                  "component": "DataTable",
                   "props": {
+                    "layout": "table",
                     "sourceField": "closureReasons",
                     "columns": [
                       { "key": "code", "header": "Codice" },
@@ -184,8 +186,26 @@
                 },
                 "message": {
                   "dynamic": true,
-                  "fallback": { "it": "Scegli la motivazione di estinzione e indica la data di efficacia (YYYY-MM-DD)." },
-                  "systemPromptAddendum": "Conferma il rapporto scelto dallo state `rapportoId`. Chiedi di indicare la motivazione di estinzione (codice 2 cifre, dal catalogo in `closureReasons`) E la data di efficacia (formato YYYY-MM-DD). Elenca massimo 3 motivazioni tipiche. 1-2 frasi, italiano, tono bancario professionale."
+                  "fallback": { "it": "Seleziona la motivazione di estinzione dalla tabella sottostante." },
+                  "systemPromptAddendum": "Conferma il rapporto scelto dallo state `rapportoId`. Chiedi di selezionare la motivazione di estinzione dalla tabella sottostante (codice a 2 cifre dal catalogo in `closureReasons`). 1 frase, italiano, tono bancario professionale."
+                }
+              },
+              {
+                "id": "collect_date",
+                "name": "collect_date",
+                "displayName": "Data efficacia",
+                "nodeType": "USER_INPUT",
+                "stateInputs": ["closureReasons"],
+                "stateOutputs": ["closureDate"],
+                "allowedExtraFields": ["closureReasonCode", "closureReasonText"],
+                "render": {
+                  "component": "DatePickerCard",
+                  "props": { "format": "YYYY-MM-DD" }
+                },
+                "message": {
+                  "dynamic": true,
+                  "fallback": { "it": "Indica la data di efficacia desiderata (formato AAAA-MM-GG)." },
+                  "systemPromptAddendum": "Chiedi la data di efficacia in formato YYYY-MM-DD (ad esempio 2026-04-30). Se possibile cita il rapporto scelto da `rapportoId`. 1 frase, italiano, tono bancario professionale."
                 }
               },
               {

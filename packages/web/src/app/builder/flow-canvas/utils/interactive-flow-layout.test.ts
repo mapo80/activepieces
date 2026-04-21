@@ -141,6 +141,50 @@ describe('buildInteractiveFlowChildGraph — new layer-based layout', () => {
     expect(Math.abs(aCenter - center + (bCenter - center))).toBeLessThan(1);
   });
 
+  it('estinzione: collect_reason and collect_date are placed on same layer side-by-side (parallel siblings)', () => {
+    const graph = flowCanvasUtils.buildInteractiveFlowChildGraph(
+      buildAction([
+        toolNode({
+          id: 'load_reasons',
+          stateInputs: ['rapportoId'],
+          stateOutputs: ['closureReasons'],
+        }),
+        userInputNode({
+          id: 'collect_reason',
+          stateInputs: ['closureReasons'],
+          stateOutputs: ['closureReasonCode'],
+        }),
+        userInputNode({
+          id: 'collect_date',
+          stateInputs: ['closureReasons'],
+          stateOutputs: ['closureDate'],
+        }),
+        toolNode({
+          id: 'generate_pdf',
+          stateInputs: ['closureReasonCode', 'closureDate'],
+          stateOutputs: ['moduleBase64'],
+        }),
+      ]),
+    );
+    const children = graph.nodes.filter(
+      (n): n is ApInteractiveFlowChildNode =>
+        n.type === ApNodeType.INTERACTIVE_FLOW_CHILD,
+    );
+    const byId = new Map(children.map((c) => [c.data.node.id, c]));
+    expect(byId.get('collect_reason')!.position.y).toBe(
+      byId.get('collect_date')!.position.y,
+    );
+    expect(byId.get('collect_reason')!.position.x).not.toBe(
+      byId.get('collect_date')!.position.x,
+    );
+    expect(byId.get('generate_pdf')!.position.y).toBeGreaterThan(
+      byId.get('collect_reason')!.position.y,
+    );
+    expect(byId.get('collect_reason')!.position.y).toBeGreaterThan(
+      byId.get('load_reasons')!.position.y,
+    );
+  });
+
   it('no two child nodes have overlapping bounding boxes (complex Estinzione layout)', () => {
     const nodes: InteractiveFlowNode[] = [
       toolNode({

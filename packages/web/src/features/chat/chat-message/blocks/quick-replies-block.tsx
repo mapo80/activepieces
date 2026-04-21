@@ -11,7 +11,8 @@ interface Props {
 const STYLE_CLASSES: Record<string, string> = {
   default: 'border border-border bg-background hover:bg-muted',
   primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
-  destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+  destructive:
+    'bg-destructive text-destructive-foreground hover:bg-destructive/90',
 };
 
 export const QuickRepliesBlock: React.FC<Props> = ({ block, onPick }) => {

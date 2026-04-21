@@ -1,5 +1,7 @@
 import * as nodeFs from 'node:fs'
 import {
+    Block,
+    BubblePayload,
     EngineGenericError,
     FlowActionType,
     FlowRunStatus,
@@ -21,8 +23,6 @@ import {
     PendingInteraction,
     ResolveMcpGatewayResponse,
     StepOutputStatus,
-    Block,
-    BubblePayload,
 } from '@activepieces/shared'
 import { workerSocket } from '../worker-socket'
 import { BaseExecutor } from './base-executor'
@@ -903,6 +903,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                         nodeType: pauseHint.nodeType === 'CONFIRM' ? 'CONFIRM' : 'USER_INPUT',
                         displayName: pauseHint.displayName,
                         stateOutputs: pauseHint.stateOutputs,
+                        allowedExtraFields: pauseHint.allowedExtraFields,
                     } : undefined,
                     identityFields: ['customerName'],
                     pendingInteraction: previousPendingInteraction ?? undefined,
@@ -979,6 +980,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                             nodeType: pauseHint.nodeType === 'CONFIRM' ? 'CONFIRM' : 'USER_INPUT',
                             displayName: pauseHint.displayName,
                             stateOutputs: pauseHint.stateOutputs,
+                            allowedExtraFields: pauseHint.allowedExtraFields,
                         } : undefined,
                         identityFields: ['customerName'],
                         pendingInteraction: previousPendingInteraction ?? undefined,

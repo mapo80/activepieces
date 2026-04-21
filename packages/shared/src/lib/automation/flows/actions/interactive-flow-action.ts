@@ -98,6 +98,7 @@ const NodeBaseSchema = {
     displayName: z.string(),
     stateInputs: z.array(z.string()),
     stateOutputs: z.array(z.string()),
+    allowedExtraFields: z.array(z.string()).optional(),
 }
 
 export const InteractiveFlowToolNodeSchema = z.object({

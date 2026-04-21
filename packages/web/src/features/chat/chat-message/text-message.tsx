@@ -50,7 +50,9 @@ export const TextMessage: React.FC<TextMessageProps> = React.memo(
               return <thead className="bg-muted/60">{children}</thead>;
             },
             tbody({ children }) {
-              return <tbody className="divide-y divide-border">{children}</tbody>;
+              return (
+                <tbody className="divide-y divide-border">{children}</tbody>
+              );
             },
             tr({ children }) {
               return <tr className="even:bg-muted/20">{children}</tr>;
