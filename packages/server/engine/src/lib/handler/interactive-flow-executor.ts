@@ -21,6 +21,8 @@ import {
     PendingInteraction,
     ResolveMcpGatewayResponse,
     StepOutputStatus,
+    Block,
+    BubblePayload,
 } from '@activepieces/shared'
 import { workerSocket } from '../worker-socket'
 import { BaseExecutor } from './base-executor'
@@ -506,6 +508,58 @@ function buildRejectionHint({ policyDecisions, stateFields, locale }: {
     if (lines.length === 0) return null
     const header = it ? 'Ho trovato un problema con l\'ultima risposta:' : 'There is an issue with the previous answer:'
     return `${header}\n${lines.join('\n')}`
+}
+
+function stripMarkdownTable(text: string): string {
+    // Remove markdown GFM tables (header + separator + body rows) — they are
+    // redundant when we also emit a structured data-list block.
+    const withoutTables = text.replace(/\n?\|[^\n]*\|\n\|[-:\s|]+\|(\n\|[^\n]*\|)+/g, '')
+    return withoutTables.replace(/\n{3,}/g, '\n\n').trim()
+}
+
+function buildPauseBody({ message, pendingInteraction, node, state }: {
+    message: string
+    pendingInteraction: PendingInteraction | null
+    node: InteractiveFlowUserInputNode | InteractiveFlowConfirmNode
+    state: InteractiveFlowState
+}): BubblePayload {
+    if (pendingInteraction?.type === 'pick_from_list' && pendingInteraction.options.length > 0) {
+        const renderProps = (node.render?.props ?? {}) as Record<string, unknown>
+        const sourceField = typeof renderProps.sourceField === 'string' ? renderProps.sourceField : undefined
+        const sourceArray = sourceField && Array.isArray(state[sourceField])
+            ? state[sourceField] as Array<Record<string, unknown>>
+            : []
+        const columns = Array.isArray(renderProps.columns)
+            ? renderProps.columns as Array<{ key: string, header: string }>
+            : []
+        const titleKey = columns[1]?.key
+        const subtitleKey = columns[2]?.key
+        const items: Block = {
+            type: 'data-list',
+            selectMode: 'single',
+            items: pendingInteraction.options.map((opt) => {
+                const valueStr = String(opt.value)
+                const row = sourceArray.find((r) => {
+                    const primaryKey = columns[0]?.key
+                    return primaryKey && String(r[primaryKey]) === valueStr
+                })
+                const title = row && titleKey ? String(row[titleKey] ?? opt.label) : opt.label
+                const subtitle = row && subtitleKey ? String(row[subtitleKey] ?? '') : undefined
+                return {
+                    primary: valueStr,
+                    title,
+                    subtitle: subtitle || undefined,
+                    payload: valueStr,
+                }
+            }),
+        }
+        const blocks: Block[] = []
+        const cleanedMessage = stripMarkdownTable(message)
+        if (cleanedMessage.trim().length > 0) blocks.push({ type: 'text', value: cleanedMessage })
+        blocks.push(items)
+        return { type: 'blocks-v1', blocks }
+    }
+    return { type: 'markdown', value: message, files: [] }
 }
 
 function pendingOverwriteFromPolicyDecisions({ policyDecisions, nodeId }: {
@@ -1370,6 +1424,13 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 constants,
                 event: { stepName: action.name, nodeId: nextPauseNode.id, kind: 'PAUSED', locale },
             })
+            const pendingInteractionForPause = computePendingInteraction({ node: nextPauseNode, state: flowState })
+            const pauseBody = buildPauseBody({
+                message: message ?? '',
+                pendingInteraction: pendingInteractionForPause,
+                node: nextPauseNode,
+                state: flowState,
+            })
             // If this flow was triggered via a sync webhook (AP chat UI,
             // sync forms, or any sync HTTP caller), push the bot's
             // pause message back to the caller in the `HumanInputFormResult`
@@ -1381,6 +1442,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 ifDebug('handle:pause:sendFlowResponse', {
                     workerHandlerId: constants.workerHandlerId,
                     httpRequestId: constants.httpRequestId,
+                    bodyType: pauseBody.type,
                 })
                 try {
                     await workerSocket.getWorkerClient().sendFlowResponse({
@@ -1388,11 +1450,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                         httpRequestId: constants.httpRequestId,
                         runResponse: {
                             status: 200,
-                            body: {
-                                type: 'markdown',
-                                value: message ?? '',
-                                files: [],
-                            },
+                            body: pauseBody,
                             headers: {},
                         },
                     })
@@ -1405,7 +1463,6 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     })
                 }
             }
-            const pendingInteractionForPause = computePendingInteraction({ node: nextPauseNode, state: flowState })
             await persistSession({
                 botMessage: message ?? undefined,
                 pendingInteraction: pendingInteractionForPause,

@@ -188,6 +188,14 @@ export function FlowChat({
             });
             break;
           }
+
+          case HumanInputFormResultTypes.BLOCKS_V1: {
+            onAddMessage({
+              role: 'bot',
+              blocks: result.blocks,
+            });
+            break;
+          }
         }
       }
 
@@ -213,6 +221,10 @@ export function FlowChat({
   const handleSendMessage = (message: ChatMessage) => {
     onSendingMessage?.(message);
     sendMessage({ isRetrying: false, message });
+  };
+
+  const handlePick = (payload: string) => {
+    handleSendMessage({ textContent: payload, files: [] });
   };
 
   if (isLoadingError) {
@@ -245,6 +257,7 @@ export function FlowChat({
             flowId={flowId}
             sendMessage={sendMessage}
             setSelectedImage={toggleImageDialog}
+            onPick={handlePick}
           />
           <div className="w-full px-4 max-w-3xl">
             <ChatInput

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { BlockSchema } from '../engine/bubble-payload'
 
 const FileResponseInterfaceV1 = z.object({
     base64Url: z.string(),
@@ -21,6 +22,7 @@ export type FileResponseInterface = z.infer<typeof FileResponseInterface>
 export enum HumanInputFormResultTypes {
     FILE = 'file',
     MARKDOWN = 'markdown',
+    BLOCKS_V1 = 'blocks-v1',
 }
 
 export function createKeyForFormInput(displayName: string) {
@@ -43,6 +45,10 @@ export const HumanInputFormResult = z.union([
         type: z.literal(HumanInputFormResultTypes.MARKDOWN),
         value: z.string(),
         files: z.array(FileResponseInterface).optional(),
+    }),
+    z.object({
+        type: z.literal(HumanInputFormResultTypes.BLOCKS_V1),
+        blocks: z.array(BlockSchema).min(1),
     }),
 ])
 

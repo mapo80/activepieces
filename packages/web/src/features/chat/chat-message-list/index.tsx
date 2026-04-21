@@ -1,5 +1,6 @@
 import {
   ApErrorParams,
+  BlockSchema,
   ChatUIResponse,
   FileResponseInterface,
   isNil,
@@ -25,6 +26,7 @@ export const Messages = z.array(
     role: z.union([z.literal('user'), z.literal('bot')]),
     textContent: z.string().optional(),
     files: z.array(FileResponseInterface).optional(),
+    blocks: z.array(BlockSchema).optional(),
   }),
 );
 export type Messages = z.infer<typeof Messages>;
@@ -38,6 +40,7 @@ interface ChatMessageListProps extends React.HTMLAttributes<HTMLDivElement> {
   flowId?: string;
   sendMessage?: (arg0: { isRetrying: boolean; message: ChatMessage }) => void;
   setSelectedImage?: (image: string | null) => void;
+  onPick?: (payload: string) => void;
 }
 
 const ChatMessageList = React.forwardRef<HTMLDivElement, ChatMessageListProps>(
@@ -53,6 +56,7 @@ const ChatMessageList = React.forwardRef<HTMLDivElement, ChatMessageListProps>(
       flowId,
       sendMessage,
       setSelectedImage,
+      onPick,
       ...props
     },
     ref,
@@ -92,8 +96,10 @@ const ChatMessageList = React.forwardRef<HTMLDivElement, ChatMessageListProps>(
                     <MultiMediaMessage
                       textContent={message.textContent}
                       attachments={message.files}
+                      blocks={message.blocks}
                       role={message.role}
                       setSelectedImage={setSelectedImage || (() => {})}
+                      onPick={onPick}
                     />
                   </ChatBubbleMessage>
                 </ChatBubble>
