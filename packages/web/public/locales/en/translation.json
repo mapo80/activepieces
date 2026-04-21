@@ -1504,5 +1504,20 @@
   "WRITES": "WRITES",
   "branches": "branches",
   "skip connection": "skip connection",
-  "Data flow {{fields}} from {{source}} to {{target}}": "Data flow {{fields}} from {{source}} to {{target}}"
+  "Data flow {{fields}} from {{source}} to {{target}}": "Data flow {{fields}} from {{source}} to {{target}}",
+  "Advanced": "Advanced",
+  "Label (IT)": "Label (IT)",
+  "Label (EN)": "Label (EN)",
+  "Etichetta visibile": "Visible label",
+  "Display label": "Display label",
+  "Parser": "Parser",
+  "Format": "Format",
+  "Pattern (regex)": "Pattern (regex)",
+  "Min length": "Min length",
+  "Max length": "Max length",
+  "Enum from (state array)": "Enum from (state array)",
+  "another stateField of type=array": "another stateField of type=array",
+  "Enum value field (key in enum array items)": "Enum value field (key in enum array items)",
+  "Extraction scope": "Extraction scope",
+  "Internal (hidden from bot context)": "Internal (hidden from bot context)"
 }

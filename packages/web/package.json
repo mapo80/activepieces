@@ -112,6 +112,10 @@
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.17",
     "@tailwindcss/vite": "4.1.17",
+    "@testing-library/dom": "^10",
+    "@testing-library/jest-dom": "^6",
+    "@testing-library/react": "^16",
+    "@testing-library/user-event": "^14",
     "@types/canvas-confetti": "^1.9.0",
     "@types/deep-equal": "1.0.1",
     "@types/pako": "2.0.3",
