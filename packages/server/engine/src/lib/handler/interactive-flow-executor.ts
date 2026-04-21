@@ -566,7 +566,7 @@ function buildPauseBody({ message, pendingInteraction, node, state, locale }: {
             type: 'quick-replies',
             replies: [
                 { label: 'Confermo invio', payload: 'sì confermo invio', style: 'primary' },
-                { label: 'Annulla', payload: 'no annulla', style: 'destructive' },
+                { label: 'Annulla', payload: 'no annulla', style: 'default' },
             ],
         })
         return { type: 'blocks-v1', blocks }
