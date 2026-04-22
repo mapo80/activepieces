@@ -74,6 +74,10 @@ export const PlatformPlanEntity = new EntitySchema<PlatformPlanSchema>({
             type: Boolean,
             default: false,
         },
+        copilotEnabled: {
+            type: Boolean,
+            default: false,
+        },
         managePiecesEnabled: {
             type: Boolean,
         },
