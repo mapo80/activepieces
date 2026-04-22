@@ -61,6 +61,7 @@
               { "name": "closureReasonCode", "type": "string", "extractable": true,
                 "parser": "reason-code-cued",
                 "enumFrom": "closureReasons", "enumValueField": "code",
+                "pattern": "^\\d{2}$",
                 "description": "Codice motivazione a 2 cifre. DEVE esistere nella lista caricata (state.closureReasons[].codice). Se l'utente cita un numero, prima di produrlo verifica che sia nel catalogo. Se l'utente descrive la motivazione a parole (es. 'trasferimento estero'), NON inferire il codice: produci invece closureReasonText." },
               { "name": "closureReasonText", "type": "string", "extractable": true,
                 "description": "Descrizione testuale della motivazione quando l'utente NON cita un codice esplicito. Es: 'trasferimento estero', 'trasloco'. Il server mapperà text → code." },

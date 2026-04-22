@@ -79,7 +79,7 @@ function verifyDomain({ field, value, state, fieldSpec }: {
     field: string
     value: unknown
     state: Record<string, unknown>
-    fieldSpec?: { enumFrom?: string, enumValueField?: string, parser?: string }
+    fieldSpec?: { enumFrom?: string, enumValueField?: string, parser?: string, pattern?: string }
 }): { ok: true } | { ok: false, reason: string } {
     if (field === 'closureDate') {
         if (typeof value !== 'string') return { ok: false, reason: 'date-not-string' }
@@ -96,11 +96,12 @@ function verifyDomain({ field, value, state, fieldSpec }: {
     if (fieldSpec?.enumFrom && fieldSpec?.enumValueField) {
         const list = state[fieldSpec.enumFrom]
         if (!Array.isArray(list) || list.length === 0) {
-            // Deferred enum check: if the field declares parser 'reason-code-cued'
-            // AND the value matches the expected 2-digit format, accept
-            // tentatively. The enum source is expected to be loaded by a tool
-            // whose execution may race with extraction on a batched first turn.
-            if (fieldSpec.parser === 'reason-code-cued' && typeof value === 'string' && /^\d{2}$/.test(value)) {
+            // Deferred validation: if the field declares a format pattern,
+            // accept tentatively when the catalog is not yet populated. The
+            // engine's reValidateEnumFields pass will enforce existence once
+            // the producing tool has run. Pattern-mismatched values and
+            // fields without a pattern stay rejected.
+            if (fieldSpec.pattern && typeof value === 'string' && new RegExp(fieldSpec.pattern).test(value)) {
                 return { ok: true }
             }
             return { ok: false, reason: 'enum-unavailable-in-state' }

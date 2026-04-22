@@ -378,6 +378,36 @@ function findReadyBranchNodes({ nodes, state, executedNodeIds, skippedNodeIds }:
     )
 }
 
+function reValidateEnumFields({ flowState, fields }: {
+    flowState: InteractiveFlowState
+    fields: InteractiveFlowStateField[]
+}): boolean {
+    let anyCleared = false
+    for (const field of fields) {
+        if (!field.enumFrom || !field.enumValueField) continue
+        const value = flowState[field.name]
+        if (isNil(value)) continue
+        const catalog = flowState[field.enumFrom]
+        if (!Array.isArray(catalog) || catalog.length === 0) continue
+        const valueKey = field.enumValueField
+        const allowed = catalog.map(item =>
+            item && typeof item === 'object'
+                ? (item as Record<string, unknown>)[valueKey]
+                : undefined,
+        )
+        if (!allowed.includes(value)) {
+            Reflect.deleteProperty(flowState, field.name)
+            anyCleared = true
+            ifDebug('handle:revalidate:cleared', {
+                field: field.name,
+                catalog: field.enumFrom,
+                rejectedValue: String(value).slice(0, 40),
+            })
+        }
+    }
+    return anyCleared
+}
+
 function findNextUserOrConfirmNode({ nodes, state, executedNodeIds, skippedNodeIds }: {
     nodes: InteractiveFlowNode[]
     state: InteractiveFlowState
@@ -1034,7 +1064,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 // can be validated and resolved during first-turn extraction.
                 // Tools with non-empty stateInputs are deferred to the main
                 // while(changed) loop so they don't fire for resumed sessions.
-                const preExtractTools = nodes.filter(n =>
+                const preExtractTools = nodes.filter((n): n is InteractiveFlowToolNode =>
                     isToolNode(n)
                     && (n.stateInputs ?? []).length === 0
                     && !executedNodeIds.has(n.id)
@@ -1235,6 +1265,14 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
 
             const readyTools = findReadyToolNodes({ nodes, state: flowState, executedNodeIds, skippedNodeIds })
             for (const node of readyTools) {
+                // Re-validate enum-backed fields before each tool in case a
+                // previous tool in this iteration populated a catalog that
+                // invalidates a tentatively-accepted value (e.g. rapportoId
+                // accepted at extraction before load_accounts ran).
+                if (reValidateEnumFields({ flowState, fields })) changed = true
+                // If re-validation cleared any input this tool needs, skip it.
+                if (!node.stateInputs.every(f => !isNil(flowState[f]))) continue
+
                 const policy = node.errorPolicy
                 await interactiveFlowEvents.emit({
                     constants,
@@ -1308,6 +1346,10 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 }
                 changed = true
             }
+            // Final re-validation after the tool loop: the last tool may
+            // have populated a catalog whose consistency no later per-tool
+            // call could have checked. Clean up before auto-select / pause.
+            if (reValidateEnumFields({ flowState, fields })) changed = true
 
             for (const node of nodes) {
                 if (!isUserInputNode(node)) continue
