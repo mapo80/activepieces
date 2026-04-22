@@ -88,6 +88,7 @@
                 "name": "pick_ndg",
                 "displayName": "Seleziona NDG",
                 "nodeType": "USER_INPUT",
+                "singleOptionStrategy": "auto",
                 "stateInputs": ["customerMatches"],
                 "stateOutputs": ["ndg"],
                 "render": {
