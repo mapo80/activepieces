@@ -179,4 +179,27 @@ describe('NodesEditor — node list', () => {
     );
     expect(hasConfirmValue).toBe(true);
   });
+
+  it('shows singleOptionStrategy Select only for USER_INPUT nodes', () => {
+    render(<Harness defaultValues={BASE_SETTINGS} />);
+    // Click USER_INPUT node (pick_ndg, arrayIndex=1) → select appears
+    fireEvent.click(screen.getByTestId('node-card-1'));
+    expect(screen.getByTestId('single-option-strategy')).toBeInTheDocument();
+  });
+
+  it('hides singleOptionStrategy Select for TOOL nodes', () => {
+    render(<Harness defaultValues={BASE_SETTINGS} />);
+    fireEvent.click(screen.getByTestId('node-card-0'));
+    expect(
+      screen.queryByTestId('single-option-strategy'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides singleOptionStrategy Select for CONFIRM nodes', () => {
+    render(<Harness defaultValues={BASE_SETTINGS} />);
+    fireEvent.click(screen.getByTestId('node-card-3'));
+    expect(
+      screen.queryByTestId('single-option-strategy'),
+    ).not.toBeInTheDocument();
+  });
 });

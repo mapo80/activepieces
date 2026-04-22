@@ -24,7 +24,7 @@ const DataListItemSchema = z.object({
 const DataListBlockSchema = z.object({
     type: z.literal('data-list'),
     selectMode: z.enum(['single', 'multi']).default('single'),
-    layout: z.enum(['cards', 'table']).default('cards'),
+    layout: z.enum(['cards', 'table', 'single-confirm']).default('cards'),
     columns: z.array(DataListColumnSchema).optional(),
     items: z.array(DataListItemSchema).min(1),
 })

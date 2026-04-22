@@ -4,6 +4,7 @@ import {
   DataListItem,
 } from '@activepieces/shared';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
 
@@ -31,6 +32,16 @@ export const DataListBlock: React.FC<Props> = ({ block, onPick }) => {
     onPick?.(item.payload);
   };
 
+  if (block.layout === 'single-confirm' && block.items.length === 1) {
+    return (
+      <SingleConfirmLayout
+        block={block}
+        confirmed={selected !== null}
+        onConfirm={() => handlePick(block.items[0])}
+      />
+    );
+  }
+
   if (
     block.layout === 'table' &&
     block.columns !== undefined &&
@@ -47,6 +58,66 @@ export const DataListBlock: React.FC<Props> = ({ block, onPick }) => {
   }
 
   return <CardsLayout block={block} selected={selected} onPick={handlePick} />;
+};
+
+const SingleConfirmLayout: React.FC<{
+  block: DataListBlockType;
+  confirmed: boolean;
+  onConfirm: () => void;
+}> = ({ block, confirmed, onConfirm }) => {
+  const { t } = useTranslation();
+  const [dismissed, setDismissed] = useState(false);
+  const item = block.items[0];
+  const title = item.title ?? item.primary;
+  const primary = item.title ? item.primary : undefined;
+  return (
+    <div
+      data-testid="single-confirm-block"
+      className="my-1 overflow-hidden rounded-md border border-border p-3 flex flex-col gap-2"
+    >
+      <div className="flex flex-col">
+        <span className="font-medium text-foreground">{title}</span>
+        {primary && (
+          <span className="text-sm text-muted-foreground">{primary}</span>
+        )}
+        {item.subtitle && (
+          <span className="text-xs text-muted-foreground">{item.subtitle}</span>
+        )}
+      </div>
+      {dismissed ? (
+        <div className="text-xs text-muted-foreground">
+          {t('Type your answer below.')}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={confirmed}
+            onClick={onConfirm}
+            data-testid="single-confirm-yes"
+            className={cn(
+              'px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
+              confirmed && 'opacity-60 cursor-default',
+            )}
+          >
+            {t('Yes')}
+          </button>
+          <button
+            type="button"
+            disabled={confirmed}
+            onClick={() => setDismissed(true)}
+            data-testid="single-confirm-no"
+            className={cn(
+              'px-3 py-1.5 text-sm rounded-md border border-border hover:bg-muted transition-colors',
+              confirmed && 'opacity-60 cursor-default',
+            )}
+          >
+            {t('No')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 };
 
 const CardsLayout: React.FC<LayoutProps> = ({ block, selected, onPick }) => (

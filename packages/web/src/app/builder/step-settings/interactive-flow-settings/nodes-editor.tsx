@@ -349,6 +349,38 @@ export function NodesEditor({ readonly }: Props): React.ReactElement {
                   path={`settings.nodes.${activeIndex}.message`}
                   readonly={readonly}
                 />
+                {activeNode.nodeType ===
+                  InteractiveFlowNodeType.USER_INPUT && (
+                  <FormField
+                    control={form.control}
+                    name={`settings.nodes.${activeIndex}.singleOptionStrategy`}
+                    render={({ field }) => (
+                      <label className="flex flex-col gap-1 text-xs">
+                        {t('When the list has a single option')}
+                        <Select
+                          disabled={readonly}
+                          value={field.value ?? 'confirm'}
+                          onValueChange={field.onChange}
+                        >
+                          <SelectTrigger data-testid="single-option-strategy">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="confirm">
+                              {t('Ask confirmation (Yes/No)')}
+                            </SelectItem>
+                            <SelectItem value="auto">
+                              {t('Auto-select without asking')}
+                            </SelectItem>
+                            <SelectItem value="list">
+                              {t('Show the list anyway')}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </label>
+                    )}
+                  />
+                )}
                 <LivePreview
                   componentName={activeNode.render?.component}
                   propsJson={

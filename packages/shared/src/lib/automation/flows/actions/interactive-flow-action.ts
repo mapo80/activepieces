@@ -113,11 +113,15 @@ export const InteractiveFlowToolNodeSchema = z.object({
 })
 export type InteractiveFlowToolNode = z.infer<typeof InteractiveFlowToolNodeSchema>
 
+export const InteractiveFlowSingleOptionStrategySchema = z.enum(['list', 'confirm', 'auto'])
+export type InteractiveFlowSingleOptionStrategy = z.infer<typeof InteractiveFlowSingleOptionStrategySchema>
+
 export const InteractiveFlowUserInputNodeSchema = z.object({
     ...NodeBaseSchema,
     nodeType: z.literal(InteractiveFlowNodeType.USER_INPUT),
     message: NodeMessageSchema,
     render: InteractiveFlowRenderHintSchema,
+    singleOptionStrategy: InteractiveFlowSingleOptionStrategySchema.optional(),
 })
 export type InteractiveFlowUserInputNode = z.infer<typeof InteractiveFlowUserInputNodeSchema>
 

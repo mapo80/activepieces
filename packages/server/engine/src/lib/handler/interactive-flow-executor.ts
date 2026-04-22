@@ -581,7 +581,12 @@ function buildPauseBody({ message, pendingInteraction, node, state, locale }: {
             ? renderProps.columns as Array<{ key: string, header: string, align?: 'left' | 'right' | 'center' }>
             : []
         const requestedLayout = renderProps.layout === 'table' ? 'table' : 'cards'
-        const layout: 'cards' | 'table' = requestedLayout === 'table' && columns.length > 0 ? 'table' : 'cards'
+        const strategy = isUserInputNode(node) ? (node.singleOptionStrategy ?? 'confirm') : 'confirm'
+        const singleConfirmActive = pendingInteraction.options.length === 1 && strategy === 'confirm'
+        const layout: 'cards' | 'table' | 'single-confirm' =
+            singleConfirmActive ? 'single-confirm'
+                : requestedLayout === 'table' && columns.length > 0 ? 'table'
+                    : 'cards'
         const primaryKey = columns[0]?.key
         const titleKey = columns[1]?.key
         const subtitleKey = columns[2]?.key
@@ -1276,6 +1281,25 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                             })
                     }
                 }
+                changed = true
+            }
+
+            for (const node of nodes) {
+                if (!isUserInputNode(node)) continue
+                if (node.singleOptionStrategy !== 'auto') continue
+                if (executedNodeIds.has(node.id) || skippedNodeIds.has(node.id)) continue
+                if (!node.stateInputs.every(f => !isNil(flowState[f]))) continue
+                if (!node.stateOutputs.some(f => isNil(flowState[f]))) continue
+                const pending = computePendingInteraction({ node, state: flowState })
+                if (pending?.type !== 'pick_from_list') continue
+                if (pending.options.length !== 1) continue
+                flowState[pending.field] = pending.options[0].value
+                executedNodeIds.add(node.id)
+                ifDebug('handle:auto-select-single', {
+                    nodeId: node.id,
+                    field: pending.field,
+                    valuePreview: String(pending.options[0].value).slice(0, 40),
+                })
                 changed = true
             }
         }

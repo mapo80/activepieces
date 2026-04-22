@@ -234,6 +234,172 @@ describe('interactive-flow executor — blocks-v1 emit for pick_from_list', () =
         })
     })
 
+    it('emits layout="single-confirm" when singleOptionStrategy is confirm and only 1 match', async () => {
+        const sendSpy = installSyncCaller()
+        const matches = [{ ndg: '11255521', denominazione: 'BELLAFRONTE GIANLUCA', tipologia: 'PRIVATO' }]
+        installFetchMock({
+            extractorReturns: { customerMatches: matches },
+            questionText: 'È BELLAFRONTE GIANLUCA — NDG 11255521? Confermi?',
+        })
+
+        const action = buildPickNdgFlow()
+        action.settings.nodes[0].singleOptionStrategy = 'confirm'
+
+        const executionState = FlowExecutorContext.empty().upsertStep('trigger', {
+            type: 'PIECE_TRIGGER' as never,
+            status: StepOutputStatus.SUCCEEDED,
+            input: {},
+            output: { sessionId: 'sid-single-confirm', message: 'Bellafronte' },
+        } as never)
+
+        await flowExecutor.execute({
+            action,
+            executionState,
+            constants: generateMockEngineConstants(EXECUTOR_CONSTANTS_SYNC),
+        })
+
+        expect(sendSpy).toHaveBeenCalled()
+        const call = sendSpy.mock.calls[0][0] as SendFlowResponseCall
+        const body = call.runResponse.body as BlocksV1Payload
+        expect(body.type).toBe('blocks-v1')
+        const dataList = body.blocks.find(b => b.type === 'data-list') as Extract<typeof body.blocks[number], { type: 'data-list' }>
+        expect(dataList).toBeDefined()
+        expect(dataList.layout).toBe('single-confirm')
+        expect(dataList.items).toHaveLength(1)
+        expect(dataList.items[0]).toMatchObject({ primary: '11255521', title: 'BELLAFRONTE GIANLUCA', payload: '11255521' })
+    })
+
+    it('defaults to single-confirm when singleOptionStrategy is undefined and only 1 match', async () => {
+        const sendSpy = installSyncCaller()
+        const matches = [{ ndg: '11255521', denominazione: 'BELLAFRONTE GIANLUCA', tipologia: 'PRIVATO' }]
+        installFetchMock({
+            extractorReturns: { customerMatches: matches },
+            questionText: 'Confermi?',
+        })
+
+        const action = buildPickNdgFlow()
+
+        const executionState = FlowExecutorContext.empty().upsertStep('trigger', {
+            type: 'PIECE_TRIGGER' as never,
+            status: StepOutputStatus.SUCCEEDED,
+            input: {},
+            output: { sessionId: 'sid-default-confirm', message: 'Bellafronte' },
+        } as never)
+
+        await flowExecutor.execute({
+            action,
+            executionState,
+            constants: generateMockEngineConstants(EXECUTOR_CONSTANTS_SYNC),
+        })
+
+        const call = sendSpy.mock.calls[0][0] as SendFlowResponseCall
+        const body = call.runResponse.body as BlocksV1Payload
+        const dataList = body.blocks.find(b => b.type === 'data-list') as Extract<typeof body.blocks[number], { type: 'data-list' }>
+        expect(dataList.layout).toBe('single-confirm')
+    })
+
+    it('keeps layout "cards" when singleOptionStrategy is "list" even with 1 match', async () => {
+        const sendSpy = installSyncCaller()
+        const matches = [{ ndg: '11255521', denominazione: 'BELLAFRONTE GIANLUCA', tipologia: 'PRIVATO' }]
+        installFetchMock({
+            extractorReturns: { customerMatches: matches },
+            questionText: 'Seleziona dalla lista.',
+        })
+
+        const action = buildPickNdgFlow()
+        action.settings.nodes[0].singleOptionStrategy = 'list'
+
+        const executionState = FlowExecutorContext.empty().upsertStep('trigger', {
+            type: 'PIECE_TRIGGER' as never,
+            status: StepOutputStatus.SUCCEEDED,
+            input: {},
+            output: { sessionId: 'sid-list-override', message: 'Bellafronte' },
+        } as never)
+
+        await flowExecutor.execute({
+            action,
+            executionState,
+            constants: generateMockEngineConstants(EXECUTOR_CONSTANTS_SYNC),
+        })
+
+        const call = sendSpy.mock.calls[0][0] as SendFlowResponseCall
+        const body = call.runResponse.body as BlocksV1Payload
+        const dataList = body.blocks.find(b => b.type === 'data-list') as Extract<typeof body.blocks[number], { type: 'data-list' }>
+        expect(dataList.layout).toBe('cards')
+        expect(dataList.items).toHaveLength(1)
+    })
+
+    it('keeps cards/table layout when 2+ options regardless of singleOptionStrategy=confirm', async () => {
+        const sendSpy = installSyncCaller()
+        const matches = [
+            { ndg: '11255521', denominazione: 'BELLAFRONTE GIANLUCA', tipologia: 'PRIVATO' },
+            { ndg: '22334455', denominazione: 'ROSSI MARIO', tipologia: 'PRIVATO' },
+        ]
+        installFetchMock({
+            extractorReturns: { customerMatches: matches },
+            questionText: 'Ho trovato 2 clienti.',
+        })
+
+        const action = buildPickNdgFlow()
+        action.settings.nodes[0].singleOptionStrategy = 'confirm'
+
+        const executionState = FlowExecutorContext.empty().upsertStep('trigger', {
+            type: 'PIECE_TRIGGER' as never,
+            status: StepOutputStatus.SUCCEEDED,
+            input: {},
+            output: { sessionId: 'sid-multi', message: 'Rossi' },
+        } as never)
+
+        await flowExecutor.execute({
+            action,
+            executionState,
+            constants: generateMockEngineConstants(EXECUTOR_CONSTANTS_SYNC),
+        })
+
+        const call = sendSpy.mock.calls[0][0] as SendFlowResponseCall
+        const body = call.runResponse.body as BlocksV1Payload
+        const dataList = body.blocks.find(b => b.type === 'data-list') as Extract<typeof body.blocks[number], { type: 'data-list' }>
+        expect(dataList.layout).toBe('cards')
+        expect(dataList.items).toHaveLength(2)
+    })
+
+    it('auto-selects the single option without pausing when singleOptionStrategy is "auto"', async () => {
+        const sendSpy = installSyncCaller()
+        const matches = [{ ndg: '11255521', denominazione: 'BELLAFRONTE GIANLUCA', tipologia: 'PRIVATO' }]
+        installFetchMock({
+            extractorReturns: { customerMatches: matches },
+            questionText: 'irrelevant',
+        })
+
+        const action = buildPickNdgFlow()
+        action.settings.nodes[0].singleOptionStrategy = 'auto'
+
+        const executionState = FlowExecutorContext.empty().upsertStep('trigger', {
+            type: 'PIECE_TRIGGER' as never,
+            status: StepOutputStatus.SUCCEEDED,
+            input: {},
+            output: { sessionId: 'sid-auto', message: 'Bellafronte' },
+        } as never)
+
+        const result = await flowExecutor.execute({
+            action,
+            executionState,
+            constants: generateMockEngineConstants(EXECUTOR_CONSTANTS_SYNC),
+        })
+
+        const stepOutput = result.steps[action.name]
+        expect(stepOutput?.status).toBe(StepOutputStatus.SUCCEEDED)
+        const output = stepOutput?.output as { state: Record<string, unknown>, executedNodeIds: string[] }
+        expect(output.state.ndg).toBe('11255521')
+        expect(output.executedNodeIds).toContain('pick_ndg')
+
+        if (sendSpy.mock.calls.length > 0) {
+            const call = sendSpy.mock.calls[0][0] as SendFlowResponseCall
+            const body = call.runResponse.body as { type: string }
+            expect(body.type).not.toBe('blocks-v1')
+        }
+    })
+
     it('falls back to markdown payload when pendingInteraction is open_text (no pick_from_list)', async () => {
         const sendSpy = installSyncCaller()
         installFetchMock({
