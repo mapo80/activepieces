@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { McpToolPickerDialog } from '@/features/interactive-flow/components/mcp-tool-picker-dialog';
 import { interactiveFlowComponentRegistry } from '@/features/interactive-flow/components/registry';
 import { cn } from '@/lib/utils';
 
@@ -38,7 +39,9 @@ export function NodesEditor({ readonly }: Props): React.ReactElement {
     name: 'settings.nodes',
   });
   const [activeIndex, setActiveIndex] = useState<number>(0);
+  const [toolPickerOpen, setToolPickerOpen] = useState(false);
   const activeNode = form.watch(`settings.nodes.${activeIndex}`);
+  const mcpGatewayId = form.watch('settings.mcpGatewayId');
   const stateFieldNames = (form.watch('settings.stateFields') ?? [])
     .map((f) => f.name)
     .filter((n): n is string => !!n);
@@ -166,12 +169,30 @@ export function NodesEditor({ readonly }: Props): React.ReactElement {
                   render={({ field }) => (
                     <label className="flex flex-col gap-1 text-xs">
                       {t('MCP Tool')}
-                      <Input
-                        disabled={readonly}
-                        placeholder="banking/search_customer"
-                        value={field.value ?? ''}
-                        onChange={field.onChange}
-                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          readOnly
+                          disabled={readonly}
+                          className="font-mono"
+                          placeholder={
+                            mcpGatewayId
+                              ? t('Select a tool…')
+                              : t('Select a gateway first')
+                          }
+                          value={field.value ?? ''}
+                          data-testid={`node-tool-value-${activeIndex}`}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={readonly || !mcpGatewayId}
+                          onClick={() => setToolPickerOpen(true)}
+                          data-testid={`node-tool-browse-${activeIndex}`}
+                        >
+                          {t('Browse…')}
+                        </Button>
+                      </div>
                     </label>
                   )}
                 />
@@ -248,6 +269,30 @@ export function NodesEditor({ readonly }: Props): React.ReactElement {
           </>
         ) : null}
       </div>
+      {activeNode?.nodeType === InteractiveFlowNodeType.TOOL && (
+        <McpToolPickerDialog
+          gatewayId={mcpGatewayId ?? null}
+          open={toolPickerOpen}
+          onOpenChange={setToolPickerOpen}
+          currentValue={activeNode.tool}
+          onSelect={(toolName, inputSchema) => {
+            form.setValue(`settings.nodes.${activeIndex}.tool`, toolName, {
+              shouldDirty: true,
+            });
+            if (mcpGatewayId && inputSchema !== undefined) {
+              form.setValue(
+                `settings.nodes.${activeIndex}.toolInputSchemaSnapshot`,
+                {
+                  capturedAt: new Date().toISOString(),
+                  gatewayId: mcpGatewayId,
+                  schema: inputSchema,
+                },
+                { shouldDirty: true },
+              );
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
