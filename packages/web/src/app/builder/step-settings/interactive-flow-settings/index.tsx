@@ -75,13 +75,13 @@ export const InteractiveFlowSettings = React.memo(
               <Sparkles className="size-3.5" />
               {t('Gateway & AI')}
             </TabsTrigger>
-            <TabsTrigger value="prompt" className="gap-1.5">
-              <MessageSquareText className="size-3.5" />
-              {t('System prompt')}
-            </TabsTrigger>
             <TabsTrigger value="style" className="gap-1.5">
               <Palette className="size-3.5" />
               {t('Conversation style')}
+            </TabsTrigger>
+            <TabsTrigger value="prompt" className="gap-1.5">
+              <MessageSquareText className="size-3.5" />
+              {t('System prompt')}
             </TabsTrigger>
             <TabsTrigger value="fields" className="gap-1.5">
               <Database className="size-3.5" />
@@ -288,33 +288,6 @@ export const InteractiveFlowSettings = React.memo(
             </div>
           </TabsContent>
 
-          <TabsContent value="prompt">
-            <p className="pb-3 text-xs text-muted-foreground">
-              {t(
-                'Role and guardrails shared by the field-extractor and the question-generator LLMs. Keep it short; the full conversation context is already appended at runtime.',
-              )}
-            </p>
-            <FormField
-              control={form.control}
-              name="settings.systemPrompt"
-              render={({ field }) => (
-                <FormItem className="flex flex-col gap-2">
-                  <FormLabel>{t('System prompt')}</FormLabel>
-                  <MarkdownEditor
-                    value={field.value ?? ''}
-                    readonly={readonly}
-                    placeholder={t(
-                      'You are a banking assistant helping the user close an account…',
-                    )}
-                    className="h-[calc(100vh-320px)] min-h-[360px]"
-                    minHeight="100%"
-                    onChange={(next) => field.onChange(next || undefined)}
-                  />
-                </FormItem>
-              )}
-            />
-          </TabsContent>
-
           <TabsContent value="style">
             <p className="pb-3 text-xs text-muted-foreground">
               {t(
@@ -394,6 +367,33 @@ export const InteractiveFlowSettings = React.memo(
                 )}
               />
             </div>
+          </TabsContent>
+
+          <TabsContent value="prompt">
+            <p className="pb-3 text-xs text-muted-foreground">
+              {t(
+                'Role and guardrails shared by the field-extractor and the question-generator LLMs. Keep it short; the full conversation context is already appended at runtime.',
+              )}
+            </p>
+            <FormField
+              control={form.control}
+              name="settings.systemPrompt"
+              render={({ field }) => (
+                <FormItem className="flex flex-col gap-2">
+                  <FormLabel>{t('System prompt')}</FormLabel>
+                  <MarkdownEditor
+                    value={field.value ?? ''}
+                    readonly={readonly}
+                    placeholder={t(
+                      'You are a banking assistant helping the user close an account…',
+                    )}
+                    className="h-[calc(100vh-320px)] min-h-[360px]"
+                    minHeight="100%"
+                    onChange={(next) => field.onChange(next || undefined)}
+                  />
+                </FormItem>
+              )}
+            />
           </TabsContent>
 
           <TabsContent value="fields">
