@@ -13,10 +13,6 @@ const baseTheme = EditorView.baseTheme({
   '&.cm-editor': {
     fontSize: '13px',
   },
-  '.cm-content': {
-    fontFamily:
-      'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-  },
 });
 
 type Props = {
