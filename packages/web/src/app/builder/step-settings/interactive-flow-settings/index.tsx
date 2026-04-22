@@ -1,5 +1,15 @@
 import { InteractiveFlowAction } from '@activepieces/shared';
-import React from 'react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Database,
+  MessageSquareText,
+  Palette,
+  Settings as SettingsIcon,
+  Sparkles,
+  Workflow,
+} from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -16,6 +26,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { mcpGatewaysQueries } from '@/features/mcp-gateways/lib/mcp-gateways-hooks';
+import { cn } from '@/lib/utils';
 
 import { NodesEditor } from './nodes-editor';
 import { StateFieldsEditor } from './state-fields-editor';
@@ -48,14 +59,32 @@ export const InteractiveFlowSettings = React.memo(
         data-testid="interactive-flow-settings"
       >
         <Tabs defaultValue="general">
-          <TabsList>
-            <TabsTrigger value="general">{t('General')}</TabsTrigger>
-            <TabsTrigger value="gateway">{t('Gateway & AI')}</TabsTrigger>
-            <TabsTrigger value="prompt">{t('System prompt')}</TabsTrigger>
-            <TabsTrigger value="style">{t('Conversation style')}</TabsTrigger>
-            <TabsTrigger value="fields">{t('State fields')}</TabsTrigger>
-            <TabsTrigger value="nodes">{t('Nodes')}</TabsTrigger>
-          </TabsList>
+          <ScrollableTabsList>
+            <TabsTrigger value="general" className="gap-1.5">
+              <SettingsIcon className="size-3.5" />
+              {t('General')}
+            </TabsTrigger>
+            <TabsTrigger value="gateway" className="gap-1.5">
+              <Sparkles className="size-3.5" />
+              {t('Gateway & AI')}
+            </TabsTrigger>
+            <TabsTrigger value="prompt" className="gap-1.5">
+              <MessageSquareText className="size-3.5" />
+              {t('System prompt')}
+            </TabsTrigger>
+            <TabsTrigger value="style" className="gap-1.5">
+              <Palette className="size-3.5" />
+              {t('Conversation style')}
+            </TabsTrigger>
+            <TabsTrigger value="fields" className="gap-1.5">
+              <Database className="size-3.5" />
+              {t('State fields')}
+            </TabsTrigger>
+            <TabsTrigger value="nodes" className="gap-1.5">
+              <Workflow className="size-3.5" />
+              {t('Nodes')}
+            </TabsTrigger>
+          </ScrollableTabsList>
 
           <TabsContent value="general">
             <p className="pb-3 text-xs text-muted-foreground">
@@ -371,3 +400,78 @@ export const InteractiveFlowSettings = React.memo(
 );
 
 InteractiveFlowSettings.displayName = 'InteractiveFlowSettings';
+
+function ScrollableTabsList({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactElement {
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateArrows = useCallback((): void => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setCanScrollLeft(el.scrollLeft > 1);
+    setCanScrollRight(el.scrollLeft < maxScroll - 1);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    updateArrows();
+    const resizeObserver = new ResizeObserver(updateArrows);
+    resizeObserver.observe(el);
+    el.addEventListener('scroll', updateArrows, { passive: true });
+    return () => {
+      resizeObserver.disconnect();
+      el.removeEventListener('scroll', updateArrows);
+    };
+  }, [updateArrows]);
+
+  const scrollBy = (delta: number): void => {
+    scrollerRef.current?.scrollBy({ left: delta, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="relative">
+      <div
+        ref={scrollerRef}
+        className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        data-testid="interactive-flow-tabs-scroller"
+      >
+        <TabsList className="flex-nowrap">{children}</TabsList>
+      </div>
+      {canScrollLeft && (
+        <button
+          type="button"
+          aria-label="Scroll left"
+          onClick={() => scrollBy(-120)}
+          className={cn(
+            'absolute left-0 top-1/2 z-10 flex h-7 w-6 -translate-y-1/2 items-center justify-center rounded-md border border-border bg-background shadow-sm',
+            'hover:bg-muted focus:outline-none',
+          )}
+          data-testid="interactive-flow-tabs-scroll-left"
+        >
+          <ChevronLeft className="size-3.5" />
+        </button>
+      )}
+      {canScrollRight && (
+        <button
+          type="button"
+          aria-label="Scroll right"
+          onClick={() => scrollBy(120)}
+          className={cn(
+            'absolute right-0 top-1/2 z-10 flex h-7 w-6 -translate-y-1/2 items-center justify-center rounded-md border border-border bg-background shadow-sm',
+            'hover:bg-muted focus:outline-none',
+          )}
+          data-testid="interactive-flow-tabs-scroll-right"
+        >
+          <ChevronRight className="size-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
