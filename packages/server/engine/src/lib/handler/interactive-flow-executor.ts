@@ -888,6 +888,17 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
         let previousPendingInteraction: PendingInteraction | null = null
         let pendingOverwriteSignal: PendingInteraction | null = null
         let rejectionHint: string | null = null
+
+        let gateway: ResolveMcpGatewayResponse | null = null
+        const ensureGateway = async (): Promise<ResolveMcpGatewayResponse> => {
+            if (!isNil(gateway)) return gateway
+            if (isNil(settings.mcpGatewayId)) {
+                throw new EngineGenericError('McpGatewayNotConfigured', 'No MCP gateway selected in the interactive flow settings')
+            }
+            gateway = await resolveGateway({ gatewayId: settings.mcpGatewayId, constants })
+            return gateway
+        }
+
         if (!isNil(sessionKey)) {
             try {
                 const loaded = await sessionStore.load({
@@ -1018,6 +1029,30 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             })
             if (!isNil(userMessage) && userMessage.trim().length > 0) {
                 history = sessionStore.appendHistory({ history, role: 'user', text: userMessage, historyMaxTurns })
+                // Pre-run truly-stateless catalog tools (stateInputs === [])
+                // so enum-backed fields (closureReasonCode, closureReasonText)
+                // can be validated and resolved during first-turn extraction.
+                // Tools with non-empty stateInputs are deferred to the main
+                // while(changed) loop so they don't fire for resumed sessions.
+                const preExtractTools = nodes.filter(n =>
+                    isToolNode(n)
+                    && (n.stateInputs ?? []).length === 0
+                    && !executedNodeIds.has(n.id)
+                    && !skippedNodeIds.has(n.id),
+                )
+                for (const preTool of preExtractTools) {
+                    try {
+                        const params = buildToolParams({ node: preTool, state: flowState })
+                        const resolvedGateway = await ensureGateway()
+                        const result = await executeToolWithPolicy({ node: preTool, params, gateway: resolvedGateway, policy: preTool.errorPolicy })
+                        mapOutputsToState({ node: preTool, result, state: flowState, fields })
+                        executedNodeIds.add(preTool.id)
+                        ifDebug('handle:first-turn:pre-tool', { nodeId: preTool.id, outputs: preTool.stateOutputs })
+                    }
+                    catch (e) {
+                        ifDebug('handle:first-turn:pre-tool-error', { nodeId: preTool.id, error: (e as Error).message?.slice(0, 120) })
+                    }
+                }
                 try {
                     const pauseHint = findNextUserOrConfirmNode({ nodes, state: flowState, executedNodeIds, skippedNodeIds })
                     const extractResult = await fieldExtractor.extractWithPolicy({
@@ -1162,16 +1197,6 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             if (!isBranchNode(node) && isAlreadyWritten({ node, state: flowState })) {
                 executedNodeIds.add(node.id)
             }
-        }
-
-        let gateway: ResolveMcpGatewayResponse | null = null
-        const ensureGateway = async (): Promise<ResolveMcpGatewayResponse> => {
-            if (!isNil(gateway)) return gateway
-            if (isNil(settings.mcpGatewayId)) {
-                throw new EngineGenericError('McpGatewayNotConfigured', 'No MCP gateway selected in the interactive flow settings')
-            }
-            gateway = await resolveGateway({ gatewayId: settings.mcpGatewayId, constants })
-            return gateway
         }
 
         let changed = true

@@ -664,7 +664,7 @@ function applyVerificationPipeline({
             field: chosenCandidate.field,
             value: chosenCandidate.value,
             state: currentState,
-            fieldSpec: fieldSpec ? { enumFrom: fieldSpec.enumFrom, enumValueField: fieldSpec.enumValueField } : undefined,
+            fieldSpec: fieldSpec ? { enumFrom: fieldSpec.enumFrom, enumValueField: fieldSpec.enumValueField, parser: fieldSpec.parser } : undefined,
         })
         if (!domain.ok) {
             policyDecisions.push({ field: chosenCandidate.field, action: 'reject', reason: domain.reason })

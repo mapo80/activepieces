@@ -57,6 +57,7 @@
                 "description": "Identificativo rapporto nel formato esatto NN-NNN-NNNNNNNN (es. 01-034-00392400)" },
               { "name": "closureReasons", "type": "array", "extractable": false },
               { "name": "closureReasonCode", "type": "string", "extractable": true,
+                "parser": "reason-code-cued",
                 "enumFrom": "closureReasons", "enumValueField": "code",
                 "description": "Codice motivazione a 2 cifre. DEVE esistere nella lista caricata (state.closureReasons[].codice). Se l'utente cita un numero, prima di produrlo verifica che sia nel catalogo. Se l'utente descrive la motivazione a parole (es. 'trasferimento estero'), NON inferire il codice: produci invece closureReasonText." },
               { "name": "closureReasonText", "type": "string", "extractable": true,
@@ -162,7 +163,7 @@
                 "name": "load_reasons",
                 "displayName": "Carica motivazioni",
                 "nodeType": "TOOL",
-                "stateInputs": ["rapportoId"],
+                "stateInputs": [],
                 "stateOutputs": ["closureReasons"],
                 "tool": "banking-operations/list_closure_reasons",
                 "toolParams": {}
