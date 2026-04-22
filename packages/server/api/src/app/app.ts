@@ -6,6 +6,7 @@ import { createAdapter } from '@socket.io/redis-adapter'
 import { FastifyInstance, FastifyRequest, HTTPMethods } from 'fastify'
 import { aiProviderService } from './ai/ai-provider-service'
 import { aiProviderModule } from './ai/ai-provider.module'
+import { copilotModule } from './ai/copilot/copilot.module'
 import { platformAnalyticsModule } from './analytics/platform-analytics.module'
 import { setPlatformOAuthService } from './app-connection/app-connection-service/oauth2'
 import { appConnectionModule } from './app-connection/app-connection.module'
@@ -224,6 +225,7 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
     await app.register(workerModule)
     await aiProviderService(app.log).setup()
     await app.register(aiProviderModule)
+    await app.register(copilotModule)
     await app.register(licenseKeysModule)
     await app.register(tablesModule)
     await app.register(knowledgeBaseModule)
