@@ -21,7 +21,9 @@ import { flowVersionService } from '../../flows/flow-version/flow-version.servic
 import { flowService } from '../../flows/flow/flow.service'
 import { validateInteractiveFlow } from '../../flows/flow-version/interactive-flow-validator'
 
-const DEFAULT_MODEL = 'claude-sonnet-4-5'
+const DEFAULT_MODEL = process.env.COPILOT_MODEL ?? 'claude-cli'
+const DEFAULT_PROVIDER: AIProviderName =
+    (process.env.COPILOT_PROVIDER as AIProviderName | undefined) ?? AIProviderName.CUSTOM
 const TIMEOUT_MS = 60_000
 
 function computeMaxSteps(toolsCount: number): number {
@@ -96,7 +98,7 @@ async function* runCopilotLoop(params: {
     try {
         model = await interactiveFlowModelFactory.build({
             platformId: session.platformId,
-            provider: AIProviderName.ANTHROPIC,
+            provider: DEFAULT_PROVIDER,
             modelId: DEFAULT_MODEL,
             log,
         })

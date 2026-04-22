@@ -108,7 +108,7 @@ export const OPEN_SOURCE_PLAN: PlatformPlanWithOnlyLimits = {
     embeddingEnabled: false,
     agentsEnabled: true,
     aiProvidersEnabled: true,
-    copilotEnabled: false,
+    copilotEnabled: true,
     globalConnectionsEnabled: false,
     customRolesEnabled: false,
     includedAiCredits: 0,
