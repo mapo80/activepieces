@@ -102,33 +102,6 @@ export const InteractiveFlowSettings = React.memo(
             <div className="flex flex-col gap-3">
               <FormField
                 control={form.control}
-                name="settings.greeting"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('Greeting Message (EN)')}</FormLabel>
-                    <Input
-                      disabled={readonly}
-                      onChange={(e) =>
-                        field.onChange(
-                          e.target.value === ''
-                            ? undefined
-                            : { en: e.target.value },
-                        )
-                      }
-                      value={
-                        typeof field.value === 'string'
-                          ? field.value
-                          : field.value?.en ?? ''
-                      }
-                      placeholder={t(
-                        'Welcome message for the interactive flow',
-                      )}
-                    />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
                 name="settings.locale"
                 render={({ field }) => (
                   <FormItem>
