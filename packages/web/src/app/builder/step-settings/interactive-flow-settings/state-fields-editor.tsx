@@ -129,7 +129,7 @@ function StateFieldRow({
       className="rounded border border-border p-2"
       data-testid={`state-field-row-${index}`}
     >
-      <div className="grid grid-cols-[1fr_120px_1fr_auto_auto_auto] items-center gap-2">
+      <div className="grid grid-cols-[1fr_120px_auto_auto_auto] items-center gap-2">
         <FormField
           control={form.control}
           name={`settings.stateFields.${index}.name`}
@@ -162,19 +162,6 @@ function StateFieldRow({
                 ))}
               </SelectContent>
             </Select>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name={`settings.stateFields.${index}.description`}
-          render={({ field: inner }) => (
-            <Input
-              disabled={readonly}
-              placeholder={t('Description for the extractor LLM')}
-              className="text-xs"
-              value={inner.value ?? ''}
-              onChange={inner.onChange}
-            />
           )}
         />
         <label className="flex items-center gap-1 text-xs">
@@ -216,6 +203,19 @@ function StateFieldRow({
           <Trash2 className="size-4" />
         </Button>
       </div>
+      <FormField
+        control={form.control}
+        name={`settings.stateFields.${index}.description`}
+        render={({ field: inner }) => (
+          <Input
+            disabled={readonly}
+            placeholder={t('Description for the extractor LLM')}
+            className="mt-2 text-xs"
+            value={inner.value ?? ''}
+            onChange={inner.onChange}
+          />
+        )}
+      />
 
       <Collapsible
         open={advancedOpen}
