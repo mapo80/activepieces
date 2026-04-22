@@ -2,6 +2,7 @@ import { InteractiveFlowAction } from '@activepieces/shared';
 import {
   ChevronLeft,
   ChevronRight,
+  CircleHelp,
   Database,
   MessageSquareText,
   Palette,
@@ -25,6 +26,12 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { mcpGatewaysQueries } from '@/features/mcp-gateways/lib/mcp-gateways-hooks';
 import { cn } from '@/lib/utils';
 
@@ -142,7 +149,31 @@ export const InteractiveFlowSettings = React.memo(
                 name="settings.messageInput"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Initial message expression')}</FormLabel>
+                    <FormLabel className="flex items-center gap-1">
+                      {t('Initial message expression')}
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex size-4 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus:outline-none"
+                              aria-label={t('What is this?')}
+                            >
+                              <CircleHelp className="size-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            align="start"
+                            className="max-w-sm text-xs leading-relaxed"
+                          >
+                            {t(
+                              'AP template expression read when the flow starts — use `{{trigger.body.message}}` to feed the field-extractor with the first free-text message from the webhook payload.',
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </FormLabel>
                     <Input
                       disabled={readonly}
                       placeholder="{{trigger.body.message}}"
@@ -151,11 +182,6 @@ export const InteractiveFlowSettings = React.memo(
                         field.onChange(e.target.value || undefined)
                       }
                     />
-                    <p className="text-xs text-muted-foreground">
-                      {t(
-                        'AP template expression read when the flow starts — use `{{trigger.body.message}}` to feed the field-extractor with the first free-text message from the webhook payload.',
-                      )}
-                    </p>
                   </FormItem>
                 )}
               />
