@@ -15,6 +15,7 @@ import { useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
+import { MarkdownEditor } from '@/components/custom/markdown-editor';
 import { FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
@@ -25,7 +26,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
   TooltipContent,
@@ -298,18 +298,17 @@ export const InteractiveFlowSettings = React.memo(
               control={form.control}
               name="settings.systemPrompt"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col gap-2">
                   <FormLabel>{t('System prompt')}</FormLabel>
-                  <Textarea
-                    disabled={readonly}
-                    rows={12}
+                  <MarkdownEditor
+                    value={field.value ?? ''}
+                    readonly={readonly}
                     placeholder={t(
                       'You are a banking assistant helping the user close an account…',
                     )}
-                    value={field.value ?? ''}
-                    onChange={(e) =>
-                      field.onChange(e.target.value || undefined)
-                    }
+                    className="h-[calc(100vh-320px)] min-h-[360px]"
+                    minHeight="100%"
+                    onChange={(next) => field.onChange(next || undefined)}
                   />
                 </FormItem>
               )}
