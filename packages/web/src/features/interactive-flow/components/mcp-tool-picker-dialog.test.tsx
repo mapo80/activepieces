@@ -89,15 +89,14 @@ function renderPicker(overrides?: {
   onSelect?: (toolName: string, schema: unknown) => void;
   isError?: boolean;
 }): {
-  listToolsSpy: ReturnType<typeof vi.spyOn>;
   onSelect: (name: string, schema: unknown) => void;
 } {
   const onSelect = overrides?.onSelect ?? vi.fn();
-  const listToolsSpy = vi.spyOn(mcpGatewaysApi, 'listTools').mockResolvedValue({
+  const spy = vi.spyOn(mcpGatewaysApi, 'listTools').mockResolvedValue({
     tools: overrides?.tools ?? MOCK_TOOLS,
   });
   if (overrides?.isError) {
-    listToolsSpy.mockRejectedValue(new Error('network'));
+    spy.mockRejectedValue(new Error('network'));
   }
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -115,7 +114,7 @@ function renderPicker(overrides?: {
       </QueryClientProvider>
     </I18nextProvider>,
   );
-  return { listToolsSpy, onSelect };
+  return { onSelect };
 }
 
 describe('McpToolPickerDialog', () => {
