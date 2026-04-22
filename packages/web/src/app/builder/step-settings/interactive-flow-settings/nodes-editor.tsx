@@ -2,7 +2,15 @@ import {
   InteractiveFlowAction,
   InteractiveFlowNodeType,
 } from '@activepieces/shared';
-import { Plus, Search, Trash2 } from 'lucide-react';
+import {
+  CircleCheck,
+  GitBranch,
+  MessageSquare,
+  Plus,
+  Search,
+  Trash2,
+  Wrench,
+} from 'lucide-react';
 import React, { useState } from 'react';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -17,10 +26,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { McpToolPickerDialog } from '@/features/interactive-flow/components/mcp-tool-picker-dialog';
 import { interactiveFlowComponentRegistry } from '@/features/interactive-flow/components/registry';
 import { cn } from '@/lib/utils';
+
+const NODE_TYPE_META: Record<
+  InteractiveFlowNodeType,
+  { icon: React.ElementType; borderClass: string; iconClass: string }
+> = {
+  [InteractiveFlowNodeType.TOOL]: {
+    icon: Wrench,
+    borderClass: 'border-l-2 border-l-blue-500',
+    iconClass: 'text-blue-500',
+  },
+  [InteractiveFlowNodeType.USER_INPUT]: {
+    icon: MessageSquare,
+    borderClass: 'border-l-2 border-l-emerald-500',
+    iconClass: 'text-emerald-500',
+  },
+  [InteractiveFlowNodeType.CONFIRM]: {
+    icon: CircleCheck,
+    borderClass: 'border-l-2 border-l-amber-500',
+    iconClass: 'text-amber-500',
+  },
+  [InteractiveFlowNodeType.BRANCH]: {
+    icon: GitBranch,
+    borderClass: 'border-l-2 border-l-purple-500',
+    iconClass: 'text-purple-500',
+  },
+};
 
 const NODE_TYPE_VALUES = [
   InteractiveFlowNodeType.TOOL,
@@ -40,51 +76,114 @@ export function NodesEditor({ readonly }: Props): React.ReactElement {
   });
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [toolPickerOpen, setToolPickerOpen] = useState(false);
+  const [groupByType, setGroupByType] = useState<boolean>(true);
   const activeNode = form.watch(`settings.nodes.${activeIndex}`);
   const mcpGatewayId = form.watch('settings.mcpGatewayId');
   const stateFieldNames = (form.watch('settings.stateFields') ?? [])
     .map((f) => f.name)
     .filter((n): n is string => !!n);
 
+  type GroupedEntry = { header: string; arrayIndices: number[] };
+  const groupedList: GroupedEntry[] = groupByType
+    ? NODE_TYPE_VALUES.flatMap((nt) => {
+        const arrayIndices = fields
+          .map((_, idx) => idx)
+          .filter(
+            (idx) => form.getValues(`settings.nodes.${idx}.nodeType`) === nt,
+          );
+        if (arrayIndices.length === 0) return [];
+        return [{ header: `${nt} (${arrayIndices.length})`, arrayIndices }];
+      })
+    : [{ header: '', arrayIndices: fields.map((_, idx) => idx) }];
+
   return (
     <div className="grid grid-cols-[180px_1fr] gap-3">
       <div
-        className="flex flex-col gap-1"
+        className="flex flex-col gap-2"
         data-testid="interactive-flow-nodes-list"
       >
-        {fields.map((f, idx) => {
-          const node = form.watch(`settings.nodes.${idx}`);
-          return (
-            <button
-              key={f.id}
-              type="button"
-              className={cn(
-                'flex items-center justify-between rounded border px-2 py-1.5 text-left text-xs',
-                idx === activeIndex
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border hover:bg-muted',
-              )}
-              onClick={() => setActiveIndex(idx)}
-            >
-              <div className="flex flex-col">
-                <span className="font-mono">{node?.name ?? ''}</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {node?.nodeType}
-                </span>
+        <div className="flex items-center justify-between gap-2 px-1 pb-1">
+          <Label
+            htmlFor="nodes-group-by-type"
+            className="cursor-pointer text-[11px] text-muted-foreground"
+          >
+            {t('Group by type')}
+          </Label>
+          <Switch
+            id="nodes-group-by-type"
+            checked={groupByType}
+            onCheckedChange={setGroupByType}
+            data-testid="nodes-group-by-type-toggle"
+          />
+        </div>
+        {groupedList.map((group) => (
+          <div
+            key={group.header || 'flat'}
+            className="flex flex-col gap-1"
+            data-testid={
+              group.header
+                ? `nodes-group-${group.header.split(' ')[0]}`
+                : 'nodes-flat'
+            }
+          >
+            {group.header && (
+              <div className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {group.header}
               </div>
-              <Trash2
-                className="size-3 text-muted-foreground hover:text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  remove(idx);
-                  if (activeIndex >= fields.length - 1) {
-                    setActiveIndex(Math.max(0, fields.length - 2));
-                  }
-                }}
-              />
-            </button>
-          );
-        })}
+            )}
+            {group.arrayIndices.map((idx) => {
+              const node = form.watch(`settings.nodes.${idx}`);
+              const nodeType = node?.nodeType as
+                | InteractiveFlowNodeType
+                | undefined;
+              const meta = nodeType ? NODE_TYPE_META[nodeType] : undefined;
+              const Icon = meta?.icon;
+              return (
+                <button
+                  key={fields[idx].id}
+                  type="button"
+                  className={cn(
+                    'flex items-center justify-between rounded border px-2 py-1.5 text-left text-xs transition-colors',
+                    idx === activeIndex
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:bg-muted',
+                    meta?.borderClass,
+                  )}
+                  onClick={() => setActiveIndex(idx)}
+                  data-testid={`node-card-${idx}`}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    {Icon && (
+                      <Icon
+                        className={cn('size-3.5 shrink-0', meta?.iconClass)}
+                      />
+                    )}
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate font-mono">
+                        {node?.name ?? ''}
+                      </span>
+                      {!groupByType && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {node?.nodeType}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <Trash2
+                    className="size-3 shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      remove(idx);
+                      if (activeIndex >= fields.length - 1) {
+                        setActiveIndex(Math.max(0, fields.length - 2));
+                      }
+                    }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        ))}
         <Button
           type="button"
           variant="outline"
