@@ -35,6 +35,9 @@ export * from './lib/management/analytics'
 export * from './lib/management/ai-providers'
 export * from './lib/management/template'
 
+// copilot
+export * from './lib/copilot/copilot-event'
+
 // automation
 export * from './lib/automation/flows/actions/action'
 export * from './lib/automation/flows/actions/interactive-flow-action'
