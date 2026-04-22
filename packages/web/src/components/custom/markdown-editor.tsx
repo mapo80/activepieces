@@ -1,19 +1,8 @@
-import { markdown } from '@codemirror/lang-markdown';
-import { githubDark, githubLight } from '@uiw/codemirror-theme-github';
-import CodeMirror, { EditorState, EditorView } from '@uiw/react-codemirror';
+import MDEditor from '@uiw/react-md-editor';
 import React from 'react';
 
 import { useTheme } from '@/components/providers/theme-provider';
 import { cn } from '@/lib/utils';
-
-const baseTheme = EditorView.baseTheme({
-  '&.cm-editor.cm-focused': {
-    outline: 'none',
-  },
-  '&.cm-editor': {
-    fontSize: '13px',
-  },
-});
 
 type Props = {
   value: string;
@@ -33,40 +22,29 @@ export const MarkdownEditor: React.FC<Props> = ({
   minHeight = '360px',
 }) => {
   const { theme } = useTheme();
-  const editorTheme = theme === 'dark' ? githubDark : githubLight;
-  const extensions = [
-    baseTheme,
-    EditorState.readOnly.of(readonly),
-    EditorView.editable.of(!readonly),
-    EditorView.lineWrapping,
-    markdown(),
-  ];
+  const colorMode = theme === 'dark' ? 'dark' : 'light';
+
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-md border border-border bg-background',
+        'overflow-hidden rounded-md border border-border',
         className,
       )}
+      data-color-mode={colorMode}
+      data-testid="markdown-editor"
     >
-      <CodeMirror
+      <MDEditor
         value={value}
-        onChange={onChange}
-        extensions={extensions}
-        theme={editorTheme}
+        onChange={(next) => onChange(next ?? '')}
+        preview={readonly ? 'preview' : 'live'}
+        visibleDragbar={false}
         height="100%"
-        minHeight={minHeight}
-        basicSetup={{
-          lineNumbers: false,
-          foldGutter: false,
-          highlightActiveLine: false,
-          highlightActiveLineGutter: false,
-          highlightSelectionMatches: false,
-          bracketMatching: false,
-          indentOnInput: false,
-          autocompletion: false,
-          searchKeymap: false,
+        minHeight={parseInt(minHeight, 10) || 360}
+        textareaProps={{
+          placeholder,
+          readOnly: readonly,
+          spellCheck: false,
         }}
-        placeholder={placeholder}
       />
     </div>
   );
