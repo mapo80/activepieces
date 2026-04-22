@@ -32,6 +32,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
+import { CopilotToggleButton } from '@/features/flow-copilot/index.lazy';
 import { flowHooks } from '@/features/flows';
 import { foldersHooks } from '@/features/folders';
 import { getProjectName, projectCollectionUtils } from '@/features/projects';
@@ -176,6 +177,7 @@ export const BuilderHeader = () => {
 
   const rightContent = (
     <div className="flex items-center justify-center gap-4">
+      <CopilotToggleButton />
       {showSupport && (
         <Button
           variant="ghost"

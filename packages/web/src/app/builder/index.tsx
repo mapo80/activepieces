@@ -12,6 +12,10 @@ import { DataSelector } from '@/app/builder/data-selector';
 import { CanvasControls } from '@/app/builder/flow-canvas/canvas-controls';
 import { StepSettingsProvider } from '@/app/builder/step-settings/step-settings-context';
 import { RightSideBarType } from '@/app/builder/types';
+import {
+  CopilotPanelLazyMount,
+  useCopilotStore,
+} from '@/features/flow-copilot/index.lazy';
 import { ChatDrawer } from '@/app/routes/chat/chat-drawer';
 import { ShowPoweredBy } from '@/components/custom/show-powered-by';
 import {
@@ -83,6 +87,19 @@ const BuilderPage = () => {
 
   const [hasCanvasBeenInitialised, setHasCanvasBeenInitialised] =
     useState(false);
+
+  const copilotOpen = useCopilotStore((s) => s.isOpen);
+  const copilotToggle = useCopilotStore((s) => s.toggle);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        copilotToggle();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [copilotToggle]);
 
   return (
     <div className="flex h-full w-full flex-col relative max-h-[100vh]">
@@ -166,6 +183,20 @@ const BuilderPage = () => {
             {rightSidebar === RightSideBarType.VERSIONS && <FlowVersionsList />}
           </div>
         </ResizablePanel>
+        {copilotOpen && (
+          <>
+            <ResizableHandle withHandle />
+            <ResizablePanel
+              id="copilot-panel"
+              defaultSize="25%"
+              minSize="320px"
+              maxSize="40%"
+              className="min-w-0 bg-background z-30"
+            >
+              <CopilotPanelLazyMount />
+            </ResizablePanel>
+          </>
+        )}
       </ResizablePanelGroup>
 
       <ChatDrawer />
