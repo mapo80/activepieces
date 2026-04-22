@@ -139,7 +139,10 @@ const StepSettingsContainer = () => {
       pieceName: modifiedStep.settings.pieceName,
       triggerName: modifiedStep.settings.triggerName ?? '',
     });
-  const showGenerateSampleData = !readonly && !isManualTrigger;
+  const showGenerateSampleData =
+    !readonly &&
+    !isManualTrigger &&
+    modifiedStep.type !== FlowActionType.INTERACTIVE_FLOW;
   const showStepInputOutFromRun = !isNil(run) && !isManualTrigger;
 
   const [isEditingStepOrBranchName, setIsEditingStepOrBranchName] =
