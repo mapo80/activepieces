@@ -30,7 +30,7 @@ import { workerSocket } from '../worker-socket'
 import { BaseExecutor } from './base-executor'
 import { EngineConstants } from './context/engine-constants'
 import { FlowExecutorContext } from './context/flow-execution-context'
-import { fieldExtractor } from './field-extractor'
+import { fieldExtractor, PolicyDecision } from './field-extractor'
 import { interactiveFlowEvents } from './interactive-flow-events'
 import { questionGenerator } from './question-generator'
 import { DEFAULT_HISTORY_MAX_TURNS, HistoryEntry, sessionStore } from './session-store'
@@ -378,11 +378,12 @@ function findReadyBranchNodes({ nodes, state, executedNodeIds, skippedNodeIds }:
     )
 }
 
-function reValidateEnumFields({ flowState, fields }: {
+function reValidateEnumFields({ flowState, fields, alreadyEmitted }: {
     flowState: InteractiveFlowState
     fields: InteractiveFlowStateField[]
-}): boolean {
-    let anyCleared = false
+    alreadyEmitted: Set<string>
+}): { cleared: boolean, decisions: PolicyDecision[] } {
+    const decisions: PolicyDecision[] = []
     for (const field of fields) {
         if (!field.enumFrom || !field.enumValueField) continue
         const value = flowState[field.name]
@@ -396,16 +397,28 @@ function reValidateEnumFields({ flowState, fields }: {
                 : undefined,
         )
         if (!allowed.includes(value)) {
+            const capturedValue = value
             Reflect.deleteProperty(flowState, field.name)
-            anyCleared = true
+            if (field.extractable !== false) {
+                const key = `${field.name}|${String(capturedValue).slice(0, 60)}`
+                if (!alreadyEmitted.has(key)) {
+                    alreadyEmitted.add(key)
+                    decisions.push({
+                        field: field.name,
+                        action: 'reject',
+                        reason: `not-in-state-${field.enumFrom}`,
+                        value: capturedValue,
+                    })
+                }
+            }
             ifDebug('handle:revalidate:cleared', {
                 field: field.name,
                 catalog: field.enumFrom,
-                rejectedValue: String(value).slice(0, 40),
+                rejectedValue: String(capturedValue).slice(0, 40),
             })
         }
     }
-    return anyCleared
+    return { cleared: decisions.length > 0, decisions }
 }
 
 function findNextUserOrConfirmNode({ nodes, state, executedNodeIds, skippedNodeIds }: {
@@ -529,6 +542,11 @@ function buildRejectionHint({ policyDecisions, stateFields, locale }: {
         }
         else if (reason === 'explicit-user-reject' || reason.startsWith('field-not-admissible')) {
             continue
+        }
+        else if (reason.startsWith('not-in-state-')) {
+            line = it
+                ? `Il ${label}${raw} indicato non è tra le opzioni disponibili. Selezionane uno dall'elenco sottostante.`
+                : `The ${label}${raw} provided is not among the available options. Please pick one from the list below.`
         }
         else {
             line = it
@@ -918,6 +936,9 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
         let previousPendingInteraction: PendingInteraction | null = null
         let pendingOverwriteSignal: PendingInteraction | null = null
         let rejectionHint: string | null = null
+        let lastExtractionDecisions: PolicyDecision[] = []
+        const postValidationDecisions: PolicyDecision[] = []
+        const emittedRevalidationKeys = new Set<string>()
 
         let gateway: ResolveMcpGatewayResponse | null = null
         const ensureGateway = async (): Promise<ResolveMcpGatewayResponse> => {
@@ -1006,6 +1027,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     policyDecisions: extractResult.policyDecisions,
                     nodeId: pauseHint?.id ?? '__pending_overwrite__',
                 }) ?? null
+                lastExtractionDecisions = extractResult.policyDecisions
                 rejectionHint = buildRejectionHint({
                     policyDecisions: extractResult.policyDecisions,
                     stateFields: fields,
@@ -1107,6 +1129,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                         policyDecisions: extractResult.policyDecisions,
                         nodeId: pauseHint?.id ?? '__pending_overwrite__',
                     }) ?? null
+                    lastExtractionDecisions = extractResult.policyDecisions
                     rejectionHint = buildRejectionHint({
                         policyDecisions: extractResult.policyDecisions,
                         stateFields: fields,
@@ -1265,12 +1288,11 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
 
             const readyTools = findReadyToolNodes({ nodes, state: flowState, executedNodeIds, skippedNodeIds })
             for (const node of readyTools) {
-                // Re-validate enum-backed fields before each tool in case a
-                // previous tool in this iteration populated a catalog that
-                // invalidates a tentatively-accepted value (e.g. rapportoId
-                // accepted at extraction before load_accounts ran).
-                if (reValidateEnumFields({ flowState, fields })) changed = true
-                // If re-validation cleared any input this tool needs, skip it.
+                const r1 = reValidateEnumFields({ flowState, fields, alreadyEmitted: emittedRevalidationKeys })
+                if (r1.cleared) {
+                    changed = true
+                    postValidationDecisions.push(...r1.decisions)
+                }
                 if (!node.stateInputs.every(f => !isNil(flowState[f]))) continue
 
                 const policy = node.errorPolicy
@@ -1346,10 +1368,11 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 }
                 changed = true
             }
-            // Final re-validation after the tool loop: the last tool may
-            // have populated a catalog whose consistency no later per-tool
-            // call could have checked. Clean up before auto-select / pause.
-            if (reValidateEnumFields({ flowState, fields })) changed = true
+            const r2 = reValidateEnumFields({ flowState, fields, alreadyEmitted: emittedRevalidationKeys })
+            if (r2.cleared) {
+                changed = true
+                postValidationDecisions.push(...r2.decisions)
+            }
 
             for (const node of nodes) {
                 if (!isUserInputNode(node)) continue
@@ -1372,6 +1395,17 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
         }
 
         const locale = resolveLocale({ constants, settings })
+
+        const effectivePostValidation = postValidationDecisions.filter(d => isNil(flowState[d.field]))
+        const effectiveExtraction = lastExtractionDecisions.filter(d => d.action !== 'reject' || isNil(flowState[d.field]))
+        if (effectivePostValidation.length > 0 || effectiveExtraction.length !== lastExtractionDecisions.length) {
+            rejectionHint = buildRejectionHint({
+                policyDecisions: [...effectiveExtraction, ...effectivePostValidation],
+                stateFields: fields,
+                locale,
+            })
+        }
+
         const nextPauseNode = findNextUserOrConfirmNode({ nodes, state: flowState, executedNodeIds, skippedNodeIds })
 
         const hasUnresolvedToolOrBranch = nodes.some(n =>
