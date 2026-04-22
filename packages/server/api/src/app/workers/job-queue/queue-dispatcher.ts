@@ -16,7 +16,7 @@ function createQueueDispatcher(params: {
     const waiters: Waiter[] = []
     let loopRunning = false
 
-    async function poll(): Promise<ConsumeJobRequest | null> {
+    async function poll(isAlive?: () => boolean): Promise<ConsumeJobRequest | null> {
         return new Promise<ConsumeJobRequest | null>((resolve) => {
             const timer = setTimeout(() => {
                 const idx = waiters.findIndex(w => w.resolve === resolve)
@@ -26,7 +26,7 @@ function createQueueDispatcher(params: {
                 resolve(null)
             }, WAITER_TIMEOUT_MS)
 
-            waiters.push({ resolve, timer })
+            waiters.push({ resolve, timer, isAlive })
             startLoop()
         })
     }
@@ -37,8 +37,20 @@ function createQueueDispatcher(params: {
         void runLoop()
     }
 
+    function dropDeadWaiters(): void {
+        while (waiters.length > 0 && waiters[0].isAlive && !waiters[0].isAlive()) {
+            const dead = waiters.shift()!
+            clearTimeout(dead.timer)
+            dead.resolve(null)
+            log.warn({ queueName }, '[QueueDispatcher] dropped waiter from disconnected worker')
+        }
+    }
+
     async function runLoop(): Promise<void> {
         while (waiters.length > 0) {
+            dropDeadWaiters()
+            if (waiters.length === 0) break
+
             const { error, data: job } = await tryCatch(() => dequeue(worker, queueName, log))
 
             if (error) {
@@ -52,9 +64,10 @@ function createQueueDispatcher(params: {
                 continue
             }
 
+            dropDeadWaiters()
             const waiter = waiters.shift()
             if (isNil(waiter)) {
-                log.warn({ queueName, jobId: job.jobId }, '[QueueDispatcher] job dequeued but no waiter available, returning to queue')
+                log.warn({ queueName, jobId: job.jobId }, '[QueueDispatcher] job dequeued but no live waiter available, returning to queue')
                 const { error: orphanError } = await tryCatch(() => onOrphanedJob(job.jobId, job.token, job.queueName, log))
                 if (orphanError) {
                     log.error({ queueName, jobId: job.jobId, error: String(orphanError) }, '[QueueDispatcher] failed to return orphaned job to queue')
@@ -92,10 +105,11 @@ function sleep(ms: number): Promise<void> {
 type Waiter = {
     resolve: (value: ConsumeJobRequest | null) => void
     timer: ReturnType<typeof setTimeout>
+    isAlive?: () => boolean
 }
 
 export type QueueDispatcher = {
-    poll(): Promise<ConsumeJobRequest | null>
+    poll(isAlive?: () => boolean): Promise<ConsumeJobRequest | null>
     close(): void
     waiterCount(): number
 }

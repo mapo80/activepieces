@@ -189,10 +189,11 @@ export const jobBroker = (log: FastifyBaseLogger) => ({
         log.info('[jobBroker] Job broker initialized')
     },
 
-    async poll(queueName: string = QueueName.WORKER_JOBS): Promise<ConsumeJobRequest | null> {
+    async poll(params: { queueName?: string, isAlive?: () => boolean } = {}): Promise<ConsumeJobRequest | null> {
+        const queueName = params.queueName ?? QueueName.WORKER_JOBS
         const worker = await ensureBullMQWorker(queueName, log)
         const dispatcher = ensureDispatcher(queueName, worker, log)
-        return dispatcher.poll()
+        return dispatcher.poll(params.isAlive)
     },
 
     async completeJob(input: ConsumeJobResponse & { jobId: string, token: string, queueName: string }): Promise<void> {

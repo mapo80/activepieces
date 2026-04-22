@@ -11,6 +11,7 @@ import {
     WorkerToApiContract,
 } from '@activepieces/shared'
 import { FastifyBaseLogger } from 'fastify'
+import { Socket } from 'socket.io'
 import { websocketService } from '../../core/websockets.service'
 import { distributedStore } from '../../database/redis-connections'
 import { fileService } from '../../file/file.service'
@@ -33,13 +34,14 @@ const getPollQueueName = (workerGroupId?: string): string => {
     return workerGroupId ? getWorkerGroupQueueName(workerGroupId) : QueueName.WORKER_JOBS
 }
 
-export function createHandlers(log: FastifyBaseLogger, workerGroupId?: string): WorkerToApiContract {
+export function createHandlers(log: FastifyBaseLogger, workerGroupId?: string, socket?: Socket): WorkerToApiContract {
+    const isAlive = socket ? () => socket.connected : undefined
     return {
         async poll(input) {
             log.info({ workerId: input.workerId, workerGroupId }, '[workerRpc#poll] Poll request received')
             await machineService(log).onConnection(input, workerGroupId)
             const pollQueueName = getPollQueueName(workerGroupId)
-            const job = await jobBroker(log).poll(pollQueueName)
+            const job = await jobBroker(log).poll({ queueName: pollQueueName, isAlive })
             if (job) {
                 log.info({ workerId: input.workerId, jobId: job.jobId, jobType: job.jobData.jobType }, '[workerRpc#poll] Returning job to worker')
             }

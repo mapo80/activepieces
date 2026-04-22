@@ -15,7 +15,7 @@ export const workerMachineController: FastifyPluginAsyncZod = async (app) => {
             const workerGroupId = typeof rawWorkerGroupId === 'string' ? rawWorkerGroupId : undefined
             const response = await machineService(app.log).onConnection(request, workerGroupId)
             callback?.(response)
-            createRpcServer<WorkerToApiContract>(socket, createHandlers(app.log, workerGroupId))
+            createRpcServer<WorkerToApiContract>(socket, createHandlers(app.log, workerGroupId, socket))
         }
     })
 
