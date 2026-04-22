@@ -2,7 +2,7 @@ import {
   InteractiveFlowAction,
   InteractiveFlowNodeType,
 } from '@activepieces/shared';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Search, Trash2 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -185,12 +185,14 @@ export function NodesEditor({ readonly }: Props): React.ReactElement {
                         <Button
                           type="button"
                           variant="outline"
-                          size="sm"
+                          size="icon"
                           disabled={readonly || !mcpGatewayId}
                           onClick={() => setToolPickerOpen(true)}
+                          aria-label={t('Browse MCP tools')}
+                          title={t('Browse MCP tools')}
                           data-testid={`node-tool-browse-${activeIndex}`}
                         >
-                          {t('Browse…')}
+                          <Search className="size-4" />
                         </Button>
                       </div>
                     </label>
