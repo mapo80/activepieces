@@ -8,6 +8,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { authenticationSession } from '@/lib/authentication-session';
 
+import MessageLoading from '@/features/chat/chat-bubble/message-loading';
+
 import { copilotApi } from './copilot-api';
 import { useCopilotStore, CopilotMessage } from './copilot-store';
 import { SummaryCard } from './summary-card';
@@ -190,6 +192,7 @@ export function CopilotPanel({ flowId, setFlowVersion }: Props) {
               onResetToSnapshot={() => handleUndo('reset-to-snapshot')}
             />
           ))}
+          {isStreaming && <CopilotTypingIndicator />}
         </div>
       </ScrollArea>
       <div className="border-t p-2 space-y-2">
@@ -258,6 +261,18 @@ function MessageBubble(props: {
           onResetToSnapshot={props.onResetToSnapshot}
         />
       )}
+    </div>
+  );
+}
+
+function CopilotTypingIndicator() {
+  return (
+    <div
+      className="flex items-center gap-2 px-3 py-2 text-muted-foreground"
+      data-testid="copilot-typing-indicator"
+    >
+      <MessageLoading />
+      <span className="text-xs">Il copilot sta lavorando…</span>
     </div>
   );
 }
