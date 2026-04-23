@@ -1,6 +1,7 @@
 import {
     AIProviderName,
     assertNotNullOrUndefined,
+    computeFieldEligibility,
     EnginePrincipal,
     isNil,
 } from '@activepieces/shared'
@@ -222,16 +223,14 @@ function computeEligibleFields({ currentNode, identityFields, stateFields }: {
     identityFields: string[]
     stateFields: z.infer<typeof StateFieldRequestSchema>[]
 }): Set<string> {
-    const eligible = new Set<string>()
-    for (const out of currentNode.stateOutputs ?? []) eligible.add(out)
-    for (const id of identityFields) eligible.add(id)
-    for (const extra of currentNode.allowedExtraFields ?? []) eligible.add(extra)
-    for (const field of stateFields) {
-        if (field.parser === 'ndg' || field.parser === 'rapportoId' || field.parser === 'absolute-date' || field.parser === 'reason-code-cued') {
-            eligible.add(field.name)
-        }
-    }
-    return eligible
+    return computeFieldEligibility({
+        currentNode: {
+            stateOutputs: currentNode.stateOutputs,
+            allowedExtraFields: currentNode.allowedExtraFields,
+        },
+        identityFields,
+        stateFields,
+    })
 }
 
 function resolveReasonIfText({

@@ -41,6 +41,7 @@ export * from './lib/copilot/copilot-event'
 // automation
 export * from './lib/automation/flows/actions/action'
 export * from './lib/automation/flows/actions/interactive-flow-action'
+export * from './lib/automation/flows/actions/interactive-flow-eligibility'
 export * from './lib/automation/flows/actions/interactive-flow-style-templates'
 export * from './lib/automation/flows/operations'
 export * from './lib/automation/flows/operations/paste-operations'

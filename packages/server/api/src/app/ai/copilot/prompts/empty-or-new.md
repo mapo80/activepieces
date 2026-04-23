@@ -135,6 +135,25 @@ RIGHT: "render": {"component":"DatePickerCard","props":{}}
 
 Componenti render supportati: `DataTable`, `DatePickerCard`, `ConfirmCard`. Niente altri.
 
+## Schema critico — `parser` (usa SOLO quando il formato è deterministico)
+
+Il campo opzionale `parser` di uno state field attiva un pre-parser deterministico run-time (pre-LLM). Parser disponibili (elenco chiuso):
+
+- `ndg` — sequenza numerica 6-10 cifre
+- `rapportoId` — formato `XX-XXX-XXXXXXXX`
+- `absolute-date` — data ISO `YYYY-MM-DD`
+- `reason-code-cued` — codice 2 cifre preceduto da "motivazione"
+- `confirmation-keyword` — "sì/confermo/ok" in modalità conferma
+
+**NON impostare `parser` su field che raccolgono testo libero** (nome, cognome, ragione sociale, email, descrizione, note, indirizzo, ecc.). Un parser non esistente rende il field invisibile al pre-parser (non viene estratto deterministicamente) ma il field resta comunque eligible all'LLM extractor purché sia `extractable: true` con `extractionScope` non `'node-local'`.
+
+```
+WRONG: "parser": "ner-name"   ← non è un parser esistente
+WRONG: "parser": "name"       ← non è un parser esistente
+WRONG: "parser": "email"      ← non è un parser esistente
+RIGHT: (parser omesso)        ← il LLM extractor si occuperà di estrarlo
+```
+
 ## Schema critico — node.message
 
 Ogni nodo DEVE avere un `message` che può essere in due forme (lo schema Zod le accetta entrambe, qualsiasi altra forma viene rifiutata):
