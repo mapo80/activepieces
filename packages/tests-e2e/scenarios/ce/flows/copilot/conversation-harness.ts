@@ -104,7 +104,10 @@ async function publishFlowAsChat(params: {
     headers: { Authorization: `Bearer ${token}` },
     data: { type: 'LOCK_AND_PUBLISH', request: {} },
   });
-  expect(publishRes.status(), `LOCK_AND_PUBLISH failed`).toBe(200);
+  expect(
+    publishRes.status(),
+    `LOCK_AND_PUBLISH failed: ${await publishRes.text()}`,
+  ).toBe(200);
 }
 
 async function simulateConversation(params: {
