@@ -24,10 +24,10 @@ import { validateInteractiveFlow } from '../../flows/flow-version/interactive-fl
 const DEFAULT_MODEL = process.env.COPILOT_MODEL ?? 'claude-cli'
 const DEFAULT_PROVIDER: AIProviderName =
     (process.env.COPILOT_PROVIDER as AIProviderName | undefined) ?? AIProviderName.CUSTOM
-const TIMEOUT_MS = 60_000
+const TIMEOUT_MS = Number.parseInt(process.env.COPILOT_TIMEOUT_MS ?? '600000', 10)
 
 function computeMaxSteps(toolsCount: number): number {
-    return Math.max(20, toolsCount * 2)
+    return Math.max(60, toolsCount * 4)
 }
 
 function resolveTemperature(): number {

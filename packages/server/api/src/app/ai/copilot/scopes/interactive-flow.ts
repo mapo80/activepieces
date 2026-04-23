@@ -12,6 +12,7 @@ import { addNodeTool } from '../tools/interactive-flow/add-node'
 import { validatePatchTool } from '../tools/interactive-flow/validate-patch'
 import { finalizeTool } from '../tools/interactive-flow/finalize'
 import { buildListMcpToolsTool } from '../tools/interactive-flow/list-mcp-tools'
+import { scaffoldSettingsTool } from '../tools/interactive-flow/scaffold-settings'
 import { validateInteractiveFlow } from '../../../flows/flow-version/interactive-flow-validator'
 
 const SYSTEM_PROMPT = fs.readFileSync(
@@ -39,6 +40,7 @@ export function registerInteractiveFlowScope(log: FastifyBaseLogger): void {
         systemPrompt: SYSTEM_PROMPT,
         tools: {
             read_flow_settings: readFlowSettingsTool,
+            scaffold_interactive_flow_settings: scaffoldSettingsTool,
             add_state_field: addStateFieldTool,
             update_state_field: updateStateFieldTool,
             set_system_prompt: setSystemPromptTool,

@@ -14,6 +14,7 @@ import { finalizeTool } from '../tools/interactive-flow/finalize'
 import { buildListMcpToolsTool } from '../tools/interactive-flow/list-mcp-tools'
 import { buildCreateNewFlowTool } from '../tools/empty-or-new/create-new-flow'
 import { insertInteractiveFlowActionTool } from '../tools/empty-or-new/insert-interactive-flow-action'
+import { scaffoldSettingsTool } from '../tools/interactive-flow/scaffold-settings'
 import { validateInteractiveFlow } from '../../../flows/flow-version/interactive-flow-validator'
 
 const SYSTEM_PROMPT = fs.readFileSync(
@@ -39,6 +40,7 @@ export function registerEmptyOrNewScope(log: FastifyBaseLogger): void {
             read_flow_settings: readFlowSettingsTool,
             create_new_flow: buildCreateNewFlowTool(log),
             insert_interactive_flow_action: insertInteractiveFlowActionTool,
+            scaffold_interactive_flow_settings: scaffoldSettingsTool,
             list_mcp_tools: buildListMcpToolsTool(log),
             add_state_field: addStateFieldTool,
             update_state_field: updateStateFieldTool,
