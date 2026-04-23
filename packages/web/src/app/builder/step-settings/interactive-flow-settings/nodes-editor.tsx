@@ -349,8 +349,7 @@ export function NodesEditor({ readonly }: Props): React.ReactElement {
                   path={`settings.nodes.${activeIndex}.message`}
                   readonly={readonly}
                 />
-                {activeNode.nodeType ===
-                  InteractiveFlowNodeType.USER_INPUT && (
+                {activeNode.nodeType === InteractiveFlowNodeType.USER_INPUT && (
                   <FormField
                     control={form.control}
                     name={`settings.nodes.${activeIndex}.singleOptionStrategy`}

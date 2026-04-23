@@ -9,6 +9,7 @@ import { updateStateFieldTool } from '../tools/interactive-flow/update-state-fie
 import { setSystemPromptTool } from '../tools/interactive-flow/set-system-prompt'
 import { setMessageInputTool } from '../tools/interactive-flow/set-message-input'
 import { addNodeTool } from '../tools/interactive-flow/add-node'
+import { updateNodeTool } from '../tools/interactive-flow/update-node'
 import { validatePatchTool } from '../tools/interactive-flow/validate-patch'
 import { finalizeTool } from '../tools/interactive-flow/finalize'
 import { buildListMcpToolsTool } from '../tools/interactive-flow/list-mcp-tools'
@@ -46,6 +47,7 @@ export function registerInteractiveFlowScope(log: FastifyBaseLogger): void {
             set_system_prompt: setSystemPromptTool,
             set_message_input: setMessageInputTool,
             add_node: addNodeTool,
+            update_node: updateNodeTool,
             validate_patch: validatePatchTool,
             list_mcp_tools: buildListMcpToolsTool(log),
             finalize: finalizeTool,

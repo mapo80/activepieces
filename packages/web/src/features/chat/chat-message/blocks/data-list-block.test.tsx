@@ -65,9 +65,7 @@ describe('DataListBlock — single-confirm layout', () => {
     renderBlock(singleConfirmBlock, onPick);
     fireEvent.click(screen.getByTestId('single-confirm-no'));
     expect(onPick).not.toHaveBeenCalled();
-    expect(
-      screen.queryByTestId('single-confirm-yes'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('single-confirm-yes')).not.toBeInTheDocument();
     expect(screen.queryByTestId('single-confirm-no')).not.toBeInTheDocument();
   });
 

@@ -65,28 +65,29 @@ Nodes to call `add_node` for, in this exact order:
 4. `load_accounts` — TOOL, stateInputs:["ndg"], stateOutputs:["accounts"], tool:"banking-customers/load_accounts", toolParams:{"ndg":"{{ndg}}"}
 5. `pick_rapporto` — USER_INPUT, stateInputs:["accounts"], stateOutputs:["rapportoId"], render:{"component":"DataTable","props":{"sourceField":"accounts","columns":[{"key":"codiceRapportoNonNumerico","header":"Rapporto"},{"key":"descrizioneCategSottocateg","header":"Tipologia"}]}}, message:{"dynamic":true,"fallback":{"it":"Seleziona il rapporto"}}
 6. `load_reasons` — TOOL, stateInputs:[], stateOutputs:["closureReasons"], tool:"banking-customers/list_closure_reasons", toolParams:{}
-7. `collect_reason` — USER_INPUT, stateInputs:["closureReasons"], stateOutputs:["closureReasonCode","closureReasonText"], render:{"component":"DataTable","props":{"sourceField":"closureReasons","columns":[{"key":"code","header":"Codice"},{"key":"label","header":"Motivazione"}]}}, message:{"dynamic":true,"fallback":{"it":"Seleziona la motivazione"}}
-8. `collect_date` — USER_INPUT, stateInputs:[], stateOutputs:["closureDate"], render:{"component":"DatePickerCard"}, message:{"dynamic":true,"fallback":{"it":"Indica la data di efficacia"}}
+7. `collect_reason` — USER_INPUT, stateInputs:["closureReasons"], stateOutputs:["closureReasonCode"], render:{"component":"DataTable","props":{"sourceField":"closureReasons","columns":[{"key":"code","header":"Codice"},{"key":"label","header":"Motivazione"}]}}, message:{"dynamic":true,"fallback":{"it":"Seleziona la motivazione"}}
+8. `collect_date` — USER_INPUT, stateInputs:["closureReasons"], stateOutputs:["closureDate"], render:{"component":"DatePickerCard"}, message:{"dynamic":true,"fallback":{"it":"Indica la data di efficacia"}}
 9. `generate_pdf` — TOOL, stateInputs:["ndg","rapportoId","closureReasonCode","closureDate"], stateOutputs:["moduleBase64"], tool:"banking-customers/generate_pdf", toolParams:{"ndg":"{{ndg}}","rapportoId":"{{rapportoId}}","reasonCode":"{{closureReasonCode}}","date":"{{closureDate}}"}
-10. `confirm_closure` — CONFIRM, stateInputs:["moduleBase64"], stateOutputs:["confirmed"], render:{"component":"ConfirmCard","props":{"sourceField":"moduleBase64"}}, message:{"dynamic":true,"fallback":{"it":"Confermi l'invio?"}}
+10. `confirm_closure` — CONFIRM, stateInputs:["moduleBase64","profile"], stateOutputs:["confirmed"], render:{"component":"ConfirmCard","props":{"sourceField":"moduleBase64"}}, message:{"dynamic":true,"fallback":{"it":"Confermi l'invio?"}}
 11. `submit` — TOOL, stateInputs:["confirmed","ndg","rapportoId","closureReasonCode","closureDate"], stateOutputs:["caseId"], tool:"banking-customers/submit", toolParams:{"ndg":"{{ndg}}","rapportoId":"{{rapportoId}}","reasonCode":"{{closureReasonCode}}","date":"{{closureDate}}"}
 
 **Execution protocol when building the estinzione flow (FAST PATH — use this whenever possible):**
 
-1. Call `insert_interactive_flow_action({name:"interactive_flow", displayName:"Estinzione"})` FIRST.
-2. Call `scaffold_interactive_flow_settings` ONCE with the COMPLETE payload:
+1. Call `list_mcp_gateways()` FIRST — returns `[{id, name, url}, ...]`. Remember the first gateway's `id`: this is your `mcpGatewayId` for step 3. If the list is empty, emit a final_response explaining the flow cannot be built without a gateway.
+2. Call `insert_interactive_flow_action({name:"interactive_flow", displayName:"Estinzione"})`.
+3. Call `scaffold_interactive_flow_settings` ONCE with the COMPLETE payload **including the mcpGatewayId from step 1**:
    ```json
    {
      "systemPrompt": "Sei un assistente bancario esperto in estinzione rapporti. Non inventare dati: estrai solo campi presenti nel messaggio. customerName: nome/cognome del cliente. ndg: 6-10 cifre, deve appartenere al cliente. rapportoId: formato XX-XXX-XXXXXXXX, deve appartenere al cliente. closureReasonCode: codice a 2 cifre dal catalogo. closureDate: formato YYYY-MM-DD, da oggi in avanti, max 5 anni. confirmed: true solo alla conferma esplicita al nodo confirm_closure.",
      "messageInput": "{{trigger.message}}",
      "sessionIdInput": "{{trigger.sessionId}}",
      "locale": "it",
-     "mcpGatewayId": "<from list_mcp_tools gateway id>",
+     "mcpGatewayId": "<id returned by list_mcp_gateways step 1>",
      "stateFields": [ ... all 13 fields with patterns and labels as listed above ... ],
      "nodes": [ ... all 11 nodes with render/tool/toolParams as listed above ... ]
    }
    ```
-3. Call `validate_patch` and fix any error via `update_state_field` / `update_node`.
-4. Call `finalize({summary:"Ho creato il flow Estinzione Rapporto con 13 state fields e 11 nodi."})`.
+4. Call `validate_patch` and fix any error via `update_state_field` / `update_node`.
+5. Call `finalize({summary:"Ho creato il flow Estinzione Rapporto con 13 state fields e 11 nodi."})`.
 
 **ALWAYS prefer `scaffold_interactive_flow_settings` over multiple `add_state_field` + `add_node` calls** when you know the full flow structure upfront. It replaces 27 sequential calls with a single one, drastically reducing latency. Only fall back to the granular tools when you need to modify an existing flow incrementally.
