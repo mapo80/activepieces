@@ -69,6 +69,7 @@ export const CopilotEventSchema = z.discriminatedUnion('type', [
 
 export const CopilotSessionCreateRequestSchema = z.object({
     flowId: z.string(),
+    projectId: z.string(),
     selectedStepName: z.string().optional(),
 })
 

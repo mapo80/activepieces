@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
+import { authenticationSession } from '@/lib/authentication-session';
 
 import { copilotApi } from './copilot-api';
 import { useCopilotStore, CopilotMessage } from './copilot-store';
@@ -52,7 +53,9 @@ export function CopilotPanel({ flowId, setFlowVersion }: Props) {
     try {
       let effectiveSessionId = sessionId;
       if (!effectiveSessionId) {
-        const created = await copilotApi.createSession({ flowId });
+        const projectId = authenticationSession.getProjectId();
+        if (!projectId) throw new Error('missing projectId');
+        const created = await copilotApi.createSession({ flowId, projectId });
         startSession({
           sessionId: created.sessionId,
           scope: created.scope,
