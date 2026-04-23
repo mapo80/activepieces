@@ -21,7 +21,7 @@ export type CopilotMessage =
       toolCalls: ToolCallCard[];
       isStreaming: boolean;
       summary?: {
-        status: 'success' | 'partial' | 'error';
+        status: 'success' | 'partial' | 'error' | 'info';
         text: string;
         appliedCount: number;
         failedAttempts: number;
@@ -67,7 +67,7 @@ type CopilotActions = {
   }) => void;
   setSummary: (params: {
     assistantId: string;
-    status: 'success' | 'partial' | 'error';
+    status: 'success' | 'partial' | 'error' | 'info';
     text: string;
     appliedCount: number;
     failedAttempts: number;

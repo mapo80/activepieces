@@ -200,6 +200,7 @@ async function* runCopilotLoop(params: {
 
     let tokensUsed = 0
     let finalized = false
+    let textDeltaChars = 0
     const finalizeSummary = ''
     const finalizeQuestions: string[] = []
 
@@ -220,6 +221,7 @@ async function* runCopilotLoop(params: {
                 if (ev) yield ev
             }
             if (part.type === 'text-delta') {
+                textDeltaChars += part.text.length
                 yield { type: 'text-delta', delta: part.text }
             }
             else if (part.type === 'finish') {
@@ -240,18 +242,23 @@ async function* runCopilotLoop(params: {
         // partial = operations landed but the scope validator rejects the
         //           flow — the Copilot produced something half-baked and
         //           should be flagged to the user so they don't trust it.
-        // error   = no operations landed at all (LLM produced nothing usable).
+        // info    = no operations landed but the LLM produced a textual
+        //           reply (greeting, clarifying question, explanation).
+        //           This is not an error: the assistant is conversing.
+        // error   = no operations landed AND no text output (true failure,
+        //           e.g. model initialization refused or abort mid-reply).
         const finalValidation = contract.validator(currentFlowVersion)
-        const status: 'success' | 'partial' | 'error' =
-            appliedCount === 0 ? 'error' :
-                finalValidation.valid ? 'success' :
-                    'partial'
+        const status: 'success' | 'partial' | 'error' | 'info' =
+            appliedCount > 0
+                ? (finalValidation.valid ? 'success' : 'partial')
+                : (textDeltaChars > 0 ? 'info' : 'error')
         const validationErrorsLine = finalValidation.valid ? '' :
             ` Errori: ${(finalValidation.errors ?? []).slice(0, 3).map((e) => e.message).join('; ')}`
         const fallbackTextIt =
             status === 'success' ? `Flow pronto: ${appliedCount} ${appliedCount === 1 ? 'modifica applicata' : 'modifiche applicate'}${failedToolCalls > 0 ? ` (${failedToolCalls} ${failedToolCalls === 1 ? 'tentativo' : 'tentativi'} auto-corretti)` : ''}.` :
                 status === 'partial' ? `Flow creato ma la validazione segnala problemi.${validationErrorsLine}` :
-                    'Operazione non completata.'
+                    status === 'info' ? '' :
+                        'Operazione non completata.'
 
         yield {
             type: 'summary',

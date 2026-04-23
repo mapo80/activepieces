@@ -52,7 +52,7 @@ export const CopilotEventSchema = z.discriminatedUnion('type', [
     z.object({
         type: z.literal('summary'),
         scope: CopilotScopeSchema,
-        status: z.enum(['success', 'partial', 'error']),
+        status: z.enum(['success', 'partial', 'error', 'info']),
         text: z.string(),
         appliedCount: z.number(),
         failedAttempts: z.number(),
@@ -99,7 +99,7 @@ export type CopilotEvent =
     | { type: 'flow-updated', toolCallId: string, flowVersion: FlowVersion, inverse: AppliedInverse }
     | { type: 'flow-created', toolCallId: string, flowId: string, flowVersionId: string, inverse: AppliedInverse }
     | { type: 'tool-call-end', toolCallId: string, result?: unknown, error?: string }
-    | { type: 'summary', scope: CopilotScope, status: 'success' | 'partial' | 'error', text: string, appliedCount: number, failedAttempts: number, questions?: string[] }
+    | { type: 'summary', scope: CopilotScope, status: 'success' | 'partial' | 'error' | 'info', text: string, appliedCount: number, failedAttempts: number, questions?: string[] }
     | { type: 'error', message: string }
     | { type: 'done', tokensUsed: number, durationMs: number }
 export type CopilotSessionCreateRequest = z.infer<typeof CopilotSessionCreateRequestSchema>

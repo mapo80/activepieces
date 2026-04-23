@@ -4,7 +4,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-type Status = 'success' | 'partial' | 'error';
+type Status = 'success' | 'partial' | 'error' | 'info';
 
 export function SummaryCard(props: {
   status: Status;
@@ -16,6 +16,11 @@ export function SummaryCard(props: {
   onUndoCopilotOnly: () => void;
   onResetToSnapshot: () => void;
 }) {
+  // Conversational turn (greetings, clarifying questions): the assistant
+  // already rendered the reply in the normal message bubble. Suppress the
+  // summary card — there's nothing to summarize and a generic "success"
+  // frame would be misleading.
+  if (props.status === 'info') return null;
   const tone = STATUS_STYLES[props.status];
   const Icon = tone.icon;
   return (
@@ -78,7 +83,7 @@ export function SummaryCard(props: {
 }
 
 const STATUS_STYLES: Record<
-  Status,
+  Exclude<Status, 'info'>,
   {
     container: string;
     heading: string;
