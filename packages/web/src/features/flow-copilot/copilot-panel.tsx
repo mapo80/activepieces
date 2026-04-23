@@ -27,6 +27,7 @@ export function CopilotPanel({ flowId, setFlowVersion }: Props) {
     scope,
     isStreaming,
     hasManualEditSinceSession,
+    storeFlowId,
     close,
   } = useCopilotStore((s) => ({
     messages: s.messages,
@@ -34,8 +35,15 @@ export function CopilotPanel({ flowId, setFlowVersion }: Props) {
     scope: s.scope,
     isStreaming: s.isStreaming,
     hasManualEditSinceSession: s.hasManualEditSinceSession,
+    storeFlowId: s.flowId,
     close: s.close,
   }));
+  const resetSession = useCopilotStore((s) => s.resetSession);
+  React.useEffect(() => {
+    if (storeFlowId && storeFlowId !== flowId) {
+      resetSession();
+    }
+  }, [flowId, storeFlowId, resetSession]);
   const draftInput = useCopilotStore((s) => s.draftInput);
   const setDraftInput = useCopilotStore((s) => s.setDraftInput);
   const startSession = useCopilotStore((s) => s.startSession);

@@ -69,6 +69,7 @@ type CopilotActions = {
   markManualEdit: () => void;
   clearManualEdit: () => void;
   reset: () => void;
+  resetSession: () => void;
 };
 
 const initialState: CopilotState = {
@@ -196,6 +197,15 @@ export const useCopilotStore = create<CopilotState & CopilotActions>()(
       markManualEdit: () => set({ hasManualEditSinceSession: true }),
       clearManualEdit: () => set({ hasManualEditSinceSession: false }),
       reset: () => set(initialState),
+      resetSession: () =>
+        set({
+          sessionId: null,
+          scope: null,
+          flowId: null,
+          messages: [],
+          isStreaming: false,
+          hasManualEditSinceSession: false,
+        }),
     }),
     {
       name: 'copilot-store',
