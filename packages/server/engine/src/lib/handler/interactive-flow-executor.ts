@@ -117,6 +117,13 @@ function buildToolParams({ node, state }: {
     )
 }
 
+function canonicalEnumKey(value: unknown): string {
+    if (value === null || value === undefined) return ''
+    if (typeof value === 'string') return value
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+    return JSON.stringify(value)
+}
+
 function coerceStateValue({ value, field }: {
     value: unknown
     field: InteractiveFlowStateField
@@ -396,7 +403,8 @@ function reValidateEnumFields({ flowState, fields, alreadyEmitted }: {
                 ? (item as Record<string, unknown>)[valueKey]
                 : undefined,
         )
-        if (!allowed.includes(value)) {
+        const normalizedValue = canonicalEnumKey(value)
+        if (!allowed.some(v => canonicalEnumKey(v) === normalizedValue)) {
             const capturedValue = value
             Reflect.deleteProperty(flowState, field.name)
             if (field.extractable !== false) {

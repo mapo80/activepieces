@@ -189,7 +189,14 @@ export const useCopilotStore = create<CopilotState & CopilotActions>()(
               : m,
           ),
         })),
-      setSummary: ({ assistantId, status, text, appliedCount, failedAttempts, questions }) =>
+      setSummary: ({
+        assistantId,
+        status,
+        text,
+        appliedCount,
+        failedAttempts,
+        questions,
+      }) =>
         set((s) => ({
           messages: s.messages.map((m) =>
             m.kind === 'assistant' && m.id === assistantId

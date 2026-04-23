@@ -46,7 +46,7 @@ export type FieldEligibilityContext = {
     }
     readonly identityFields?: readonly string[]
     readonly stateFields: readonly Pick<
-        InteractiveFlowStateField,
-        'name' | 'extractable' | 'extractionScope'
+    InteractiveFlowStateField,
+    'name' | 'extractable' | 'extractionScope'
     >[]
 }

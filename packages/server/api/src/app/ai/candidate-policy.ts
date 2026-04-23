@@ -110,11 +110,19 @@ function verifyDomain({ field, value, state, fieldSpec }: {
         const allowed = list
             .map(item => (item && typeof item === 'object' ? (item as Record<string, unknown>)[valueField] : undefined))
             .filter(v => v !== undefined)
-        if (!allowed.some(v => v === value)) {
+        const normalizedValue = canonicalEnumKey(value)
+        if (!allowed.some(v => canonicalEnumKey(v) === normalizedValue)) {
             return { ok: false, reason: `not-in-state-${fieldSpec.enumFrom}` }
         }
     }
     return { ok: true }
+}
+
+function canonicalEnumKey(value: unknown): string {
+    if (value === null || value === undefined) return ''
+    if (typeof value === 'string') return value
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+    return JSON.stringify(value)
 }
 
 function verifyFieldAdmissibility({ field, currentNode, identityFields = [], fieldSpec }: {

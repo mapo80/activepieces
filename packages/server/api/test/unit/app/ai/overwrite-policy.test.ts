@@ -163,11 +163,14 @@ describe('overwritePolicy.valuesEqual', () => {
 })
 
 describe('overwritePolicy.shouldPromoteTurnAffirmed', () => {
-    it('promotes in CONFIRM node', () => {
-        expect(overwritePolicy.shouldPromoteTurnAffirmed({ currentNodeType: 'CONFIRM', pendingOverwriteActive: false })).toBe(true)
+    it('does NOT promote in CONFIRM node without pending interaction (safety)', () => {
+        expect(overwritePolicy.shouldPromoteTurnAffirmed({ currentNodeType: 'CONFIRM', pendingOverwriteActive: false })).toBe(false)
     })
-    it('promotes when pendingOverwrite active', () => {
+    it('promotes when pendingOverwrite active (confirm_binary or pending_overwrite)', () => {
         expect(overwritePolicy.shouldPromoteTurnAffirmed({ currentNodeType: 'USER_INPUT', pendingOverwriteActive: true })).toBe(true)
+    })
+    it('promotes in CONFIRM node only when a pending interaction is active', () => {
+        expect(overwritePolicy.shouldPromoteTurnAffirmed({ currentNodeType: 'CONFIRM', pendingOverwriteActive: true })).toBe(true)
     })
     it('does NOT promote in USER_INPUT without pending', () => {
         expect(overwritePolicy.shouldPromoteTurnAffirmed({ currentNodeType: 'USER_INPUT', pendingOverwriteActive: false })).toBe(false)

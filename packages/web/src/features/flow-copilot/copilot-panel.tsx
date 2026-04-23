@@ -6,9 +6,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
-import { authenticationSession } from '@/lib/authentication-session';
-
 import MessageLoading from '@/features/chat/chat-bubble/message-loading';
+import { authenticationSession } from '@/lib/authentication-session';
 
 import { copilotApi } from './copilot-api';
 import { CopilotMarkdown } from './copilot-markdown';

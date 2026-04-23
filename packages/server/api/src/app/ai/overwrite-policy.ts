@@ -57,13 +57,11 @@ function valuesEqual({ a, b }: { a: unknown, b: unknown }): boolean {
     }
 }
 
-function shouldPromoteTurnAffirmed({ currentNodeType, pendingOverwriteActive }: {
+function shouldPromoteTurnAffirmed({ pendingOverwriteActive }: {
     currentNodeType: 'CONFIRM' | 'USER_INPUT' | 'TOOL' | 'BRANCH' | undefined
     pendingOverwriteActive: boolean
 }): boolean {
-    if (currentNodeType === 'CONFIRM') return true
-    if (pendingOverwriteActive) return true
-    return false
+    return pendingOverwriteActive
 }
 
 export const overwritePolicy = {

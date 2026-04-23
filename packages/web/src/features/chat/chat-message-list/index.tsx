@@ -41,6 +41,7 @@ interface ChatMessageListProps extends React.HTMLAttributes<HTMLDivElement> {
   sendMessage?: (arg0: { isRetrying: boolean; message: ChatMessage }) => void;
   setSelectedImage?: (image: string | null) => void;
   onPick?: (payload: string) => void;
+  runtimeIndicator?: React.ReactNode;
 }
 
 const ChatMessageList = React.forwardRef<HTMLDivElement, ChatMessageListProps>(
@@ -57,6 +58,7 @@ const ChatMessageList = React.forwardRef<HTMLDivElement, ChatMessageListProps>(
       sendMessage,
       setSelectedImage,
       onPick,
+      runtimeIndicator,
       ...props
     },
     ref,
@@ -126,7 +128,13 @@ const ChatMessageList = React.forwardRef<HTMLDivElement, ChatMessageListProps>(
                   src={chatUI?.platformLogoUrl}
                   fallback={<BotIcon className="size-5" />}
                 />
-                <ChatBubbleMessage isLoading />
+                {runtimeIndicator ? (
+                  <ChatBubbleMessage className="flex flex-col gap-2 w-full">
+                    {runtimeIndicator}
+                  </ChatBubbleMessage>
+                ) : (
+                  <ChatBubbleMessage isLoading />
+                )}
               </ChatBubble>
             )}
           </div>

@@ -29,6 +29,7 @@ async function extractWithPolicy({ constants, config, message, stateFields, curr
             format: f.format,
             required: false,
             extractable: f.extractable,
+            extractionScope: f.extractionScope,
             minLength: f.minLength,
             maxLength: f.maxLength,
             pattern: f.pattern,

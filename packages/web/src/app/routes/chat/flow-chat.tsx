@@ -21,6 +21,7 @@ import {
   Messages,
 } from '@/features/chat';
 import { humanInputApi } from '@/features/forms';
+import { ChatRuntimeTimeline } from '@/features/interactive-flow/components/chat-runtime-timeline';
 import { cn } from '@/lib/utils';
 
 import NotFoundPage from '../404-page';
@@ -258,6 +259,7 @@ export function FlowChat({
             sendMessage={sendMessage}
             setSelectedImage={toggleImageDialog}
             onPick={handlePick}
+            runtimeIndicator={<ChatRuntimeTimeline active={isSending} />}
           />
           <div className="w-full px-4 max-w-3xl">
             <ChatInput

@@ -199,6 +199,27 @@ describe('candidatePolicy.verifyDomain — enumFrom', () => {
         const r = candidatePolicy.verifyDomain({ field: 'customerName', value: 'Bellafronte', state })
         expect(r.ok).toBe(true)
     })
+
+    it('accepts numeric catalog value against string candidate (JSON parser shrinks "11255521" into a number)', () => {
+        const numericCatalog = { customerMatches: [{ ndg: 11255521, label: 'Bellafronte' }] }
+        const ndgSpec = { enumFrom: 'customerMatches', enumValueField: 'ndg' }
+        const r = candidatePolicy.verifyDomain({ field: 'ndg', value: '11255521', state: numericCatalog, fieldSpec: ndgSpec })
+        expect(r.ok).toBe(true)
+    })
+
+    it('accepts string catalog value against numeric candidate (defensive: symmetric coercion)', () => {
+        const stringCatalog = { customerMatches: [{ ndg: '11255521' }] }
+        const ndgSpec = { enumFrom: 'customerMatches', enumValueField: 'ndg' }
+        const r = candidatePolicy.verifyDomain({ field: 'ndg', value: 11255521, state: stringCatalog, fieldSpec: ndgSpec })
+        expect(r.ok).toBe(true)
+    })
+
+    it('still rejects when the value is not in the catalog regardless of representation', () => {
+        const numericCatalog = { customerMatches: [{ ndg: 11255521 }] }
+        const ndgSpec = { enumFrom: 'customerMatches', enumValueField: 'ndg' }
+        const r = candidatePolicy.verifyDomain({ field: 'ndg', value: '99999999', state: numericCatalog, fieldSpec: ndgSpec })
+        expect(r.ok).toBe(false)
+    })
 })
 
 describe('candidatePolicy.verifyFieldAdmissibility', () => {

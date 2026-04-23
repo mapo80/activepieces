@@ -29,6 +29,7 @@ const StateFieldRequestSchema = z.object({
     required: z.boolean().optional(),
     sensitive: z.boolean().optional(),
     extractable: z.boolean().optional(),
+    extractionScope: z.enum(['global', 'node-local']).optional(),
     minLength: z.number().int().min(1).max(200).optional(),
     maxLength: z.number().int().min(1).max(1000).optional(),
     pattern: z.string().optional(),

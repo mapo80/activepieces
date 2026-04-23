@@ -169,7 +169,7 @@
                 "name": "load_reasons",
                 "displayName": "Carica motivazioni",
                 "nodeType": "TOOL",
-                "stateInputs": [],
+                "stateInputs": ["rapportoId"],
                 "stateOutputs": ["closureReasons"],
                 "tool": "banking-operations/list_closure_reasons",
                 "toolParams": {}
@@ -179,7 +179,7 @@
                 "name": "collect_reason",
                 "displayName": "Motivazione",
                 "nodeType": "USER_INPUT",
-                "stateInputs": ["closureReasons"],
+                "stateInputs": ["closureReasons", "rapportoId"],
                 "stateOutputs": ["closureReasonCode"],
                 "render": {
                   "component": "DataTable",
@@ -203,7 +203,7 @@
                 "name": "collect_date",
                 "displayName": "Data efficacia",
                 "nodeType": "USER_INPUT",
-                "stateInputs": ["closureReasons"],
+                "stateInputs": ["closureReasons", "rapportoId"],
                 "stateOutputs": ["closureDate"],
                 "render": {
                   "component": "DatePickerCard",
