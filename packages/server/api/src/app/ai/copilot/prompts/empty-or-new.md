@@ -72,12 +72,41 @@ Ogni `stateInput` di un nodo DEVE essere scritto prima, da uno di:
 
 Il validator rifiuta `ORPHAN_INPUT`. Se il validator rileva un orphan, correggi aggiungendo il nodo produttore o marcando il field `extractable: true`.
 
+## Qualità della `description` degli state field (impatta l'extractor runtime)
+
+Il runtime field-extractor è un LLM che legge il messaggio utente e, per ogni state field `extractable:true`, decide SE estrarre un valore e QUALE. Ha come unica guida la `description` del field + il `systemPrompt` globale.
+
+**Description minima non basta**. Ogni field estraibile deve avere una `description` in italiano che include:
+
+1. **Cosa rappresenta** (semantica business)
+2. **Almeno 2-3 esempi VALIDI** tra virgolette singole (es. "'Bellafronte', 'Mario Rossi', 'De Santis'")
+3. **Lista di termini INVALIDI** che NON vanno estratti, con esempi concreti dal dominio (verbi/imperativi come 'procedere', 'mostrare'; saluti; termini dominio come 'rapporto', 'motivazione', 'conto')
+4. **Regola di fallback esplicita**: "Se il messaggio non contiene X, OMETTI questo campo" — impedisce estrazioni spurie
+
+Esempio di description di qualità (dominio bancario):
+```
+"Cognome o nome+cognome di UN VERO CLIENTE esplicitamente menzionato. VALIDO: 'Bellafronte', 'Mario Rossi', 'De Santis'. INVALIDO (NON estrarre): verbi/imperativi (procedere, mostrare, dammi, ripeti), saluti (ciao, salve, grazie), termini dominio (rapporto, conto, motivazione, elenco). Se il messaggio non contiene un nome di persona, OMETTI questo campo."
+```
+
+Description scarna da **NON produrre** (l'extractor fa estrazioni errate):
+```
+"Cognome o nome completo del cliente"     ← troppo vago, niente esempi, niente blacklist
+```
+
+Applica il template (semantica + VALID + INVALID + fallback) a TUTTI i field `extractable:true`. Per field `extractable:false` (catalog/object output di tool) basta 1-2 frasi descrittive.
+
 ## System prompt (`set_system_prompt`)
 
-Un prompt italiano breve (~500-800 caratteri) che:
-1. Nomi del processo: "Sei un assistente esperto in <dominio>."
-2. Elenco dei field `extractable: true` con la regola di estrazione (es. "fiscalCode: 16 caratteri alfanumerici maiuscoli")
-3. Frase finale: "Non inventare dati: estrai solo valori presenti nel messaggio dell'operatore."
+Un prompt italiano strutturato (~500-900 caratteri) con queste sezioni:
+
+1. **Ruolo**: "Sei un assistente <dominio>. Estrai SOLO i campi realmente presenti nel messaggio dell'utente; non inventare mai dati."
+2. **Regole per-field**: per ogni field `extractable:true`, una riga con esempi concreti e casi edge. Esempio:
+   - `customerName`: un cognome o nome+cognome (es. 'Bellafronte', 'Mario Rossi').
+   - `ndg`: sequenza numerica 6-10 cifre (es. '11255521'). Se l'utente dice 'il primo' o 'seleziona il primo', NON inferire.
+   - `confirmed`: `true` solo se l'utente conferma esplicitamente ('sì, confermo', 'procedi', 'ok'); un generico "ok" isolato non basta.
+3. **Off-topic**: "Se l'utente scrive qualcosa non pertinente (saluti, off-topic, domande estranee), riporta cortesemente la conversazione al task in corso senza rispondere al contenuto off-topic."
+
+Il systemPrompt globale e le description dei field sono complementari: entrambi ricevono il messaggio utente e insieme decidono cosa estrarre.
 
 # SCHEMA CRITICO — toolParams e render.props
 

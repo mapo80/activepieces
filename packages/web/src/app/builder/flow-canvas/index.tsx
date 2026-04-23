@@ -268,6 +268,19 @@ const getChildrenKey = (step: Step) => {
           : 'null';
         return `${routerKey}-${childrenKey}`;
       }, '');
+    case FlowActionType.INTERACTIVE_FLOW: {
+      // The INTERACTIVE_FLOW container renders one child node per entry in
+      // settings.nodes. If this signature is not part of the graph key,
+      // XYFlow skips re-rendering when the Copilot adds/removes nodes
+      // (flowVersion.id is stable across applyOperation since TypeORM
+      // saves in place). We also include stateFields length so the
+      // layered layout reflows when fields change the node dependencies.
+      const nodeIds = (step.settings.nodes ?? [])
+        .map((n) => `${n.name}:${n.nodeType}`)
+        .join('|');
+      const stateFieldsCount = (step.settings.stateFields ?? []).length;
+      return `if:${nodeIds}:sf=${stateFieldsCount}`;
+    }
     case FlowActionType.CODE:
     case FlowActionType.PIECE:
       return '';

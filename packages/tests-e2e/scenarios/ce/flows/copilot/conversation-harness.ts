@@ -100,14 +100,40 @@ async function publishFlowAsChat(params: {
   });
   expect(importRes.status(), `IMPORT_FLOW failed: ${await importRes.text()}`).toBe(200);
 
+  // LOCK_AND_PUBLISH can take up to 5 minutes server-side (WATCHER_SAFETY_TIMEOUT_MS):
+  // the server enqueues a worker job to run the ON_ENABLE hook of the chat
+  // trigger piece. Playwright's default request timeout (30s) would cause a
+  // misleading failure; extend to 6 min so we see the real server response.
   const publishRes = await request.post(`${AP_API}/v1/flows/${flowId}`, {
     headers: { Authorization: `Bearer ${token}` },
     data: { type: 'LOCK_AND_PUBLISH', request: {} },
+    timeout: 6 * 60_000,
   });
   expect(
     publishRes.status(),
     `LOCK_AND_PUBLISH failed: ${await publishRes.text()}`,
   ).toBe(200);
+
+  // Poll the flow status to confirm it landed in ENABLED + published.
+  const deadline = Date.now() + 60_000;
+  let ready = false;
+  while (Date.now() < deadline) {
+    const res = await request.get(`${AP_API}/v1/flows/${flowId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status() === 200) {
+      const f = (await res.json()) as {
+        status?: string;
+        publishedVersionId?: string | null;
+      };
+      if (f.status === 'ENABLED' && f.publishedVersionId) {
+        ready = true;
+        break;
+      }
+    }
+    await new Promise((r) => setTimeout(r, 2_000));
+  }
+  expect(ready, 'flow never reached ENABLED state after publish').toBe(true);
 }
 
 async function simulateConversation(params: {

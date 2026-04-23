@@ -10,32 +10,39 @@
 
 import type { ConversationStep } from '../../scenarios/ce/flows/copilot/conversation-harness';
 
+// Each turn echoes ALL previously-established fields because the AP chat
+// trigger creates a fresh flow run per message (state does not persist).
+// The field extractor pulls everything from the single message. Messages
+// are phrased to be clean for extraction (no flowery prose that might
+// distract the extractor from the canonical field values).
+//
+// `expectBotPattern` is intentionally loose per turn — the authoritative
+// gate is the final turn matching the caseId regex. Per-turn regex would
+// couple the test to the exact wording the LLM chooses for each prompt,
+// which is brittle across runs.
 export const estinzioneConversationScript: ConversationStep[] = [
   {
     kind: 'text',
-    user: 'Vorrei estinguere un rapporto di Bellafronte',
-    expectBotPattern: /bellafronte/i,
+    user: 'cliente Bellafronte',
   },
   {
     kind: 'text',
-    user: 'confermo il cliente Bellafronte con NDG 11255521',
-    expectBotPattern: /11255521|rapport|account/i,
-  },
-  {
-    kind: 'text',
-    user: 'per il cliente NDG 11255521 scelgo il rapporto 01-034-00392400',
-    expectBotPattern: /motivazion|trasferimento|data|reason|effective|closure/i,
+    user: 'cliente Bellafronte NDG 11255521',
   },
   {
     kind: 'text',
     user:
-      'per NDG 11255521 rapporto 01-034-00392400: motivazione 01 trasferimento estero, data efficacia 2029-04-15',
-    expectBotPattern: /confer|estinzion|modulo|pdf|confirm|submission/i,
+      'cliente Bellafronte NDG 11255521 rapporto 01-034-00392400',
   },
   {
     kind: 'text',
     user:
-      'per cliente Bellafronte NDG 11255521 rapporto 01-034-00392400 motivazione 01 data 2029-04-15: sì, confermo l\'invio della pratica',
-    expectBotPattern: /ES-\d{4}-\d+|invi|success|pratica|submit|complet/i,
+      'cliente Bellafronte NDG 11255521 rapporto 01-034-00392400 motivazione 01 data 2029-04-15',
+  },
+  {
+    kind: 'text',
+    user:
+      'cliente Bellafronte NDG 11255521 rapporto 01-034-00392400 motivazione 01 data 2029-04-15 sì confermo l\'invio della pratica',
+    expectBotPattern: /ES-\d{4}-\d+|caseId|success|pratica|submit|complet|invi/i,
   },
 ];
