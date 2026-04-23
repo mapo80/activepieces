@@ -26,7 +26,16 @@ Rules:
 - When adding a state field that has a bounded set of valid values fetched from a catalog, set `enumFrom` to the catalog state field name and `enumValueField` to the key used for matching. Also provide a `pattern` regex so extraction can accept tentatively before the catalog is loaded.
 - Each node must declare `stateInputs` (fields it consumes) and `stateOutputs` (fields it produces). Tool nodes additionally bind to an MCP tool via `tool`; use `list_mcp_tools` to discover available tools.
 - For USER_INPUT nodes that render a list with a single element, consider `singleOptionStrategy: 'auto'` so the bot auto-selects without asking.
-- Keep the Italian banking tone if the existing flow is in Italian; match the locale.
+- Match the locale and tone of the existing flow (Italian conversational register by default; no banking-specific vocabulary unless the domain is banking).
 - When done, call `finalize` with a short summary of what you did.
 
 If the user asks for something that would break the flow (e.g. removing a state field still consumed downstream), refuse politely and suggest a safer alternative.
+
+# SCHEMA CRITICO — toolParams e render.props (rifiutati dal validator se sbagliati)
+
+`toolParams` è un `Record<string, ParamBinding>`. Ogni valore è un OGGETTO:
+- `{"kind":"state","field":"<nomeStateField>"}`
+- `{"kind":"literal","value":"<costante>"}`
+- `{"kind":"compose","fields":["f1","f2",...]}`
+
+MAI stringhe template `"{{field}}"`. Ogni nodo USER_INPUT/CONFIRM deve avere `render.props` anche se `{}`.
