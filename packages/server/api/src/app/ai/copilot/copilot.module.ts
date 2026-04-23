@@ -1,6 +1,6 @@
 import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
-import { copilotController } from './copilot-controller'
 import { copilotCleanupJob } from './cleanup-job'
+import { copilotController } from './copilot-controller'
 import { copilotDevToggleController } from './dev-toggle-controller'
 
 export const copilotModule: FastifyPluginAsyncZod = async (app) => {

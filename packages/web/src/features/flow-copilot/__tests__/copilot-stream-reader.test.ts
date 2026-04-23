@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { readNdjsonStream } from '../copilot-stream-reader';
 import type { CopilotEvent } from '@activepieces/shared';
+import { describe, expect, it } from 'vitest';
+
+import { readNdjsonStream } from '../copilot-stream-reader';
 
 function bodyFromChunks(chunks: string[]): Response {
   const encoder = new TextEncoder();

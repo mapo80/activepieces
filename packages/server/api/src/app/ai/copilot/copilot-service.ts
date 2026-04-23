@@ -1,25 +1,23 @@
-import { stepCountIs, streamText, tool, ToolSet } from 'ai'
-import { FastifyBaseLogger } from 'fastify'
-import { nanoid } from 'nanoid'
 import {
     AIProviderName,
     AppliedInverse,
     CopilotEvent,
     CopilotScope,
-    FlowOperationRequest,
-    FlowVersion,
-    flowStructureUtil,
     FlowActionType,
+    FlowOperationRequest,
+    flowStructureUtil,
+    FlowVersion,
     InteractiveFlowAction,
     isNil,
 } from '@activepieces/shared'
+import { stepCountIs, streamText, tool, ToolSet } from 'ai'
+import { FastifyBaseLogger } from 'fastify'
+import { flowVersionService } from '../../flows/flow-version/flow-version.service'
+import { validateInteractiveFlow } from '../../flows/flow-version/interactive-flow-validator'
+import { interactiveFlowModelFactory } from '../interactive-flow-model-factory'
+import { copilotInverseOp } from './inverse-op'
 import { CopilotContext, copilotScopeRegistry, CopilotTool } from './scope-registry'
 import { CopilotSession, copilotSessionStore } from './session-store'
-import { copilotInverseOp } from './inverse-op'
-import { interactiveFlowModelFactory } from '../interactive-flow-model-factory'
-import { flowVersionService } from '../../flows/flow-version/flow-version.service'
-import { flowService } from '../../flows/flow/flow.service'
-import { validateInteractiveFlow } from '../../flows/flow-version/interactive-flow-validator'
 
 const DEFAULT_MODEL = process.env.COPILOT_MODEL ?? 'claude-cli'
 const DEFAULT_PROVIDER: AIProviderName =
@@ -199,8 +197,8 @@ async function* runCopilotLoop(params: {
 
     let tokensUsed = 0
     let finalized = false
-    let finalizeSummary = ''
-    let finalizeQuestions: string[] = []
+    const finalizeSummary = ''
+    const finalizeQuestions: string[] = []
 
     try {
         const result = streamText({

@@ -1,15 +1,23 @@
-import React from 'react';
 import { Check, Loader2, X } from 'lucide-react';
+import React from 'react';
+
 import { cn } from '@/lib/utils';
+
 import type { ToolCallCard as ToolCallCardModel } from './copilot-store';
 
 export function ToolCallCard({ card }: { card: ToolCallCardModel }) {
   const [expanded, setExpanded] = React.useState(false);
   const icon =
     card.status === 'pending' ? (
-      <Loader2 className="size-4 animate-spin text-muted-foreground" data-testid="copilot-tool-pending" />
+      <Loader2
+        className="size-4 animate-spin text-muted-foreground"
+        data-testid="copilot-tool-pending"
+      />
     ) : card.status === 'success' ? (
-      <Check className="size-4 text-green-600" data-testid="copilot-tool-success" />
+      <Check
+        className="size-4 text-green-600"
+        data-testid="copilot-tool-success"
+      />
     ) : (
       <X className="size-4 text-destructive" data-testid="copilot-tool-error" />
     );
@@ -33,7 +41,9 @@ export function ToolCallCard({ card }: { card: ToolCallCardModel }) {
         {card.flowUpdatedPreview && (
           <span className="text-xxs text-green-600">• flow updated</span>
         )}
-        <span className="ml-auto text-muted-foreground">{expanded ? '−' : '+'}</span>
+        <span className="ml-auto text-muted-foreground">
+          {expanded ? '−' : '+'}
+        </span>
       </button>
       {expanded && (
         <div className="px-2 pb-2 text-muted-foreground space-y-1">
@@ -45,7 +55,9 @@ export function ToolCallCard({ card }: { card: ToolCallCardModel }) {
           </div>
           {card.error && (
             <div>
-              <div className="text-xxs uppercase tracking-wide text-destructive">error</div>
+              <div className="text-xxs uppercase tracking-wide text-destructive">
+                error
+              </div>
               <pre className="whitespace-pre-wrap break-all bg-background p-1 rounded text-xxs">
                 {card.error}
               </pre>

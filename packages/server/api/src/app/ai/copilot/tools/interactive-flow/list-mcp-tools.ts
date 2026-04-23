@@ -1,7 +1,7 @@
-import { z } from 'zod'
 import { FastifyBaseLogger } from 'fastify'
-import { CopilotContext, CopilotTool } from '../../scope-registry'
+import { z } from 'zod'
 import { mcpGatewayService } from '../../../../mcp-gateway/mcp-gateway.service'
+import { CopilotContext, CopilotTool } from '../../scope-registry'
 
 const Parameters = z.object({
     gatewayId: z.string().optional().describe('MCP gateway id. If omitted, uses the current flow context gateway.'),

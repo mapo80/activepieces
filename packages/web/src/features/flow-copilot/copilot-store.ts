@@ -1,6 +1,6 @@
+import type { CopilotScope } from '@activepieces/shared';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { CopilotScope, FlowVersion } from '@activepieces/shared';
 
 export type ToolCallCard = {
   toolCallId: string;
@@ -99,12 +99,16 @@ export const useCopilotStore = create<CopilotState & CopilotActions>()(
           hasManualEditSinceSession: false,
         }),
       appendUserMessage: (text) => {
-        const id = `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const id = `user-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}`;
         set((s) => ({ messages: [...s.messages, { kind: 'user', id, text }] }));
         return id;
       },
       startAssistantMessage: () => {
-        const id = `asst-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const id = `asst-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}`;
         set((s) => ({
           messages: [
             ...s.messages,

@@ -1,5 +1,5 @@
-import { nanoid } from 'nanoid'
 import { AppliedInverse, CopilotScope, FlowOperationRequest, FlowVersion } from '@activepieces/shared'
+import { nanoid } from 'nanoid'
 
 type SessionHistoryEntry = {
     role: 'user' | 'assistant'

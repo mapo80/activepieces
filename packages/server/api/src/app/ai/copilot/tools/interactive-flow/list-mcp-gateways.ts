@@ -1,7 +1,7 @@
-import { z } from 'zod'
 import { FastifyBaseLogger } from 'fastify'
-import { CopilotContext, CopilotTool } from '../../scope-registry'
+import { z } from 'zod'
 import { mcpGatewayService } from '../../../../mcp-gateway/mcp-gateway.service'
+import { CopilotContext, CopilotTool } from '../../scope-registry'
 
 const Parameters = z.object({})
 

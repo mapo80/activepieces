@@ -1,28 +1,37 @@
-import React from 'react';
+import { FlowVersion } from '@activepieces/shared';
 import { Bot, Send, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import React from 'react';
 import { toast } from 'sonner';
-import { useBuilderStateContext } from '@/app/builder/builder-hooks';
-import { useCopilotStore, CopilotMessage } from './copilot-store';
-import { copilotApi } from './copilot-api';
-import { ToolCallCard } from './tool-call-card';
-import { SummaryCard } from './summary-card';
 
-export function CopilotPanel() {
-  const { messages, sessionId, scope, isStreaming, hasManualEditSinceSession, close } =
-    useCopilotStore((s) => ({
-      messages: s.messages,
-      sessionId: s.sessionId,
-      scope: s.scope,
-      isStreaming: s.isStreaming,
-      hasManualEditSinceSession: s.hasManualEditSinceSession,
-      close: s.close,
-    }));
-  const { flowId, setFlowVersion } = useBuilderStateContext((s) => ({
-    flowId: s.flow.id,
-    setFlowVersion: s.setVersion,
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
+
+import { copilotApi } from './copilot-api';
+import { useCopilotStore, CopilotMessage } from './copilot-store';
+import { SummaryCard } from './summary-card';
+import { ToolCallCard } from './tool-call-card';
+
+type Props = {
+  flowId: string;
+  setFlowVersion: (v: FlowVersion) => void;
+};
+
+export function CopilotPanel({ flowId, setFlowVersion }: Props) {
+  const {
+    messages,
+    sessionId,
+    scope,
+    isStreaming,
+    hasManualEditSinceSession,
+    close,
+  } = useCopilotStore((s) => ({
+    messages: s.messages,
+    sessionId: s.sessionId,
+    scope: s.scope,
+    isStreaming: s.isStreaming,
+    hasManualEditSinceSession: s.hasManualEditSinceSession,
+    close: s.close,
   }));
   const draftInput = useCopilotStore((s) => s.draftInput);
   const setDraftInput = useCopilotStore((s) => s.setDraftInput);
@@ -152,7 +161,12 @@ export function CopilotPanel() {
             <span className="text-xs text-muted-foreground">/ {scope}</span>
           )}
         </div>
-        <Button variant="ghost" size="sm" onClick={close} data-testid="copilot-close">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={close}
+          data-testid="copilot-close"
+        >
           <X className="size-4" />
         </Button>
       </div>
@@ -160,7 +174,8 @@ export function CopilotPanel() {
         <div className="space-y-2">
           {messages.length === 0 && (
             <div className="text-xs text-muted-foreground p-2">
-              Descrivi cosa vuoi modificare nel flow. Il copilot applicherà le modifiche in tempo reale.
+              Descrivi cosa vuoi modificare nel flow. Il copilot applicherà le
+              modifiche in tempo reale.
             </div>
           )}
           {messages.map((m) => (

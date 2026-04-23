@@ -1,4 +1,3 @@
-import { FastifyBaseLogger } from 'fastify'
 import {
     AppliedInverse,
     FlowOperationRequest,
@@ -6,9 +5,10 @@ import {
     FlowVersion,
     isNil,
 } from '@activepieces/shared'
-import { CopilotSession, copilotSessionStore } from './session-store'
-import { flowVersionService } from '../../flows/flow-version/flow-version.service'
+import { FastifyBaseLogger } from 'fastify'
 import { flowService } from '../../flows/flow/flow.service'
+import { flowVersionService } from '../../flows/flow-version/flow-version.service'
+import { CopilotSession, copilotSessionStore } from './session-store'
 
 type UndoMode = 'copilot-only' | 'reset-to-snapshot'
 

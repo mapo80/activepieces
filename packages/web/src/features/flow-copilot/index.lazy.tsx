@@ -1,13 +1,28 @@
+import { FlowVersion } from '@activepieces/shared';
 import React from 'react';
 
 const CopilotPanelLazy = React.lazy(() =>
   import('./copilot-panel').then((m) => ({ default: m.CopilotPanel })),
 );
 
-export function CopilotPanelLazyMount() {
+type LazyMountProps = {
+  flowId: string;
+  setFlowVersion: (v: FlowVersion) => void;
+};
+
+export function CopilotPanelLazyMount({
+  flowId,
+  setFlowVersion,
+}: LazyMountProps) {
   return (
-    <React.Suspense fallback={<div className="p-3 text-xs text-muted-foreground">Loading copilot…</div>}>
-      <CopilotPanelLazy />
+    <React.Suspense
+      fallback={
+        <div className="p-3 text-xs text-muted-foreground">
+          Loading copilot…
+        </div>
+      }
+    >
+      <CopilotPanelLazy flowId={flowId} setFlowVersion={setFlowVersion} />
     </React.Suspense>
   );
 }

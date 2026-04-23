@@ -1,8 +1,10 @@
-import React from 'react';
 import { Bot } from 'lucide-react';
+import React from 'react';
+
 import { Button } from '@/components/ui/button';
-import { useCopilotStore } from './copilot-store';
 import { platformHooks } from '@/hooks/platform-hooks';
+
+import { useCopilotStore } from './copilot-store';
 
 export function CopilotToggleButton() {
   const { platform } = platformHooks.useCurrentPlatform();

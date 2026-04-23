@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
+
 import { useCopilotStore } from '../copilot-store';
 
 beforeEach(() => {
@@ -17,9 +18,11 @@ describe('useCopilotStore', () => {
   });
 
   it('startSession resets messages and sets scope + flow id', () => {
-    useCopilotStore
-      .getState()
-      .startSession({ sessionId: 's1', scope: 'INTERACTIVE_FLOW', flowId: 'f1' });
+    useCopilotStore.getState().startSession({
+      sessionId: 's1',
+      scope: 'INTERACTIVE_FLOW',
+      flowId: 'f1',
+    });
     const s = useCopilotStore.getState();
     expect(s.sessionId).toBe('s1');
     expect(s.scope).toBe('INTERACTIVE_FLOW');
@@ -70,7 +73,11 @@ describe('useCopilotStore', () => {
     const asst = useCopilotStore.getState().messages[0];
     if (asst.kind === 'assistant') {
       expect(asst.isStreaming).toBe(false);
-      expect(asst.summary).toEqual({ text: 'done', appliedCount: 2, questions: ['q1'] });
+      expect(asst.summary).toEqual({
+        text: 'done',
+        appliedCount: 2,
+        questions: ['q1'],
+      });
     }
   });
 

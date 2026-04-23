@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { FlowOperationRequest } from '../automation/flows/operations'
 import { FlowVersion } from '../automation/flows/flow-version'
+import { FlowOperationRequest } from '../automation/flows/operations'
 
 export const CopilotScopeSchema = z.enum([
     'INTERACTIVE_FLOW',

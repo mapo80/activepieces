@@ -1,11 +1,11 @@
-import { z } from 'zod'
 import {
+    FlowActionType,
     FlowOperationRequest,
     FlowOperationType,
-    FlowActionType,
     InteractiveFlowActionSettings,
     isNil,
 } from '@activepieces/shared'
+import { z } from 'zod'
 import { CopilotContext, CopilotTool } from '../../scope-registry'
 
 const Parameters = z.object({

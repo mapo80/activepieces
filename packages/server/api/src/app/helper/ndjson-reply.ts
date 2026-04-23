@@ -6,7 +6,7 @@ async function streamNdjson<T>(params: {
     onError?: (err: Error) => T | undefined
 }): Promise<void> {
     const { reply, events, onError } = params
-    reply.hijack()
+    void reply.hijack()
     reply.raw.writeHead(200, {
         'Content-Type': 'application/x-ndjson',
         'Transfer-Encoding': 'chunked',

@@ -1,7 +1,7 @@
-import { z } from 'zod'
 import { FastifyBaseLogger } from 'fastify'
-import { CopilotContext, CopilotTool } from '../../scope-registry'
+import { z } from 'zod'
 import { flowService } from '../../../../flows/flow/flow.service'
+import { CopilotContext, CopilotTool } from '../../scope-registry'
 
 const Parameters = z.object({
     displayName: z.string().min(1).describe('Human-friendly name of the new flow.'),

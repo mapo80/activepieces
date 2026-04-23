@@ -12,10 +12,6 @@ import { DataSelector } from '@/app/builder/data-selector';
 import { CanvasControls } from '@/app/builder/flow-canvas/canvas-controls';
 import { StepSettingsProvider } from '@/app/builder/step-settings/step-settings-context';
 import { RightSideBarType } from '@/app/builder/types';
-import {
-  CopilotPanelLazyMount,
-  useCopilotStore,
-} from '@/features/flow-copilot/index.lazy';
 import { ChatDrawer } from '@/app/routes/chat/chat-drawer';
 import { ShowPoweredBy } from '@/components/custom/show-powered-by';
 import {
@@ -23,6 +19,10 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable-panel';
+import {
+  CopilotPanelLazyMount,
+  useCopilotStore,
+} from '@/features/flow-copilot/index.lazy';
 import { piecesHooks } from '@/features/pieces';
 import { platformHooks } from '@/hooks/platform-hooks';
 import { useElementSize } from '@/hooks/use-element-size';
@@ -48,6 +48,8 @@ const BuilderPage = () => {
     selectedStepName,
     removeAllStepTestsListeners,
     selectedStep,
+    flowId,
+    setVersion,
   ] = useBuilderStateContext((state) => [
     state.flowVersion,
     state.rightSidebar,
@@ -57,6 +59,8 @@ const BuilderPage = () => {
       state.selectedStep ?? '',
       state.flowVersion.trigger,
     ),
+    state.flow.id,
+    state.setVersion,
   ]);
   useEffect(() => {
     return () => {
@@ -193,7 +197,10 @@ const BuilderPage = () => {
               maxSize="40%"
               className="min-w-0 bg-background z-30"
             >
-              <CopilotPanelLazyMount />
+              <CopilotPanelLazyMount
+                flowId={flowId}
+                setFlowVersion={setVersion}
+              />
             </ResizablePanel>
           </>
         )}

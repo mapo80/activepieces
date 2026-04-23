@@ -1,4 +1,4 @@
-import { CopilotScope, FlowActionType, FlowVersion, flowStructureUtil } from '@activepieces/shared'
+import { CopilotScope, FlowActionType, flowStructureUtil, FlowVersion } from '@activepieces/shared'
 
 function detectScope(params: {
     flowVersion: FlowVersion

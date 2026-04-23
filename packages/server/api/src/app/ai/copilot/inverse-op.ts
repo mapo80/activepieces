@@ -2,8 +2,8 @@ import {
     AppliedInverse,
     FlowOperationRequest,
     FlowOperationType,
-    FlowVersion,
     flowStructureUtil,
+    FlowVersion,
     isNil,
 } from '@activepieces/shared'
 

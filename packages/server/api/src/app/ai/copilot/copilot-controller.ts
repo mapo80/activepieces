@@ -1,22 +1,22 @@
-import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
-import { FastifyBaseLogger } from 'fastify'
-import { z } from 'zod'
 import {
     CopilotEvent,
     isNil,
     PrincipalType,
 } from '@activepieces/shared'
-import { copilotSessionStore } from './session-store'
-import { copilotScopeDetector } from './scope-detector'
-import { copilotService } from './copilot-service'
-import { copilotUndoHandler } from './undo-handler'
-import { registerInteractiveFlowScope } from './scopes/interactive-flow'
-import { registerEmptyOrNewScope } from './scopes/empty-or-new'
-import { flowVersionService } from '../../flows/flow-version/flow-version.service'
-import { flowService } from '../../flows/flow/flow.service'
-import { ndjsonReply } from '../../helper/ndjson-reply'
-import { platformMustHaveFeatureEnabled } from '../../ee/authentication/ee-authorization'
+import { FastifyBaseLogger } from 'fastify'
+import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
+import { z } from 'zod'
 import { securityAccess } from '../../core/security/authorization/fastify-security'
+import { platformMustHaveFeatureEnabled } from '../../ee/authentication/ee-authorization'
+import { flowService } from '../../flows/flow/flow.service'
+import { flowVersionService } from '../../flows/flow-version/flow-version.service'
+import { ndjsonReply } from '../../helper/ndjson-reply'
+import { copilotService } from './copilot-service'
+import { copilotScopeDetector } from './scope-detector'
+import { registerEmptyOrNewScope } from './scopes/empty-or-new'
+import { registerInteractiveFlowScope } from './scopes/interactive-flow'
+import { copilotSessionStore } from './session-store'
+import { copilotUndoHandler } from './undo-handler'
 
 const COPILOT_SECURITY = {
     security: securityAccess.publicPlatform([PrincipalType.USER]),
@@ -88,11 +88,11 @@ export const copilotController: FastifyPluginAsyncZod = async (app) => {
         const body = req.body as z.infer<typeof MessageBody>
         const session = copilotSessionStore.get(params.id)
         if (isNil(session)) {
-            reply.status(404).send({ error: 'session-not-found' })
+            void reply.status(404).send({ error: 'session-not-found' })
             return
         }
         if (req.principal.type !== PrincipalType.USER || req.principal.id !== session.userId) {
-            reply.status(403).send({ error: 'forbidden' })
+            void reply.status(403).send({ error: 'forbidden' })
             return
         }
         const abortController = new AbortController()
@@ -117,11 +117,11 @@ export const copilotController: FastifyPluginAsyncZod = async (app) => {
         const body = req.body as z.infer<typeof UndoBody>
         const session = copilotSessionStore.get(params.id)
         if (isNil(session)) {
-            reply.status(404).send({ error: 'session-not-found' })
+            void reply.status(404).send({ error: 'session-not-found' })
             return
         }
         if (req.principal.type !== PrincipalType.USER || req.principal.id !== session.userId) {
-            reply.status(403).send({ error: 'forbidden' })
+            void reply.status(403).send({ error: 'forbidden' })
             return
         }
         const newVersion = await copilotUndoHandler.undo({
@@ -136,11 +136,11 @@ export const copilotController: FastifyPluginAsyncZod = async (app) => {
         const params = req.params as { id: string }
         const session = copilotSessionStore.get(params.id)
         if (isNil(session)) {
-            reply.status(404).send({ error: 'session-not-found' })
+            void reply.status(404).send({ error: 'session-not-found' })
             return
         }
         if (req.principal.type !== PrincipalType.USER || req.principal.id !== session.userId) {
-            reply.status(403).send({ error: 'forbidden' })
+            void reply.status(403).send({ error: 'forbidden' })
             return
         }
         copilotSessionStore.delete(params.id)

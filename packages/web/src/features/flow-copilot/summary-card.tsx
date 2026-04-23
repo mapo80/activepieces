@@ -1,6 +1,7 @@
-import React from 'react';
-import { Button } from '@/components/ui/button';
 import { Undo2, History } from 'lucide-react';
+import React from 'react';
+
+import { Button } from '@/components/ui/button';
 
 export function SummaryCard(props: {
   text: string;
@@ -18,7 +19,9 @@ export function SummaryCard(props: {
       <div className="text-sm whitespace-pre-wrap">{props.text}</div>
       {props.appliedCount > 0 && (
         <div className="text-xs text-muted-foreground">
-          {props.appliedCount} {props.appliedCount === 1 ? 'modifica' : 'modifiche'} applicat{props.appliedCount === 1 ? 'a' : 'e'}.
+          {props.appliedCount}{' '}
+          {props.appliedCount === 1 ? 'modifica' : 'modifiche'} applicat
+          {props.appliedCount === 1 ? 'a' : 'e'}.
         </div>
       )}
       {props.questions.length > 0 && (

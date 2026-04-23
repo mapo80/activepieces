@@ -1,12 +1,12 @@
-import { z } from 'zod'
 import {
     FlowActionType,
     flowStructureUtil,
     InteractiveFlowAction,
     isNil,
 } from '@activepieces/shared'
-import { CopilotContext, CopilotTool } from '../../scope-registry'
+import { z } from 'zod'
 import { validateInteractiveFlow } from '../../../../flows/flow-version/interactive-flow-validator'
+import { CopilotContext, CopilotTool } from '../../scope-registry'
 
 const Parameters = z.object({})
 

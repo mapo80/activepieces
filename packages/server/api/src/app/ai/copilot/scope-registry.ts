@@ -1,6 +1,6 @@
-import { z } from 'zod'
 import { CopilotScope, FlowOperationRequest, FlowVersion } from '@activepieces/shared'
 import { Tool } from 'ai'
+import { z } from 'zod'
 
 export type ValidationResult = {
     valid: boolean

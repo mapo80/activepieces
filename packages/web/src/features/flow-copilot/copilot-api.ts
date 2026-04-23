@@ -1,11 +1,13 @@
-import { authenticationSession } from '@/lib/authentication-session';
-import { readNdjsonStream } from './copilot-stream-reader';
 import type {
   CopilotEvent,
   CopilotSessionCreateRequest,
   CopilotSessionCreateResponse,
   FlowVersion,
 } from '@activepieces/shared';
+
+import { authenticationSession } from '@/lib/authentication-session';
+
+import { readNdjsonStream } from './copilot-stream-reader';
 
 const API_BASE = '/api/v1/ai/copilot';
 
