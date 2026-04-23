@@ -113,6 +113,7 @@ async function* runCopilotLoop(params: {
     const toolEvents: CopilotEvent[] = []
     const pendingOpsByCallId: Map<string, FlowOperationRequest> = new Map()
     let currentFlowVersion = await reloadFlowVersion(session.flowVersionId)
+    let failedToolCalls = 0
 
     function buildAiToolset(): ToolSet {
         const set: ToolSet = {}
@@ -156,6 +157,7 @@ async function* runCopilotLoop(params: {
                             const validation = await dryRunValidate({ draft: dryRunVersion, scope: session.scope })
                             if (!validation.valid) {
                                 toolEvents.push({ type: 'tool-call-end', toolCallId: callId, error: `validation: ${JSON.stringify(validation.errors)}` })
+                                failedToolCalls++
                                 return { ok: false, validation }
                             }
                             const { newFlowVersion, inverse } = await applyOperationAndBuildInverse({ session, op: maybeOp, log })
@@ -180,6 +182,7 @@ async function* runCopilotLoop(params: {
                     }
                     catch (err) {
                         toolEvents.push({ type: 'tool-call-end', toolCallId: callId, error: (err as Error).message })
+                        failedToolCalls++
                         return { ok: false, error: (err as Error).message }
                     }
                 },
@@ -227,15 +230,36 @@ async function* runCopilotLoop(params: {
             const ev = toolEvents.shift()
             if (ev) yield ev
         }
-        const finalizeCall = session.appliedOps.length > 0 ? session.appliedOps.length : 0
+        const appliedCount = session.appliedOps.length
         const finalizeResult = pendingOpsByCallId
         if (finalizeResult) finalized = true
+
+        // Status semantics based on the FINAL flow state.
+        // success = operations landed AND the scope validator accepts the
+        //           resulting flow (it's actually usable by the operator).
+        // partial = operations landed but the scope validator rejects the
+        //           flow — the Copilot produced something half-baked and
+        //           should be flagged to the user so they don't trust it.
+        // error   = no operations landed at all (LLM produced nothing usable).
+        const finalValidation = contract.validator(currentFlowVersion)
+        const status: 'success' | 'partial' | 'error' =
+            appliedCount === 0 ? 'error' :
+                finalValidation.valid ? 'success' :
+                    'partial'
+        const validationErrorsLine = finalValidation.valid ? '' :
+            ` Errori: ${(finalValidation.errors ?? []).slice(0, 3).map((e) => e.message).join('; ')}`
+        const fallbackTextIt =
+            status === 'success' ? `Flow pronto: ${appliedCount} ${appliedCount === 1 ? 'modifica applicata' : 'modifiche applicate'}${failedToolCalls > 0 ? ` (${failedToolCalls} ${failedToolCalls === 1 ? 'tentativo' : 'tentativi'} auto-corretti)` : ''}.` :
+                status === 'partial' ? `Flow creato ma la validazione segnala problemi.${validationErrorsLine}` :
+                    'Operazione non completata.'
 
         yield {
             type: 'summary',
             scope: session.scope,
-            text: finalizeSummary || `Applied ${finalizeCall} operation(s).`,
-            appliedCount: finalizeCall,
+            status,
+            text: finalizeSummary || fallbackTextIt,
+            appliedCount,
+            failedAttempts: failedToolCalls,
             questions: finalizeQuestions,
         }
     }

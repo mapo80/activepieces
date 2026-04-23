@@ -161,6 +161,26 @@ const StepSettingsContainer = () => {
     form.trigger();
   }, [form]);
 
+  // When the selected step's settings change externally (e.g. the Flow Copilot
+  // applied an operation that mutated stateFields/nodes on the currently
+  // focused action), RHF does NOT re-initialize itself from the new
+  // defaultValues. Force a reset whenever the settings signature changes so
+  // the editor shows the fresh server state without requiring the user to
+  // close and reopen the panel.
+  const lastSettingsSignature = useRef<string>(
+    JSON.stringify(selectedStep.settings),
+  );
+  useEffect(() => {
+    const sig = JSON.stringify(selectedStep.settings);
+    if (sig !== lastSettingsSignature.current) {
+      lastSettingsSignature.current = sig;
+      form.reset(selectedStep, {
+        keepDefaultValues: false,
+        keepDirtyValues: true,
+      });
+    }
+  }, [selectedStep, form]);
+
   const { height, setHeight } = useResizableVerticalPanelsContext();
 
   return (

@@ -66,16 +66,20 @@ describe('useCopilotStore', () => {
     const aid = store.startAssistantMessage();
     store.setSummary({
       assistantId: aid,
+      status: 'success',
       text: 'done',
       appliedCount: 2,
+      failedAttempts: 0,
       questions: ['q1'],
     });
     const asst = useCopilotStore.getState().messages[0];
     if (asst.kind === 'assistant') {
       expect(asst.isStreaming).toBe(false);
       expect(asst.summary).toEqual({
+        status: 'success',
         text: 'done',
         appliedCount: 2,
+        failedAttempts: 0,
         questions: ['q1'],
       });
     }

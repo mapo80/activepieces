@@ -20,7 +20,13 @@ export type CopilotMessage =
       textParts: string[];
       toolCalls: ToolCallCard[];
       isStreaming: boolean;
-      summary?: { text: string; appliedCount: number; questions: string[] };
+      summary?: {
+        status: 'success' | 'partial' | 'error';
+        text: string;
+        appliedCount: number;
+        failedAttempts: number;
+        questions: string[];
+      };
     };
 
 type CopilotState = {
@@ -61,8 +67,10 @@ type CopilotActions = {
   }) => void;
   setSummary: (params: {
     assistantId: string;
+    status: 'success' | 'partial' | 'error';
     text: string;
     appliedCount: number;
+    failedAttempts: number;
     questions?: string[];
   }) => void;
   setStreaming: (v: boolean) => void;
@@ -181,14 +189,20 @@ export const useCopilotStore = create<CopilotState & CopilotActions>()(
               : m,
           ),
         })),
-      setSummary: ({ assistantId, text, appliedCount, questions }) =>
+      setSummary: ({ assistantId, status, text, appliedCount, failedAttempts, questions }) =>
         set((s) => ({
           messages: s.messages.map((m) =>
             m.kind === 'assistant' && m.id === assistantId
               ? {
                   ...m,
                   isStreaming: false,
-                  summary: { text, appliedCount, questions: questions ?? [] },
+                  summary: {
+                    status,
+                    text,
+                    appliedCount,
+                    failedAttempts,
+                    questions: questions ?? [],
+                  },
                 }
               : m,
           ),

@@ -111,8 +111,10 @@ export function CopilotPanel({ flowId, setFlowVersion }: Props) {
           case 'summary':
             setSummary({
               assistantId,
+              status: ev.status,
               text: ev.text,
               appliedCount: ev.appliedCount,
+              failedAttempts: ev.failedAttempts,
               questions: ev.questions,
             });
             break;
@@ -261,8 +263,10 @@ function MessageBubble(props: {
       ))}
       {props.message.summary && (
         <SummaryCard
+          status={props.message.summary.status}
           text={props.message.summary.text}
           appliedCount={props.message.summary.appliedCount}
+          failedAttempts={props.message.summary.failedAttempts}
           questions={props.message.summary.questions}
           showResetToSnapshot={props.showResetToSnapshot}
           onUndoCopilotOnly={props.onUndoCopilotOnly}

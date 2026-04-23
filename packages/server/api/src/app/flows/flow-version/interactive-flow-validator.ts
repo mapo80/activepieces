@@ -138,22 +138,31 @@ function checkDuplicateOutputs(nodes: readonly InteractiveFlowNode[]): Interacti
 }
 
 function checkUnreachableInputs(
-    stateFields: readonly { name: string }[],
+    stateFields: readonly { name: string, extractable?: boolean }[],
     nodes: readonly InteractiveFlowNode[],
 ): InteractiveFlowValidationError[] {
     const declared = new Set(stateFields.map(f => f.name))
-    const writtenByNode = new Set<string>()
+    // A field is "written" if either a node declares it as an output OR
+    // it is marked extractable:true (the runtime field-extractor writes it
+    // whenever the user's message contains a matching value). Without this
+    // branch the validator rejects legitimate flows where e.g. `customerName`
+    // is extractable and consumed by a tool node — the very first node in
+    // most conversational flows.
+    const writable = new Set<string>()
+    for (const field of stateFields) {
+        if (field.extractable === true) writable.add(field.name)
+    }
     for (const node of nodes) {
         if (node.nodeType === InteractiveFlowNodeType.BRANCH) continue
         for (const field of node.stateOutputs) {
-            writtenByNode.add(field)
+            writable.add(field)
         }
     }
     const errors: InteractiveFlowValidationError[] = []
     for (const node of nodes) {
         for (const field of node.stateInputs) {
             if (!declared.has(field)) continue
-            if (!writtenByNode.has(field)) {
+            if (!writable.has(field)) {
                 errors.push({
                     code: 'ORPHAN_INPUT',
                     path: `nodes.${node.id}.stateInputs`,

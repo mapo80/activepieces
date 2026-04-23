@@ -1,27 +1,47 @@
-import { Undo2, History } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, History, Undo2, XCircle } from 'lucide-react';
 import React from 'react';
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+type Status = 'success' | 'partial' | 'error';
 
 export function SummaryCard(props: {
+  status: Status;
   text: string;
   appliedCount: number;
+  failedAttempts: number;
   questions: string[];
   showResetToSnapshot: boolean;
   onUndoCopilotOnly: () => void;
   onResetToSnapshot: () => void;
 }) {
+  const tone = STATUS_STYLES[props.status];
+  const Icon = tone.icon;
   return (
     <div
-      className="border rounded-md p-3 bg-primary/5 my-2 space-y-2"
-      data-testid="copilot-summary-card"
+      className={cn('border rounded-md p-3 my-2 space-y-2', tone.container)}
+      data-testid={`copilot-summary-${props.status}`}
     >
+      <div className={cn('flex items-center gap-2 text-sm font-medium', tone.heading)}>
+        <Icon className="size-4" />
+        {tone.title}
+      </div>
       <div className="text-sm whitespace-pre-wrap">{props.text}</div>
       {props.appliedCount > 0 && (
         <div className="text-xs text-muted-foreground">
           {props.appliedCount}{' '}
           {props.appliedCount === 1 ? 'modifica' : 'modifiche'} applicat
-          {props.appliedCount === 1 ? 'a' : 'e'}.
+          {props.appliedCount === 1 ? 'a' : 'e'}
+          {props.failedAttempts > 0 && (
+            <>
+              {' '}
+              ({props.failedAttempts}{' '}
+              {props.failedAttempts === 1 ? 'tentativo' : 'tentativi'}{' '}
+              auto-corretti)
+            </>
+          )}
+          .
         </div>
       )}
       {props.questions.length > 0 && (
@@ -56,3 +76,35 @@ export function SummaryCard(props: {
     </div>
   );
 }
+
+const STATUS_STYLES: Record<
+  Status,
+  {
+    container: string;
+    heading: string;
+    icon: typeof CheckCircle2;
+    title: string;
+  }
+> = {
+  success: {
+    container:
+      'border-green-600/50 bg-green-50 dark:bg-green-950/20',
+    heading: 'text-green-700 dark:text-green-400',
+    icon: CheckCircle2,
+    title: 'Flow pronto',
+  },
+  partial: {
+    container:
+      'border-amber-500/50 bg-amber-50 dark:bg-amber-950/20',
+    heading: 'text-amber-700 dark:text-amber-400',
+    icon: AlertTriangle,
+    title: 'Flow creato con correzioni',
+  },
+  error: {
+    container:
+      'border-red-600/50 bg-red-50 dark:bg-red-950/20',
+    heading: 'text-red-700 dark:text-red-400',
+    icon: XCircle,
+    title: 'Operazione non completata',
+  },
+};
