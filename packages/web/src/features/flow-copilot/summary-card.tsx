@@ -4,6 +4,8 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+import { CopilotMarkdown } from './copilot-markdown';
+
 type Status = 'success' | 'partial' | 'error' | 'info';
 
 export function SummaryCard(props: {
@@ -32,7 +34,7 @@ export function SummaryCard(props: {
         <Icon className="size-4" />
         {tone.title}
       </div>
-      <div className="text-sm whitespace-pre-wrap">{props.text}</div>
+      <CopilotMarkdown content={props.text} />
       {props.appliedCount > 0 && (
         <div className="text-xs text-muted-foreground">
           {props.appliedCount}{' '}

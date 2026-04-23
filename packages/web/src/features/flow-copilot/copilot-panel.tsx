@@ -11,6 +11,7 @@ import { authenticationSession } from '@/lib/authentication-session';
 import MessageLoading from '@/features/chat/chat-bubble/message-loading';
 
 import { copilotApi } from './copilot-api';
+import { CopilotMarkdown } from './copilot-markdown';
 import { useCopilotStore, CopilotMessage } from './copilot-store';
 import { SummaryCard } from './summary-card';
 import { ToolCallCard } from './tool-call-card';
@@ -255,9 +256,7 @@ function MessageBubble(props: {
   const textContent = props.message.textParts.join('');
   return (
     <div className="space-y-1" data-testid="copilot-assistant-bubble">
-      {textContent && (
-        <div className="text-sm whitespace-pre-wrap">{textContent}</div>
-      )}
+      {textContent && <CopilotMarkdown content={textContent} />}
       {props.message.toolCalls.map((tc) => (
         <ToolCallCard key={tc.toolCallId} card={tc} />
       ))}
