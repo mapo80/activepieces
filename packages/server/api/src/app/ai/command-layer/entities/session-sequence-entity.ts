@@ -1,7 +1,7 @@
 import { EntitySchema } from 'typeorm'
 
-export const SpikeSessionSequenceEntity = new EntitySchema<SpikeSessionSequenceSchema>({
-    name: 'spike_session_sequence',
+export const InteractiveFlowSessionSequenceEntity = new EntitySchema<InteractiveFlowSessionSequenceSchema>({
+    name: 'interactive_flow_session_sequence',
     columns: {
         sessionId: {
             type: String,
@@ -19,7 +19,7 @@ export const SpikeSessionSequenceEntity = new EntitySchema<SpikeSessionSequenceS
     },
 })
 
-export type SpikeSessionSequenceSchema = {
+export type InteractiveFlowSessionSequenceSchema = {
     sessionId: string
     nextSequence: string
     updatedAt: Date

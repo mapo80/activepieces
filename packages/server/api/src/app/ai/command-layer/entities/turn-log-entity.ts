@@ -1,7 +1,7 @@
-import { EntitySchema, EntitySchemaColumnOptions } from 'typeorm'
+import { EntitySchema } from 'typeorm'
 
-export const SpikeTurnLogEntity = new EntitySchema<SpikeTurnLogSchema>({
-    name: 'spike_turn_log',
+export const InteractiveFlowTurnLogEntity = new EntitySchema<InteractiveFlowTurnLogSchema>({
+    name: 'interactive_flow_turn_log',
     columns: {
         turnId: {
             type: String,
@@ -51,26 +51,26 @@ export const SpikeTurnLogEntity = new EntitySchema<SpikeTurnLogSchema>({
         createdAt: {
             type: 'timestamp with time zone',
             nullable: false,
-        } as EntitySchemaColumnOptions,
+        },
         committedAt: {
             type: 'timestamp with time zone',
             nullable: true,
-        } as EntitySchemaColumnOptions,
+        },
         failedReason: {
             type: 'text',
             nullable: true,
-        } as EntitySchemaColumnOptions,
+        },
     },
     indices: [
-        { name: 'idx_spike_turn_log_session_id', columns: ['sessionId'] },
-        { name: 'idx_spike_turn_log_status', columns: ['status'] },
-        { name: 'idx_spike_turn_log_lease_expiry', columns: ['lockedUntil'] },
+        { name: 'idx_if_turn_log_session_id', columns: ['sessionId'] },
+        { name: 'idx_if_turn_log_status', columns: ['status'] },
+        { name: 'idx_if_turn_log_lease_expiry', columns: ['lockedUntil'] },
     ],
 })
 
 export type TurnLogStatus = 'in-progress' | 'prepared' | 'finalized' | 'compensated' | 'failed'
 
-export type SpikeTurnLogSchema = {
+export type InteractiveFlowTurnLogSchema = {
     turnId: string
     sessionId: string
     flowRunId: string

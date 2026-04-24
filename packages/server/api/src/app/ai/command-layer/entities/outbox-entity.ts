@@ -1,7 +1,7 @@
 import { EntitySchema } from 'typeorm'
 
-export const SpikeOutboxEntity = new EntitySchema<SpikeOutboxSchema>({
-    name: 'spike_outbox',
+export const InteractiveFlowOutboxEntity = new EntitySchema<InteractiveFlowOutboxSchema>({
+    name: 'interactive_flow_outbox',
     columns: {
         outboxEventId: {
             type: 'uuid',
@@ -72,18 +72,18 @@ export const SpikeOutboxEntity = new EntitySchema<SpikeOutboxSchema>({
         },
     },
     uniques: [
-        { name: 'uq_spike_outbox_session_sequence', columns: ['sessionId', 'sessionSequence'] },
+        { name: 'uq_if_outbox_session_sequence', columns: ['sessionId', 'sessionSequence'] },
     ],
     indices: [
-        { name: 'idx_spike_outbox_session_sequence', columns: ['sessionId', 'sessionSequence'] },
-        { name: 'idx_spike_outbox_turn_id', columns: ['turnId'] },
-        { name: 'idx_spike_outbox_claim', columns: ['claimedUntil'] },
+        { name: 'idx_if_outbox_session_sequence', columns: ['sessionId', 'sessionSequence'] },
+        { name: 'idx_if_outbox_turn_id', columns: ['turnId'] },
+        { name: 'idx_if_outbox_claim', columns: ['claimedUntil'] },
     ],
 })
 
 export type OutboxEventStatus = 'pending' | 'publishable' | 'void'
 
-export type SpikeOutboxSchema = {
+export type InteractiveFlowOutboxSchema = {
     outboxEventId: string
     turnId: string
     sessionId: string

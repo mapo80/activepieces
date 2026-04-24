@@ -4,6 +4,9 @@ import {
     EntitySchema,
 } from 'typeorm'
 import { AIProviderEntity } from '../ai/ai-provider-entity'
+import { InteractiveFlowOutboxEntity } from '../ai/command-layer/entities/outbox-entity'
+import { InteractiveFlowSessionSequenceEntity } from '../ai/command-layer/entities/session-sequence-entity'
+import { InteractiveFlowTurnLogEntity } from '../ai/command-layer/entities/turn-log-entity'
 import { PlatformAnalyticsReportEntity } from '../analytics/platform-analytics-report.entity'
 import { AppConnectionEntity } from '../app-connection/app-connection.entity'
 import { UserIdentityEntity } from '../authentication/user-identity/user-identity-entity'
@@ -47,9 +50,6 @@ import { PieceTagEntity } from '../pieces/tags/pieces/piece-tag.entity'
 import { TagEntity } from '../pieces/tags/tag-entity'
 import { PlatformEntity } from '../platform/platform.entity'
 import { ProjectEntity } from '../project/project-entity'
-import { SpikeOutboxEntity } from '../spike-command-layer/entities/spike-outbox-entity'
-import { SpikeSessionSequenceEntity } from '../spike-command-layer/entities/spike-session-sequence-entity'
-import { SpikeTurnLogEntity } from '../spike-command-layer/entities/spike-turn-log-entity'
 import { StoreEntryEntity } from '../store-entry/store-entry-entity'
 import { FieldEntity } from '../tables/field/field.entity'
 import { CellEntity } from '../tables/record/cell.entity'
@@ -108,10 +108,10 @@ function getEntities(): EntitySchema<unknown>[] {
         TriggerSourceEntity,
         UserBadgeEntity,
         WaitpointEntity,
-        // Spike: command-layer primitives (throwaway, phase 0A)
-        SpikeTurnLogEntity,
-        SpikeOutboxEntity,
-        SpikeSessionSequenceEntity,
+        // Interactive Flow command layer (phase 0B)
+        InteractiveFlowTurnLogEntity,
+        InteractiveFlowOutboxEntity,
+        InteractiveFlowSessionSequenceEntity,
         // Enterprise
         ConcurrencyPoolEntity,
         ProjectMemberEntity,

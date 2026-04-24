@@ -5,7 +5,9 @@ import {
     BaseColumnSchemaPart,
 } from '../database/database-common'
 
-type StoreEntrySchema = StoreEntry
+type StoreEntrySchema = StoreEntry & {
+    version: string
+}
 
 export const StoreEntryEntity = new EntitySchema<StoreEntrySchema>({
     name: 'store-entry',
@@ -20,7 +22,12 @@ export const StoreEntryEntity = new EntitySchema<StoreEntrySchema>({
             type: 'jsonb',
             nullable: true,
         },
-    },    
+        version: {
+            type: 'bigint',
+            nullable: false,
+            default: 0,
+        },
+    },
     uniques: [
         {
             columns: ['projectId', 'key'],
