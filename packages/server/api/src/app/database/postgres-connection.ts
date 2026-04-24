@@ -361,6 +361,7 @@ import { AddDefaultToAiProvidersEnabled1776000000000 } from './migration/postgre
 import { DropWaitpointTimeoutSeconds1776342514732 } from './migration/postgres/1776342514732-DropWaitpointTimeoutSeconds'
 import { AddMcpGateway1777000000000 } from './migration/postgres/1777000000000-AddMcpGateway'
 import { AddCopilotEnabledToPlatformPlan1777100000000 } from './migration/postgres/1777100000000-AddCopilotEnabledToPlatformPlan'
+import { AddSpikeCommandLayerPrimitives1777200000000 } from './migration/postgres/1777200000000-AddSpikeCommandLayerPrimitives'
 
 const getSslConfig = (): boolean | TlsOptions => {
     const useSsl = system.get(AppSystemProp.POSTGRES_USE_SSL)
@@ -737,6 +738,7 @@ export const getMigrations = (): (new () => Migration)[] => {
         DropWaitpointTimeoutSeconds1776342514732,
         AddMcpGateway1777000000000,
         AddCopilotEnabledToPlatformPlan1777100000000,
+        AddSpikeCommandLayerPrimitives1777200000000,
     ]
     return migrations
 }
