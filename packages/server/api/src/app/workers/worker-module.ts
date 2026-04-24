@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { aiProviderWorkerController } from '../ai/ai-provider-worker.controller'
+import { commandLayerController } from '../ai/command-layer/command-layer.controller'
 import { interactiveFlowAiController } from '../ai/interactive-flow-ai.controller'
 import { runsMetadataQueue } from '../flows/flow-run/flow-runs-queue'
 import { interactiveFlowEventsController } from '../flows/flow-run/interactive-flow-events-controller'
@@ -24,6 +25,9 @@ export const workerModule: FastifyPluginAsyncZod = async (app) => {
     })
     await app.register(interactiveFlowAiController, {
         prefix: '/v1/engine/interactive-flow-ai',
+    })
+    await app.register(commandLayerController, {
+        prefix: '/v1/engine/interactive-flow-ai/command-layer',
     })
     await app.register(interactiveFlowEventsController, {
         prefix: '/v1/engine/interactive-flow-events',
