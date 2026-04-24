@@ -56,3 +56,35 @@ Append-only log. Format: `## YYYY-MM-DD HH:MM UTC`.
 - Command layer funziona su PGLite (community edition) — il vincolo PostgreSQL-only di v3.3 potrebbe essere rilassato dopo ulteriori test. PGLite supporta FOR UPDATE SKIP LOCKED, ON CONFLICT RETURNING, bigint.
 - Replay semantics: turn-log con status='finalized' può ritornare cached result; status='prepared' con lease valido → lock conflict; status='compensated' → error al client.
 - Pre-resolvers riducono il load sul LLM: cancel keywords + pending resolve deterministic catturano ~10-15% dei turni senza LLM call.
+
+## 2026-04-25 00:45 UTC — Phase 2-ENGINE-01/02/03/04/05 VERIFIED
+
+**Completed**: 5 new task on feature/command-layer-p0b-infra
+- P2-ENGINE-01: turn-interpreter-client.ts (3 HTTP wrappers: interpret/finalize/rollback)
+- P2-ENGINE-02: turn-result.ts (unified TurnResult type for both paths)
+- P2-ENGINE-03: legacyFieldExtractorAdapter (wraps fieldExtractor legacy)
+- P2-ENGINE-04: commandLayerClientAdapter (calls command-layer API)
+- P2-ENGINE-05: selectAdapter dispatcher (by useCommandLayer flag)
+
+**Gate status**:
+- G-LINT: verde (0 errors)
+- G-ENGINE-UNIT: 357/357 passing (no regression)
+- G-LEGACY-INTEGRATION: pending (executor integration P2-ENGINE-07/08 TBD)
+
+**Commits accumulated on branch**:
+1. spike(command-layer) Phase 0A primitives 7/7 VERDE [spike branch]
+2. feat(command-layer) Phase 0A-INFRA storage infrastructure [70f4de4718]
+3. feat(shared) Phase 0B-CONTRACT DTOs + schema extensions [6b8e8d645c]
+4. feat(command-layer) Phase 1-CORE core modules + endpoints [7d52b32989]
+5. feat(engine) Phase 2-ENGINE-01 turn-interpreter-client [a4a2246823]
+6. feat(engine) Phase 2-ENGINE-02/03/04/05 TurnResult + adapters [this]
+
+**Completamento stimato**: ~15% del totale plan. Core abstractions complete.
+
+**Next milestone P2-ENGINE-07/08**: injection in interactive-flow-executor.ts requires careful refactor to preserve all side-effects from current fieldExtractor.extractWithPolicy call sites. This is the highest-risk single task of Phase 2 — deferred to dedicated session with full attention.
+
+**Key architectural validation**:
+- TurnInterpreterAdapter interface generalizes legacy vs command-layer flow.
+- Both adapters produce the same TurnResult shape, enabling single switch statement at call sites.
+- MockProviderAdapter enables deterministic tests without LLM.
+- Saga lifecycle works end-to-end on PGLite (verified 9/9 interpreter tests).
