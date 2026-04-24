@@ -87,6 +87,8 @@ export const InteractiveFlowNodeStateEvent = z.object({
     timestamp: z.string(),
 })
 
+export const INTERACTIVE_FLOW_TURN_EVENT_TOPIC = 'INTERACTIVE_FLOW_TURN_EVENT'
+
 export type BadgeAwarded = z.infer<typeof BadgeAwarded>
 export type LockResourceRequest = z.infer<typeof LockResourceRequest>
 export type LockResourceResponse = z.infer<typeof LockResourceResponse>

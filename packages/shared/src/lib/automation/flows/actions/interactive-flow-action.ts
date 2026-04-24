@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { STEP_NAME_REGEX } from '../../../core/common'
+import { InfoIntentSchema } from '../../interactive-flow/info-intent'
 import { SampleDataSetting } from '../sample-data'
 
 // NOTE: shape of `branches[].conditions` mirrors ROUTER's BranchCondition.
@@ -219,6 +220,11 @@ export const PendingInteractionSchema = z.discriminatedUnion('type', [
         field: z.string().min(1),
         nodeId: z.string().min(1),
     }),
+    z.object({
+        type: z.literal('pending_cancel'),
+        reason: z.string().optional(),
+        createdAt: z.string(),
+    }),
 ])
 export type PendingInteraction = z.infer<typeof PendingInteractionSchema>
 
@@ -240,5 +246,7 @@ export const InteractiveFlowActionSettings = z.object({
     sessionNamespace: z.string().optional(),
     cleanupOnSuccess: z.boolean().optional(),
     historyMaxTurns: z.number().int().min(1).max(100).optional(),
+    infoIntents: z.array(InfoIntentSchema).optional(),
+    useCommandLayer: z.boolean().optional(),
 })
 export type InteractiveFlowActionSettings = z.infer<typeof InteractiveFlowActionSettings>
