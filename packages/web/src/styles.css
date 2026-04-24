@@ -629,3 +629,81 @@
 .tiptap h6 {
   font-size: 1rem;
 }
+
+/* Chat bubble markdown: same size as "Data selezionata" (text-sm = 0.875rem)
+   + compact vertical spacing. Uses !important + div.prose-chat specificity
+   because Tailwind 4 preflight resets element margins at element-level
+   specificity. */
+div.prose-chat {
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
+}
+div.prose-chat > :first-child {
+  margin-top: 0 !important;
+}
+div.prose-chat > :last-child {
+  margin-bottom: 0 !important;
+}
+div.prose-chat p {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+}
+div.prose-chat ul,
+div.prose-chat ol {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+  padding-left: 1.25rem !important;
+}
+div.prose-chat ul {
+  list-style: disc !important;
+}
+div.prose-chat ol {
+  list-style: decimal !important;
+}
+div.prose-chat li {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+div.prose-chat li + li {
+  margin-top: 0.125rem !important;
+}
+div.prose-chat li > p {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+div.prose-chat h1,
+div.prose-chat h2,
+div.prose-chat h3,
+div.prose-chat h4 {
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.25rem !important;
+  font-weight: 600 !important;
+  line-height: 1.3 !important;
+}
+div.prose-chat h1 {
+  font-size: 1rem !important;
+}
+div.prose-chat h2,
+div.prose-chat h3,
+div.prose-chat h4 {
+  font-size: 0.95rem !important;
+}
+div.prose-chat blockquote {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+  border-left: 2px solid var(--border) !important;
+  padding-left: 0.75rem !important;
+  color: var(--muted-foreground) !important;
+}
+div.prose-chat hr {
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+  border-color: var(--border) !important;
+}
+div.prose-chat pre {
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+div.prose-chat strong {
+  font-weight: 600 !important;
+}

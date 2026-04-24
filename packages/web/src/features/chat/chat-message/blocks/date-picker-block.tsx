@@ -51,7 +51,7 @@ export const DatePickerBlock: React.FC<Props> = ({ block, onPick }) => {
   };
 
   return (
-    <div className="my-1 inline-block rounded-md border border-border bg-background p-2">
+    <div className="my-1 w-fit max-w-full self-start rounded-md border border-border bg-background p-2">
       {block.title && (
         <div className="px-2 pb-2 text-sm font-medium">{block.title}</div>
       )}

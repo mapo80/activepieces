@@ -32,9 +32,10 @@ export const QuickRepliesBlock: React.FC<Props> = ({ block, onPick }) => {
           disabled={clicked !== null && clicked !== reply.payload}
           onClick={() => handlePick(reply)}
           className={cn(
-            'rounded-full px-3 py-1 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-            STYLE_CLASSES[reply.style ?? 'default'],
-            clicked === reply.payload && 'ring-2 ring-ring',
+            'rounded-full px-3 py-1 text-sm transition disabled:opacity-40 disabled:cursor-not-allowed',
+            clicked === reply.payload
+              ? 'bg-primary-100 text-primary hover:bg-primary-100'
+              : STYLE_CLASSES[reply.style ?? 'default'],
           )}
         >
           {reply.label}

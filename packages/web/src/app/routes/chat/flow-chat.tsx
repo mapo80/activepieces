@@ -19,9 +19,12 @@ import {
   ImageDialog,
   ChatMessageList,
   Messages,
+  RuntimeSummaryStep,
 } from '@/features/chat';
 import { humanInputApi } from '@/features/forms';
 import { ChatRuntimeTimeline } from '@/features/interactive-flow/components/chat-runtime-timeline';
+import { humanizeNodeId } from '@/features/interactive-flow/components/runtime-step-icon';
+import { useInteractiveFlowCurrentTurn } from '@/features/interactive-flow/hooks/use-interactive-flow-current-turn';
 import { cn } from '@/lib/utils';
 
 import NotFoundPage from '../404-page';
@@ -38,6 +41,7 @@ interface FlowChatProps {
   chatSessionId?: string | null;
   onAddMessage?: (message: Messages[0]) => void;
   onSetSessionId?: (sessionId: string) => void;
+  nodeLabels?: Record<string, string>;
 }
 
 export function FlowChat({
@@ -52,6 +56,7 @@ export function FlowChat({
   chatSessionId,
   onAddMessage,
   onSetSessionId,
+  nodeLabels,
 }: FlowChatProps) {
   const messagesRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -161,6 +166,8 @@ export function FlowChat({
         setSendingError(null);
         onError?.(null);
 
+        const runtimeSummary = buildRuntimeSummaryFromSnapshot();
+
         switch (result.type) {
           case HumanInputFormResultTypes.FILE: {
             if ('url' in result.value) {
@@ -172,6 +179,7 @@ export function FlowChat({
                     mimeType: result.value.mimeType,
                   },
                 ],
+                runtimeSummary,
               });
             }
             break;
@@ -186,6 +194,7 @@ export function FlowChat({
               role: 'bot',
               textContent: result.value,
               files: validFiles.length > 0 ? validFiles : undefined,
+              runtimeSummary,
             });
             break;
           }
@@ -194,6 +203,7 @@ export function FlowChat({
             onAddMessage({
               role: 'bot',
               blocks: result.blocks,
+              runtimeSummary,
             });
             break;
           }
@@ -216,6 +226,20 @@ export function FlowChat({
       scrollToBottom();
     },
   });
+
+  const { entries: runtimeEntries, getLatest: getRuntimeSnapshot } =
+    useInteractiveFlowCurrentTurn(isSending);
+
+  function buildRuntimeSummaryFromSnapshot(): RuntimeSummaryStep[] | undefined {
+    const snap = getRuntimeSnapshot();
+    const entriesNow = Object.entries(snap.nodeStatuses);
+    if (entriesNow.length === 0) return undefined;
+    return entriesNow.map(([nodeId, status]) => ({
+      nodeId,
+      label: nodeLabels?.[nodeId] ?? humanizeNodeId(nodeId),
+      status,
+    }));
+  }
 
   useEffect(scrollToBottom, [messages, isSending]);
 
@@ -259,7 +283,13 @@ export function FlowChat({
             sendMessage={sendMessage}
             setSelectedImage={toggleImageDialog}
             onPick={handlePick}
-            runtimeIndicator={<ChatRuntimeTimeline active={isSending} />}
+            runtimeIndicator={
+              <ChatRuntimeTimeline
+                active={isSending}
+                entries={runtimeEntries}
+                nodeLabels={nodeLabels}
+              />
+            }
           />
           <div className="w-full px-4 max-w-3xl">
             <ChatInput

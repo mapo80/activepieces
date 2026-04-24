@@ -1,10 +1,13 @@
 import {
+  FlowAction,
+  FlowActionType,
   FlowRun,
+  FlowTrigger,
   RunEnvironment,
   WebsocketClientEvent,
 } from '@activepieces/shared';
 import { ArrowRight } from 'lucide-react';
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 
 import { useBuilderStateContext } from '@/app/builder/builder-hooks';
 import { ChatDrawerSource } from '@/app/builder/types';
@@ -18,6 +21,20 @@ import {
 } from '@/components/ui/drawer';
 
 import { FlowChat } from './flow-chat';
+
+function findInteractiveFlowAction(
+  node: FlowTrigger | FlowAction | undefined,
+): FlowAction | undefined {
+  if (!node) return undefined;
+  if ('type' in node && node.type === FlowActionType.INTERACTIVE_FLOW) {
+    return node as FlowAction;
+  }
+  const withNext = node as { nextAction?: FlowAction };
+  if (withNext.nextAction) {
+    return findInteractiveFlowAction(withNext.nextAction);
+  }
+  return undefined;
+}
 
 export const ChatDrawer = () => {
   const [
@@ -41,6 +58,18 @@ export const ChatDrawer = () => {
   ]);
   const socket = useSocket();
   const isListening = useRef(false);
+
+  const nodeLabels = useMemo(() => {
+    const ifAction = findInteractiveFlowAction(flowVersion.trigger);
+    const settings = ifAction?.settings as
+      | { nodes?: Array<{ id?: string; displayName?: string }> }
+      | undefined;
+    const map: Record<string, string> = {};
+    for (const n of settings?.nodes ?? []) {
+      if (n.id && n.displayName) map[n.id] = n.displayName;
+    }
+    return map;
+  }, [flowVersion]);
   //shouldn't use testFlow hook here because it would run the flow with sample data not the real user message
   const listenToTestRun = () => {
     isListening.current = true;
@@ -103,6 +132,7 @@ export const ChatDrawer = () => {
             chatSessionId={chatSessionId}
             onAddMessage={addChatMessage}
             onSetSessionId={setChatSessionId}
+            nodeLabels={nodeLabels}
           />
         </div>
       </DrawerContent>
