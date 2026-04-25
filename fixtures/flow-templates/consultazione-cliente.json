@@ -1,0 +1,165 @@
+{
+  "name": "Consultazione Cliente Bancario",
+  "description": "Flow INTERACTIVE_FLOW per la consultazione informativa di un cliente: identificazione cliente, caricamento profilo e rapporti, generazione report PDF, conferma di condivisione. Flow read-only (nessuna operazione dispositiva).",
+  "type": "FLOW",
+  "flows": [
+    {
+      "displayName": "Consultazione Cliente",
+      "schemaVersion": "20",
+      "trigger": {
+        "name": "trigger",
+        "type": "PIECE_TRIGGER",
+        "displayName": "Chat UI",
+        "valid": true,
+        "settings": {
+          "pieceName": "@activepieces/piece-forms",
+          "pieceVersion": "__AUTO_PIECE_VERSION__",
+          "triggerName": "chat_submission",
+          "input": { "botName": "Assistente Banca" },
+          "propertySettings": {}
+        },
+        "nextAction": {
+          "name": "interactive_flow",
+          "type": "INTERACTIVE_FLOW",
+          "displayName": "Consultazione",
+          "valid": true,
+          "skip": false,
+          "settings": {
+            "mcpGatewayId": "__AUTO_MCP_GATEWAY__",
+            "messageInput": "{{trigger.message}}",
+            "sessionIdInput": "{{trigger.sessionId}}",
+            "cleanupOnSuccess": true,
+            "historyMaxTurns": 20,
+            "locale": "it",
+            "useCommandLayer": true,
+            "flowLabel": { "it": "consultazione cliente", "en": "customer lookup" },
+            "systemPrompt": "Sei un assistente bancario read-only per consultazione clienti. Estrai SOLO il nome cliente realmente presente nel messaggio dell'utente; non inventare mai dati. NESSUNA operazione dispositiva: solo lettura informativa. Conferma di condivisione = trust-based.",
+            "fieldExtractor": {
+              "aiProviderId": "custom",
+              "model": "claude-cli"
+            },
+            "questionGenerator": {
+              "aiProviderId": "custom",
+              "model": "claude-cli",
+              "styleTemplate": "banking_formal_it"
+            },
+            "infoIntents": [
+              {
+                "id": "count_accounts",
+                "description": "Numero di rapporti attivi del cliente",
+                "requiredFields": ["accounts"],
+                "rendererKey": "count_accounts"
+              },
+              {
+                "id": "count_matches",
+                "description": "Numero di clienti corrispondenti alla ricerca",
+                "requiredFields": ["customerMatches"],
+                "rendererKey": "count_matches"
+              }
+            ],
+            "stateFields": [
+              { "name": "customerName", "type": "string", "extractable": true,
+                "minLength": 2, "maxLength": 80, "pattern": "^[A-Za-zÀ-ÿ'\\- ]+$",
+                "description": "Cognome o nome+cognome di UN VERO CLIENTE esplicitamente menzionato." },
+              { "name": "customerMatches", "type": "array", "extractable": false },
+              { "name": "ndg", "type": "string", "extractable": true, "parser": "ndg",
+                "label": { "it": "NDG", "en": "Customer ID" },
+                "enumFrom": "customerMatches", "enumValueField": "ndg",
+                "pattern": "^\\d{6,10}$",
+                "description": "Numero Dossier Generale del cliente." },
+              { "name": "profile", "type": "object", "extractable": false },
+              { "name": "accounts", "type": "array", "extractable": false },
+              { "name": "reportBase64", "type": "string", "extractable": false, "sensitive": true },
+              { "name": "sharedConfirmed", "type": "boolean", "extractable": true,
+                "extractionScope": "node-local",
+                "description": "Conferma esplicita dell'avvenuta condivisione del report con il cliente (sì/condiviso/ok)." }
+            ],
+            "nodes": [
+              {
+                "id": "search_customer",
+                "name": "search_customer",
+                "displayName": "Cerca cliente",
+                "nodeType": "TOOL",
+                "tool": "search_customer",
+                "stateInputs": ["customerName"],
+                "stateOutputs": ["customerMatches"],
+                "params": [
+                  { "name": "name", "binding": { "kind": "state", "field": "customerName" } }
+                ]
+              },
+              {
+                "id": "pick_ndg",
+                "name": "pick_ndg",
+                "displayName": "Scegli cliente",
+                "nodeType": "USER_INPUT",
+                "stateInputs": ["customerMatches"],
+                "stateOutputs": ["ndg"],
+                "renderHint": {
+                  "component": "DataTable",
+                  "props": {
+                    "sourceField": "customerMatches",
+                    "valueKey": "ndg",
+                    "labelKeys": ["fullName", "fiscalCode"]
+                  }
+                },
+                "singleOptionStrategy": "auto"
+              },
+              {
+                "id": "load_profile",
+                "name": "load_profile",
+                "displayName": "Caricamento profilo",
+                "nodeType": "TOOL",
+                "tool": "get_profile",
+                "stateInputs": ["ndg"],
+                "stateOutputs": ["profile"],
+                "params": [
+                  { "name": "ndg", "binding": { "kind": "state", "field": "ndg" } }
+                ]
+              },
+              {
+                "id": "load_accounts",
+                "name": "load_accounts",
+                "displayName": "Caricamento rapporti",
+                "nodeType": "TOOL",
+                "tool": "list_accounts",
+                "stateInputs": ["ndg"],
+                "stateOutputs": ["accounts"],
+                "params": [
+                  { "name": "ndg", "binding": { "kind": "state", "field": "ndg" } }
+                ]
+              },
+              {
+                "id": "generate_report",
+                "name": "generate_report",
+                "displayName": "Generazione report PDF",
+                "nodeType": "TOOL",
+                "tool": "generate_customer_report",
+                "stateInputs": ["profile", "accounts"],
+                "stateOutputs": ["reportBase64"],
+                "params": [
+                  { "name": "ndg", "binding": { "kind": "state", "field": "ndg" } }
+                ]
+              },
+              {
+                "id": "confirm_shared",
+                "name": "confirm_shared",
+                "displayName": "Conferma condivisione",
+                "nodeType": "CONFIRM",
+                "stateInputs": ["reportBase64", "profile"],
+                "stateOutputs": ["sharedConfirmed"],
+                "renderHint": {
+                  "component": "ConfirmCard",
+                  "props": {
+                    "title": "Conferma condivisione report",
+                    "description": "Hai condiviso il report PDF con il cliente?",
+                    "displayField": "reportBase64"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
