@@ -13,6 +13,7 @@ import { PolicyCurrentNodeHint, policyEngine } from './policy-engine'
 import { preResolvers } from './pre-resolvers'
 import { promptBuilder } from './prompt-builder'
 import { ProviderAdapter } from './provider-adapter'
+import { commandLayerTracing } from './tracing'
 import { turnLogService } from './turn-log.service'
 
 const DEFAULT_LEASE_TTL_SECONDS = 30
@@ -22,15 +23,27 @@ function workerIdFromEnv(): string {
 }
 
 async function interpret({ request, provider, identityFields, now }: InterpretInput): Promise<InterpretTurnResponse> {
+    return commandLayerTracing.withSpan({
+        name: 'turn-interpreter.interpret',
+        attributes: { turnId: request.turnId, sessionId: request.sessionId },
+        fn: () => doInterpret({ request, provider, identityFields, now }),
+    })
+}
+
+async function doInterpret({ request, provider, identityFields, now }: InterpretInput): Promise<InterpretTurnResponse> {
     const nowDate = now ?? new Date()
     const workerId = workerIdFromEnv()
 
-    const leaseResult = await turnLogService.acquireLease({
-        turnId: request.turnId,
-        sessionId: request.sessionId,
-        flowRunId: request.flowRunId,
-        workerId,
-        ttlSeconds: DEFAULT_LEASE_TTL_SECONDS,
+    const leaseResult = await commandLayerTracing.withSpan({
+        name: 'turn-interpreter.acquireLease',
+        attributes: { turnId: request.turnId },
+        fn: () => turnLogService.acquireLease({
+            turnId: request.turnId,
+            sessionId: request.sessionId,
+            flowRunId: request.flowRunId,
+            workerId,
+            ttlSeconds: DEFAULT_LEASE_TTL_SECONDS,
+        }),
     })
     commandLayerMetrics.recordLeaseOutcome({ outcome: leaseResult.outcome })
 
