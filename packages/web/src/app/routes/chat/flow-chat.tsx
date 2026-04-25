@@ -25,6 +25,7 @@ import { humanInputApi } from '@/features/forms';
 import { ChatRuntimeTimeline } from '@/features/interactive-flow/components/chat-runtime-timeline';
 import { humanizeNodeId } from '@/features/interactive-flow/components/runtime-step-icon';
 import { useInteractiveFlowCurrentTurn } from '@/features/interactive-flow/hooks/use-interactive-flow-current-turn';
+import { useInteractiveFlowTurnEvents } from '@/features/interactive-flow/hooks/use-interactive-flow-turn-events';
 import { cn } from '@/lib/utils';
 
 import NotFoundPage from '../404-page';
@@ -227,8 +228,12 @@ export function FlowChat({
     },
   });
 
-  const { entries: runtimeEntries, getLatest: getRuntimeSnapshot } =
-    useInteractiveFlowCurrentTurn(isSending);
+  const {
+    entries: runtimeEntries,
+    getLatest: getRuntimeSnapshot,
+    flowRunId: currentFlowRunId,
+  } = useInteractiveFlowCurrentTurn(isSending);
+  const turnEventsSnapshot = useInteractiveFlowTurnEvents(currentFlowRunId);
 
   function buildRuntimeSummaryFromSnapshot(): RuntimeSummaryStep[] | undefined {
     const snap = getRuntimeSnapshot();
@@ -287,6 +292,7 @@ export function FlowChat({
               <ChatRuntimeTimeline
                 active={isSending}
                 entries={runtimeEntries}
+                turnEvents={turnEventsSnapshot.events}
                 nodeLabels={nodeLabels}
               />
             }
