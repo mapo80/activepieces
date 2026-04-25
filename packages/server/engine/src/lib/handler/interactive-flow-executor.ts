@@ -35,6 +35,7 @@ import { interactiveFlowEvents } from './interactive-flow-events'
 import { questionGenerator } from './question-generator'
 import { DEFAULT_HISTORY_MAX_TURNS, HistoryEntry, sessionStore } from './session-store'
 import { commandLayerClientAdapter } from './turn-interpreter-adapter'
+import { turnInterpreterClient } from './turn-interpreter-client'
 
 // Debug logger: disabled by default, zero overhead when the env vars
 // below are not set. Enable on-demand without editing this file:
@@ -237,13 +238,28 @@ function resolveFlowLabel({ settings }: { settings: InteractiveFlowActionSetting
     return candidates.length > 0 ? candidates[0] : undefined
 }
 
-function adaptTurnResultToExtractResult(result: { extractedFields: Record<string, unknown>, turnAffirmed: boolean, policyDecisions: unknown[], metaAnswer?: string, clarifyReason?: unknown }): { extractedFields: Record<string, unknown>, turnAffirmed: boolean, policyDecisions: PolicyDecision[], metaAnswer?: string, clarifyReason?: unknown } {
+function adaptTurnResultToExtractResult(result: {
+    extractedFields: Record<string, unknown>
+    turnAffirmed: boolean
+    policyDecisions: unknown[]
+    metaAnswer?: string
+    clarifyReason?: unknown
+    finalizeContract?: { turnId: string, leaseToken: string }
+}): {
+        extractedFields: Record<string, unknown>
+        turnAffirmed: boolean
+        policyDecisions: PolicyDecision[]
+        metaAnswer?: string
+        clarifyReason?: unknown
+        finalizeContract?: { turnId: string, leaseToken: string }
+    } {
     return {
         extractedFields: result.extractedFields,
         turnAffirmed: result.turnAffirmed,
         policyDecisions: result.policyDecisions as PolicyDecision[],
         metaAnswer: result.metaAnswer,
         clarifyReason: result.clarifyReason,
+        finalizeContract: result.finalizeContract,
     }
 }
 
@@ -962,6 +978,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
         let pendingOverwriteSignal: PendingInteraction | null = null
         let rejectionHint: string | null = null
         let lastExtractionDecisions: PolicyDecision[] = []
+        let commandLayerFinalizeContract: { turnId: string, leaseToken: string } | null = null
         const postValidationDecisions: PolicyDecision[] = []
         const emittedRevalidationKeys = new Set<string>()
 
@@ -1078,6 +1095,9 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     nodeId: pauseHint?.id ?? '__pending_overwrite__',
                 }) ?? null
                 lastExtractionDecisions = extractResult.policyDecisions
+                if (extractResult.finalizeContract) {
+                    commandLayerFinalizeContract = extractResult.finalizeContract
+                }
                 rejectionHint = buildRejectionHint({
                     policyDecisions: extractResult.policyDecisions,
                     stateFields: fields,
@@ -1737,6 +1757,9 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 botMessage: message ?? undefined,
                 pendingInteraction: pendingInteractionForPause,
             })
+            if (!isNil(commandLayerFinalizeContract)) {
+                await turnInterpreterClient.finalize({ constants, ...commandLayerFinalizeContract }).catch(() => false)
+            }
             return executionState
                 .upsertStep(action.name, stepOutput)
                 .setVerdict({ status: FlowRunStatus.PAUSED })
@@ -1784,6 +1807,9 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             }
         }
         await persistSession({ botMessage: summary, terminal: true })
+        if (!isNil(commandLayerFinalizeContract)) {
+            await turnInterpreterClient.finalize({ constants, ...commandLayerFinalizeContract }).catch(() => false)
+        }
         return executionState.upsertStep(action.name, stepOutput)
     },
 }
