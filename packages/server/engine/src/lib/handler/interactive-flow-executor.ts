@@ -34,6 +34,7 @@ import { fieldExtractor, PolicyDecision } from './field-extractor'
 import { interactiveFlowEvents } from './interactive-flow-events'
 import { questionGenerator } from './question-generator'
 import { DEFAULT_HISTORY_MAX_TURNS, HistoryEntry, sessionStore } from './session-store'
+import { statusRenderer } from './status-renderer'
 import { commandLayerClientAdapter } from './turn-interpreter-adapter'
 import { turnInterpreterClient } from './turn-interpreter-client'
 
@@ -245,6 +246,7 @@ function adaptTurnResultToExtractResult(result: {
     metaAnswer?: string
     clarifyReason?: unknown
     finalizeContract?: { turnId: string, leaseToken: string }
+    messageOut?: { preDagAck: string, kind: string }
 }): {
         extractedFields: Record<string, unknown>
         turnAffirmed: boolean
@@ -252,6 +254,7 @@ function adaptTurnResultToExtractResult(result: {
         metaAnswer?: string
         clarifyReason?: unknown
         finalizeContract?: { turnId: string, leaseToken: string }
+        messageOut?: { preDagAck: string, kind: string }
     } {
     return {
         extractedFields: result.extractedFields,
@@ -260,6 +263,7 @@ function adaptTurnResultToExtractResult(result: {
         metaAnswer: result.metaAnswer,
         clarifyReason: result.clarifyReason,
         finalizeContract: result.finalizeContract,
+        messageOut: result.messageOut,
     }
 }
 
@@ -979,6 +983,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
         let rejectionHint: string | null = null
         let lastExtractionDecisions: PolicyDecision[] = []
         let commandLayerFinalizeContract: { turnId: string, leaseToken: string } | null = null
+        let commandLayerPreDagAck: string | null = null
         const postValidationDecisions: PolicyDecision[] = []
         const emittedRevalidationKeys = new Set<string>()
 
@@ -1097,6 +1102,9 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 lastExtractionDecisions = extractResult.policyDecisions
                 if (extractResult.finalizeContract) {
                     commandLayerFinalizeContract = extractResult.finalizeContract
+                }
+                if (extractResult.messageOut?.preDagAck) {
+                    commandLayerPreDagAck = extractResult.messageOut.preDagAck
                 }
                 rejectionHint = buildRejectionHint({
                     policyDecisions: extractResult.policyDecisions,
@@ -1806,7 +1814,17 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 })
             }
         }
-        await persistSession({ botMessage: summary, terminal: true })
+        const successBotMessage = !isNil(commandLayerPreDagAck)
+            ? statusRenderer.combine({
+                preDagAck: commandLayerPreDagAck,
+                status: statusRenderer.render({
+                    state: flowState,
+                    locale: resolveLocale({ constants, settings }),
+                    success: true,
+                }),
+            }) || summary
+            : summary
+        await persistSession({ botMessage: successBotMessage, terminal: true })
         if (!isNil(commandLayerFinalizeContract)) {
             await turnInterpreterClient.finalize({ constants, ...commandLayerFinalizeContract }).catch(() => false)
         }
