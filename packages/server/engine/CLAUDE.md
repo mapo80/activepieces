@@ -98,3 +98,28 @@ Run locally:
 cd packages/server/engine
 npm run test:coverage
 ```
+
+## Command Layer integration (`useCommandLayer: true`)
+
+When the INTERACTIVE_FLOW step settings carry `useCommandLayer: true`, the
+executor delegates each turn to the API-side command layer instead of running
+the legacy `field-extractor + question-generator` chain. The integration
+points are:
+
+- `turn-interpreter-client.ts` — HTTP wrapper around
+  `POST /v1/engine/interactive-flow-ai/command-layer/interpret-turn` (and
+  `/finalize` / `/rollback`).
+- `turn-interpreter-adapter.ts` — converts the `InterpretTurnResponse` into
+  the legacy `extractResult`-shaped object the executor consumes (preserving
+  `pendingOverwriteSignal`, `rejectionHint`, `topicChange`, executed-node
+  reset semantics).
+- `status-renderer.ts` — composes the post-DAG bot message in two parts:
+  `preDagAck` (from `messageOut.preDagAck`) + the post-DAG status text
+  derived from final state.
+- `turn-result.ts` — shared TurnResult shape; carries `messageOut` so the
+  executor can surface the bifase bot message.
+
+The executor reads `useCommandLayer` from the step settings; if true, it
+calls `turnInterpreterClient.interpret`, then `finalize` (or `rollback` on
+save-failure). All side-effects (state diff, executed node reset on topic
+change, pending interactions) are applied identically to the legacy path.
