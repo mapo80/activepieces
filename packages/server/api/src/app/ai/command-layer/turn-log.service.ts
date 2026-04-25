@@ -78,7 +78,7 @@ async function prepare({ turnId, leaseToken, acceptedCommands, rejectedCommands,
           AND "lockedUntil" >= NOW()
         RETURNING "turnId"
         `,
-        [turnId, leaseToken, JSON.stringify(acceptedCommands), JSON.stringify(rejectedCommands), JSON.stringify(result)],
+        [turnId, leaseToken, sanitizeJson(acceptedCommands), sanitizeJson(rejectedCommands), sanitizeJson(result)],
     )
     return rows.length > 0
 }
@@ -131,6 +131,10 @@ async function fail({ turnId, leaseToken, reason }: FailInput): Promise<boolean>
         [turnId, leaseToken, reason ?? null],
     )
     return rows.length > 0
+}
+
+function sanitizeJson(value: unknown): string {
+    return JSON.stringify(value).replace(/\\u0000/g, '').replace(/\\u200[bcdef]/g, '')
 }
 
 async function findByTurnId({ turnId }: { turnId: string }): Promise<InteractiveFlowTurnLogSchema | null> {
