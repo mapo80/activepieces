@@ -57,7 +57,12 @@ export const commandLayerController: FastifyPluginAsyncZod = async (fastify) => 
         await reply.status(StatusCodes.OK).send({ events: payloads, count: payloads.length })
     })
 
-    fastify.get('/metrics', MetricsRoute, async (_request, reply) => {
+    fastify.get('/metrics', MetricsRoute, async (request, reply) => {
+        const fmt = (request.query as { format?: string }).format
+        if (fmt === 'prometheus') {
+            await reply.type('text/plain; version=0.0.4').status(StatusCodes.OK).send(commandLayerMetrics.snapshotPrometheus())
+            return
+        }
         await reply.status(StatusCodes.OK).send(commandLayerMetrics.snapshot())
     })
 
@@ -138,8 +143,11 @@ const MetricsRoute = {
         security: securityAccess.engine(),
     },
     schema: {
+        querystring: z.object({
+            format: z.enum(['json', 'prometheus']).optional(),
+        }),
         response: {
-            [StatusCodes.OK]: z.record(z.string(), z.number()),
+            [StatusCodes.OK]: z.union([z.record(z.string(), z.number()), z.string()]),
         },
     },
 }

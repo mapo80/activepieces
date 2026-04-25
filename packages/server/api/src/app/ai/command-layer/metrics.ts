@@ -65,6 +65,15 @@ function snapshot(): Counters {
     return { ...counters }
 }
 
+function snapshotPrometheus(): string {
+    const lines: string[] = []
+    for (const [k, v] of Object.entries(counters) as Array<[keyof Counters, number]>) {
+        lines.push(`# TYPE command_layer_${k} counter`)
+        lines.push(`command_layer_${k} ${v}`)
+    }
+    return lines.join('\n') + '\n'
+}
+
 function reset(): void {
     for (const key of Object.keys(counters) as Array<keyof Counters>) {
         counters[key] = 0
@@ -80,5 +89,6 @@ export const commandLayerMetrics = {
     recordOutboxError,
     recordCasConflict,
     snapshot,
+    snapshotPrometheus,
     reset,
 }
