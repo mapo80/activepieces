@@ -1,8 +1,14 @@
+import { WebsocketClientEvent } from '@activepieces/shared'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { FastifyInstance } from 'fastify'
 import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { aiProviderWorkerController } from '../ai/ai-provider-worker.controller'
-import { commandLayerController } from '../ai/command-layer/command-layer.controller'
+import { commandLayerController, overrideProviderAdapter } from '../ai/command-layer/command-layer.controller'
+import { lockRecoveryDaemon } from '../ai/command-layer/lock-recovery'
+import { outboxPublisher } from '../ai/command-layer/outbox-publisher'
+import { VercelAIAdapter } from '../ai/command-layer/vercel-ai-adapter'
 import { interactiveFlowAiController } from '../ai/interactive-flow-ai.controller'
+import { websocketService } from '../core/websockets.service'
 import { runsMetadataQueue } from '../flows/flow-run/flow-runs-queue'
 import { interactiveFlowEventsController } from '../flows/flow-run/interactive-flow-events-controller'
 import { pubsub } from '../helper/pubsub'
@@ -41,11 +47,42 @@ export const workerModule: FastifyPluginAsyncZod = async (app) => {
 
     await setupBullMQBoard(app)
 
+    if (process.env.AP_LLM_VIA_BRIDGE === 'true') {
+        const modelHint = process.env.AP_COMMAND_LAYER_MODEL ?? 'claude-sonnet-4-6'
+        const baseURL = process.env.OPENAI_BASE_URL ?? 'http://localhost:8787'
+        const apiKey = process.env.OPENAI_API_KEY ?? 'sk-bridge-dev'
+        const compat = createOpenAICompatible({ name: 'command-layer-bridge', apiKey, baseURL })
+        overrideProviderAdapter(new VercelAIAdapter({
+            modelHint,
+            log: app.log,
+            resolveModel: async () => compat.chatModel(modelHint),
+        }))
+        app.log.info({ modelHint, baseURL }, '[command-layer] VercelAIAdapter registered')
+    }
+    else {
+        app.log.info('[command-layer] MockProviderAdapter (default) — set AP_LLM_VIA_BRIDGE=true to use real LLM')
+    }
+
+    outboxPublisher.start({
+        log: app.log,
+        emit: async (event) => {
+            websocketService.to(event.flowRunId).emit(WebsocketClientEvent.INTERACTIVE_FLOW_TURN_EVENT, event)
+        },
+        pollIntervalMs: Number(process.env.AP_OUTBOX_POLL_MS ?? 500),
+    })
+
+    lockRecoveryDaemon.start({
+        log: app.log,
+        pollIntervalMs: Number(process.env.AP_LOCK_RECOVERY_POLL_MS ?? 10_000),
+    })
+
     app.addHook('onClose', async () => {
         await jobBroker(app.log).close()
         await runsMetadataQueue(app.log).close()
         await jobQueue(app.log).close()
         await pubsub.close()
+        outboxPublisher.stop()
+        lockRecoveryDaemon.stop()
     })
 }
 
