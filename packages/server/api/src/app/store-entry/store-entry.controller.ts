@@ -49,6 +49,19 @@ export const storeEntryController: FastifyPluginAsyncZod = async (fastify) => {
     },
     )
 
+    fastify.get('/with-version', GetWithVersionRequest, async (request, reply) => {
+        const result = await storeEntryService.getOneWithVersion({
+            projectId: request.principal.projectId,
+            key: request.query.key,
+        })
+        if (!result) {
+            await reply.status(StatusCodes.NOT_FOUND).send({ message: 'not-found' })
+            return
+        }
+        await reply.status(StatusCodes.OK).send(result)
+    },
+    )
+
     fastify.post('/put-with-version', PutWithVersionRequest, async (request, reply) => {
         const sizeOfValue = sizeof(request.body.value)
         if (sizeOfValue > STORE_VALUE_MAX_SIZE) {
@@ -113,5 +126,14 @@ const PutWithVersionRequest = {
     },
     schema: {
         body: PutWithVersionBodySchema,
+    },
+}
+
+const GetWithVersionRequest = {
+    config: {
+        security: securityAccess.engine(),
+    },
+    schema: {
+        querystring: z.object({ key: z.string() }),
     },
 }

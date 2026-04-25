@@ -228,10 +228,89 @@ function isEqualValue(a: unknown, b: unknown): boolean {
     }
 }
 
+async function loadWithRevision({ key, constants, currentFlowVersionId }: {
+    key: string
+    constants: EngineConstants
+    currentFlowVersionId: string
+}): Promise<{ record: SessionRecord | null, versionMismatch: boolean, sessionRevision: number }> {
+    const url = `${constants.internalApiUrl}v1/store-entries/with-version?key=${encodeURIComponent(key)}`
+    try {
+        const response = await fetch(url, {
+            headers: { Authorization: `Bearer ${constants.engineToken}` },
+        })
+        if (response.status === 404) {
+            return { record: null, versionMismatch: false, sessionRevision: 0 }
+        }
+        if (!response.ok) {
+            const fallback = await load({ key, constants, currentFlowVersionId })
+            return { ...fallback, sessionRevision: 0 }
+        }
+        const body = await response.json() as { value: SessionRecord, version: number } | null
+        if (!body) return { record: null, versionMismatch: false, sessionRevision: 0 }
+        if (body.value && body.value.flowVersionId !== currentFlowVersionId) {
+            return { record: body.value, versionMismatch: true, sessionRevision: body.version }
+        }
+        return { record: body.value, versionMismatch: false, sessionRevision: body.version }
+    }
+    catch {
+        const fallback = await load({ key, constants, currentFlowVersionId })
+        return { ...fallback, sessionRevision: 0 }
+    }
+}
+
+async function saveWithCAS({ key, constants, state, history, flowVersionId, historyMaxTurns, pendingInteraction, expectedRevision }: {
+    key: string
+    constants: EngineConstants
+    state: Record<string, unknown>
+    history: HistoryEntry[]
+    flowVersionId: string
+    historyMaxTurns: number
+    pendingInteraction?: PendingInteraction | null
+    expectedRevision: number
+}): Promise<{ status: 'ok' | 'conflict', newRevision?: number, currentRevision?: number }> {
+    const cappedHistory = history.slice(-historyMaxTurns)
+    const payload: SessionRecord = {
+        state,
+        history: cappedHistory,
+        flowVersionId,
+        lastTurnAt: new Date().toISOString(),
+    }
+    if (!isNil(pendingInteraction)) {
+        payload.pendingInteraction = pendingInteraction
+    }
+    const url = `${constants.internalApiUrl}v1/store-entries/put-with-version`
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${constants.engineToken}`,
+            },
+            body: JSON.stringify({ key, value: payload, expectedVersion: expectedRevision }),
+        })
+        if (response.status === 412) {
+            const body = await response.json().catch(() => null) as { currentVersion?: number } | null
+            return { status: 'conflict', currentRevision: body?.currentVersion ?? 0 }
+        }
+        if (!response.ok) {
+            await save({ key, constants, state, history: cappedHistory, flowVersionId, historyMaxTurns, pendingInteraction })
+            return { status: 'ok' }
+        }
+        const body = await response.json().catch(() => null) as { version?: number } | null
+        return { status: 'ok', newRevision: body?.version ?? expectedRevision + 1 }
+    }
+    catch {
+        await save({ key, constants, state, history: cappedHistory, flowVersionId, historyMaxTurns, pendingInteraction })
+        return { status: 'ok' }
+    }
+}
+
 export const sessionStore = {
     makeSessionKey,
     load,
+    loadWithRevision,
     save,
+    saveWithCAS,
     clear,
     detectTopicChange,
     applyStateOverwriteWithTopicChange,
