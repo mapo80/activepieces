@@ -375,3 +375,75 @@ T-PLAYWRIGHT phase deferred until W-09 partial-VERIFIED.
 
 **Next**: C-COVERAGE (G-UNIT-90 ≥ 90% on changed modules) in parallel
 with T-API tests (A-01..12). T-PLAYWRIGHT requires running app stack.
+
+## 2026-04-24 — C-COVERAGE + T-API + D-DOCS VERIFIED
+
+**Completed (5 new commits)**:
+
+- C-01/05/06/07: api package vitest.config.ts now enforces ≥90%
+  lines/branches/functions/statements on the three W-WIRING priority
+  modules (vercel-ai-adapter, outbox-publisher, lock-recovery).
+  Coverage baseline captured in
+  `docs/interactive-flow/coverage-baseline.md`. Achieved levels:
+    - vercel-ai-adapter: 100% lines / 96.15% branches / 100% functions
+    - outbox-publisher: 100% lines / 95% branches / 100% functions
+    - lock-recovery: 100% lines / 93.33% branches / 100% functions
+  via 7 new branch tests on adapter + 9 publisher unit tests + 7
+  recovery unit tests. Coverage outputs added to .gitignore.
+
+- A-11: command-layer-finalize-rollback.test.ts — 6 saga state-machine
+  edge cases (missing turn 404, double finalize idempotency, rollback
+  on already-finalized, wrong leaseToken on both finalize/rollback).
+
+- A-05/06/08: replay/metrics/admin-force-clear integration suites —
+  6 + 4 + 5 = 15 new tests covering outbox replayPublishable filtering,
+  commandLayerMetrics counter aggregation, and stale-lock reclaim
+  semantics (in-progress→failed/lease-expired,
+  prepared→compensated/finalize-timeout, threshold respect).
+
+- D-01: command-layer-developer-guide.md — when to enable, infoIntent
+  registration, system prompt rules, endpoint catalogue, diagnostic SQL,
+  anti-patterns.
+
+- D-02: command-layer-migration-guide.md — pre-flight checklist,
+  step-by-step estinzione.json migration, validation, three-tier
+  rollback procedure, cross-flow validation.
+
+- D-03: CLAUDE.md / AGENTS.md updates at root + packages/server +
+  packages/server/engine documenting command-layer module map,
+  endpoints, worker-module wiring, engine-side adapter integration.
+
+**ce/ai integration suite final count**: **106 tests across 13 files**,
+exceeding the G-E2E-API target of 104+. All gate-relevant suites green:
+
+- vercel-ai-adapter (11), outbox-publisher (9), lock-recovery (7)
+- command-layer (6), command-layer-interpreter (9),
+  command-layer-redteam (12), command-layer-pii (9),
+  command-layer-benchmark (15), command-layer-chaos (7)
+- command-layer-finalize-rollback (6), command-layer-replay (6),
+  command-layer-metrics (4), command-layer-admin-force-clear (5)
+
+**Cumulative commits**: 40 on feature/command-layer-p0b-infra.
+
+**Status of plan tasks**:
+
+| Phase | Task | Status |
+|---|---|---|
+| W-WIRING | W-01..W-08 | VERIFIED |
+| W-WIRING | W-09 | BLOCKED (bridge `curl /health` exit 7) |
+| C-COVERAGE | C-01, C-05, C-06, C-07 | VERIFIED |
+| C-COVERAGE | C-02, C-03, C-04, C-08, C-09 | DEFERRED (engine + shared + web sub-packages) |
+| T-API | A-05, A-06, A-08, A-11 | VERIFIED |
+| T-API | A-02, A-03, A-04, A-07, A-09, A-10, A-12 | PARTIAL (existing baseline covers most paths; A-10 covered by W-08 unit tests) |
+| T-PLAYWRIGHT | T-01..T-15 | DEFERRED (requires running app stack) |
+| D-DOCS | D-01, D-02, D-03 | VERIFIED |
+| D-DOCS | D-04 (OpenAPI) | IMPLICIT (FastifyPluginAsyncZod auto-generates) |
+| H-HARDEN | H-01..H-05 | NOT STARTED |
+| R-RO / S-SUNSET | — | BLOCKED (env access required) |
+
+**Next milestones to fully close the plan**:
+1. Restore bridge → run W-09 manual smoke (8 evidences).
+2. Spin up dev stack → run T-PLAYWRIGHT specs (12+ scenarios).
+3. Add coverage thresholds to engine/shared/web vitest.config (C-02..C-04).
+4. Implement H-HARDEN tasks (i18n locale fan-out, Prometheus metrics
+   format, PII redactor in outbox insert).
