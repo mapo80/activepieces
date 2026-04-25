@@ -92,6 +92,9 @@ packages/server/engine/test-results/
 packages/server/engine/coverage/
 packages/server/api/coverage/
 packages/server/api/coverage-*/
+packages/shared/coverage/
+packages/web/coverage/
+packages/web/test-results/
 
 # Terraform
 deploy/terraform/**/.terraform/
