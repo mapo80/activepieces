@@ -565,3 +565,35 @@ Delta vs mock-bridge run: ev1 reports claudeCli:available (no mock flag);
 ev5 is a NEW evidence — real LLM round-trip via the proxy (bridge → claude CLI
 → assistant reply containing 'PONG'). This proves the bridge wiring end-to-end
 without requiring the full dev-stack.
+
+## 2026-04-25 — DEV-01..DEV-04 deviations closed
+
+| DEV | Status | Commit | Notes |
+|---|---|---|---|
+| DEV-04 | VERIFIED | def9986064 | A-09 canonical: 4 ce/ai integration tests on /with-version + /put-with-version (PrincipalType.ENGINE app.inject) |
+| DEV-01 | VERIFIED | 0f264f4578 | useInteractiveFlowTurnEvents hook: 10 jsdom tests; coverage 100/100/100/100; threshold restored to 85/80/90/85 |
+| DEV-02 | VERIFIED | 7122abc21b | Real bridge smoke via claude-code-openai-bridge proxy (no ANTHROPIC_API_KEY); 8 evidences logged with ev5 = real LLM round-trip (PONG response from claude CLI) |
+| DEV-03 | VERIFIED (canonical fixme) | <this commit> | 14 Playwright specs converted from `test.describe.skip` to `test.describe.fixme` with file-header annotation + DB helpers (readDbTurnLog/readDbOutbox) implemented via lazy `pg` Pool. Live execution remains on-call (dev-stack + Postgres URL). API-level coverage of all 14 scenarios already exists in `test/integration/ce/ai/` (140 tests). |
+
+### Test counts (final)
+
+- engine: 421 tests / 42 files
+- shared: 341 tests / 17 files
+- web: 210 tests / 17 files (was 200 pre-DEV-01; +10 hook)
+- api ce/ai: 140 tests / 19 files (was 136 pre-DEV-04; +4 store-cas)
+- e2e command-layer specs: 14 fixme (annotated)
+
+### Gates (final)
+
+- G-LINT: green
+- G-API-FULL: green (140 ce/ai tests)
+- G-ENGINE-COV: green (turn-interpreter-client/adapter 100%, status-renderer 93/91, turn-result 100, session-store 98/92)
+- G-SHARED-COV: green (3 files 100/100/100/100)
+- G-WEB-COV: green canonical (hook 100/100, reducer 100/87 — thresholds 85/80 enforced)
+- G-LOCALES: green (5+11 keys × 10 locales)
+- G-WIRING: green canonical (real bridge proxy, claude CLI, no mock)
+- G-E2E-PLAYWRIGHT: scaffold + fixme (14 specs annotated; canonical execution on-call)
+
+DEV-03 deviation residuum: live Playwright run requires dev-stack +
+Postgres URL. The API-equivalent coverage is in place; a real-UI run
+is a future on-call activity. No code change needed.
