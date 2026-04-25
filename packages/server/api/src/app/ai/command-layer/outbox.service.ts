@@ -153,6 +153,37 @@ async function markRetry({ outboxEventId, backoffSeconds, maxAttempts }: { outbo
     return { dead }
 }
 
+async function replayPublishable({ sessionId, afterSequence, limit }: { sessionId: string, afterSequence: string, limit: number }): Promise<InteractiveFlowOutboxSchema[]> {
+    const ds = databaseConnection()
+    const rows = await ds.query(
+        `SELECT "outboxEventId","turnId","sessionId","flowRunId","sessionSequence","eventType","eventStatus","payload","createdAt","publishedAt"
+         FROM "interactive_flow_outbox"
+         WHERE "sessionId" = $1
+           AND "eventStatus" = 'publishable'
+           AND CAST("sessionSequence" AS BIGINT) > CAST($2 AS BIGINT)
+         ORDER BY "sessionSequence" ASC
+         LIMIT $3`,
+        [sessionId, afterSequence, limit],
+    )
+    return rows.map((r: { outboxEventId: string, turnId: string, sessionId: string, flowRunId: string, sessionSequence: string, eventType: string, eventStatus: OutboxEventStatus, payload: unknown, createdAt: Date, publishedAt: Date | null }) => ({
+        outboxEventId: r.outboxEventId,
+        turnId: r.turnId,
+        sessionId: r.sessionId,
+        flowRunId: r.flowRunId,
+        sessionSequence: String(r.sessionSequence),
+        eventType: r.eventType,
+        eventStatus: r.eventStatus,
+        payload: r.payload,
+        createdAt: r.createdAt,
+        publishedAt: r.publishedAt,
+        attempts: 0,
+        nextRetryAt: null,
+        failedAt: null,
+        claimedBy: null,
+        claimedUntil: null,
+    }))
+}
+
 export const outboxService = {
     insertPending,
     markPublishable,
@@ -160,6 +191,7 @@ export const outboxService = {
     claimNextSessionBatch,
     markPublished,
     markRetry,
+    replayPublishable,
 }
 
 export type InsertPendingInput = {

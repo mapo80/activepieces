@@ -1,5 +1,6 @@
 import {
     FinalizeTurnRequestSchema,
+    InteractiveFlowTurnEventSchema,
     InterpretTurnRequestSchema,
     InterpretTurnResponseSchema,
     RollbackTurnRequestSchema,
@@ -8,6 +9,8 @@ import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { StatusCodes } from 'http-status-codes'
 import { z } from 'zod'
 import { securityAccess } from '../../core/security/authorization/fastify-security'
+import { commandLayerMetrics } from './metrics'
+import { outboxService } from './outbox.service'
 import { MockProviderAdapter, ProviderAdapter } from './provider-adapter'
 import { turnInterpreter } from './turn-interpreter'
 
@@ -42,6 +45,20 @@ export const commandLayerController: FastifyPluginAsyncZod = async (fastify) => 
             reason: request.body.reason,
         })
         await reply.status(outcome.ok ? StatusCodes.OK : StatusCodes.NOT_FOUND).send(outcome)
+    })
+
+    fastify.get('/outbox/replay', ReplayOutboxRoute, async (request, reply) => {
+        const events = await outboxService.replayPublishable({
+            sessionId: request.query.sessionId,
+            afterSequence: request.query.afterSequence ?? '0',
+            limit: request.query.limit ?? 100,
+        })
+        const payloads = events.map(e => e.payload).filter(p => p !== null && typeof p === 'object')
+        await reply.status(StatusCodes.OK).send({ events: payloads, count: payloads.length })
+    })
+
+    fastify.get('/metrics', MetricsRoute, async (_request, reply) => {
+        await reply.status(StatusCodes.OK).send(commandLayerMetrics.snapshot())
     })
 }
 
@@ -80,6 +97,36 @@ const RollbackTurnRoute = {
         response: {
             [StatusCodes.OK]: z.object({ ok: z.boolean() }),
             [StatusCodes.NOT_FOUND]: z.object({ ok: z.boolean() }),
+        },
+    },
+}
+
+const ReplayOutboxRoute = {
+    config: {
+        security: securityAccess.engine(),
+    },
+    schema: {
+        querystring: z.object({
+            sessionId: z.string().min(1),
+            afterSequence: z.string().regex(/^\d+$/).optional(),
+            limit: z.coerce.number().int().min(1).max(500).optional(),
+        }),
+        response: {
+            [StatusCodes.OK]: z.object({
+                events: z.array(InteractiveFlowTurnEventSchema.partial()),
+                count: z.number().int().min(0),
+            }),
+        },
+    },
+}
+
+const MetricsRoute = {
+    config: {
+        security: securityAccess.engine(),
+    },
+    schema: {
+        response: {
+            [StatusCodes.OK]: z.record(z.string(), z.number()),
         },
     },
 }
