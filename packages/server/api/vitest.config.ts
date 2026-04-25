@@ -14,6 +14,33 @@ export default defineConfig({
     pool: 'forks',
     setupFiles: [path.resolve(__dirname, 'vitest.setup.ts')],
     include: [path.resolve(__dirname, 'test/**/*.test.ts')],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary', 'lcov', 'html'],
+      reportsDirectory: path.resolve(__dirname, 'coverage'),
+      include: ['packages/server/api/src/app/ai/command-layer/**'],
+      exclude: ['**/*.d.ts', '**/entities/**'],
+      thresholds: {
+        'packages/server/api/src/app/ai/command-layer/vercel-ai-adapter.ts': {
+          lines: 90,
+          branches: 90,
+          functions: 90,
+          statements: 90,
+        },
+        'packages/server/api/src/app/ai/command-layer/outbox-publisher.ts': {
+          lines: 90,
+          branches: 90,
+          functions: 90,
+          statements: 90,
+        },
+        'packages/server/api/src/app/ai/command-layer/lock-recovery.ts': {
+          lines: 90,
+          branches: 90,
+          functions: 90,
+          statements: 90,
+        },
+      },
+    },
   },
   resolve: {
     alias: {

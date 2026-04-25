@@ -78,4 +78,96 @@ describe('VercelAIAdapter', () => {
         expect(result.error).toContain('network down')
         expect(result.modelVersion).toBe('claude-sonnet-4-6')
     })
+
+    it('toolCalls undefined and usage undefined → empty commands, zero tokens', async () => {
+        generateTextMock.mockResolvedValueOnce({})
+        const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', resolveModel: async () => mockModel })
+        const result = await adapter.proposeCommands(baseInput)
+        expect(result.commands).toEqual([])
+        expect(result.tokenUsage).toEqual({ inputTokens: 0, outputTokens: 0 })
+    })
+
+    it('respects explicit timeoutMs config (constructor passes through)', async () => {
+        generateTextMock.mockResolvedValueOnce({ toolCalls: [], usage: undefined })
+        const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
+        const adapter = new VercelAIAdapter({
+            modelHint: 'claude-sonnet-4-6',
+            resolveModel: async () => mockModel,
+            timeoutMs: 1000,
+        })
+        const result = await adapter.proposeCommands(baseInput)
+        expect(result.commands).toEqual([])
+    })
+
+    it('falls back to {type:string} when allowedFields/allowedInfoIntents are empty', async () => {
+        generateTextMock.mockResolvedValueOnce({
+            toolCalls: [{
+                toolName: 'SET_FIELDS',
+                args: { updates: [{ field: 'anyField', value: 'X', evidence: 'XY' }] },
+            }],
+            usage: { promptTokens: 1, completionTokens: 1 },
+        })
+        const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', resolveModel: async () => mockModel })
+        const result = await adapter.proposeCommands({
+            ...baseInput,
+            allowedFields: [],
+            allowedInfoIntents: [],
+        })
+        expect(result.commands).toHaveLength(1)
+    })
+
+    it('tool call with args=undefined is parsed against empty object', async () => {
+        generateTextMock.mockResolvedValueOnce({
+            toolCalls: [{ toolName: 'INVALID_TYPE', args: undefined }],
+            usage: { promptTokens: 0, completionTokens: 0 },
+        })
+        const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', resolveModel: async () => mockModel })
+        const result = await adapter.proposeCommands(baseInput)
+        expect(result.commands).toEqual([])
+    })
+
+    it('error from non-Error value still produces sliced error string', async () => {
+        generateTextMock.mockRejectedValueOnce('x'.repeat(500))
+        const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', resolveModel: async () => mockModel })
+        const result = await adapter.proposeCommands(baseInput)
+        expect(result.commands).toEqual([])
+        expect(result.error).toBeDefined()
+        expect((result.error ?? '').length).toBeLessThanOrEqual(200)
+    })
+
+    it('logs warning when log is provided and Zod parse fails', async () => {
+        generateTextMock.mockResolvedValueOnce({
+            toolCalls: [{ toolName: 'BAD_TOOL', args: {} }],
+            usage: { promptTokens: 0, completionTokens: 0 },
+        })
+        const warn = vi.fn()
+        const log = { warn, error: vi.fn(), info: vi.fn(), debug: vi.fn(), trace: vi.fn(), fatal: vi.fn(), child: vi.fn(), level: 'warn', silent: vi.fn(), bindings: vi.fn() }
+        const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
+        const adapter = new VercelAIAdapter({
+            modelHint: 'claude-sonnet-4-6',
+            resolveModel: async () => mockModel,
+            log: log as never,
+        })
+        await adapter.proposeCommands(baseInput)
+        expect(warn).toHaveBeenCalledTimes(1)
+    })
+
+    it('logs warning on generateText throw when log is provided', async () => {
+        generateTextMock.mockRejectedValueOnce(new Error('boom'))
+        const warn = vi.fn()
+        const log = { warn, error: vi.fn(), info: vi.fn(), debug: vi.fn(), trace: vi.fn(), fatal: vi.fn(), child: vi.fn(), level: 'warn', silent: vi.fn(), bindings: vi.fn() }
+        const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
+        const adapter = new VercelAIAdapter({
+            modelHint: 'claude-sonnet-4-6',
+            resolveModel: async () => mockModel,
+            log: log as never,
+        })
+        const result = await adapter.proposeCommands(baseInput)
+        expect(warn).toHaveBeenCalledTimes(1)
+        expect(result.error).toContain('boom')
+    })
 })

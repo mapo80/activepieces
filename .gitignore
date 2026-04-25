@@ -90,6 +90,8 @@ packages/tests-e2e/test-results/
 packages/tests-e2e/playwright-report/
 packages/server/engine/test-results/
 packages/server/engine/coverage/
+packages/server/api/coverage/
+packages/server/api/coverage-*/
 
 # Terraform
 deploy/terraform/**/.terraform/
