@@ -88,3 +88,46 @@ Append-only log. Format: `## YYYY-MM-DD HH:MM UTC`.
 - Both adapters produce the same TurnResult shape, enabling single switch statement at call sites.
 - MockProviderAdapter enables deterministic tests without LLM.
 - Saga lifecycle works end-to-end on PGLite (verified 9/9 interpreter tests).
+
+## 2026-04-25 07:48 UTC — Phase 2-ENGINE-07/08/09 VERIFIED
+
+**Completed (3 new commits)**:
+- P2-ENGINE-07/08: Feature flag `useCommandLayer` injection in
+  interactive-flow-executor.ts at 2 call sites (resume + first-turn).
+  Branch is opt-in: when true, calls commandLayerClientAdapter.interpret
+  + adaptTurnResultToExtractResult → preserves all downstream side-effects
+  (pendingOverwriteSignal, rejectionHint, lastExtractionDecisions,
+  topicChange, executedNodeIds reset). Default (undefined/false) = legacy
+  path identical.
+- P2-ENGINE-09: sessionStore.loadWithRevision / saveWithCAS helpers
+  using new API endpoints GET /v1/store-entries/with-version and
+  POST /v1/store-entries/put-with-version. Both handle 412 (CAS
+  conflict) and transport failure gracefully (fallback to legacy save).
+
+**Gate status**:
+- G-LINT: verde (0 errors)
+- G-ENGINE-UNIT: 357/357 passing (no regression)
+- G-LEGACY-INTEGRATION: verde (default path unchanged)
+
+**Cumulative commits on feature/command-layer-p0b-infra branch**: 11
+- 70f4de4718: Phase 0A-INFRA storage infrastructure
+- 6b8e8d645c: Phase 0B-CONTRACT shared DTOs
+- 7d52b32989: Phase 1-CORE core modules + endpoints (9/9 tests)
+- ac5121fb05: progress-log Phase 0+1
+- a4a2246823: Phase 2-ENGINE-01 turn-interpreter-client
+- (P2-02-05 commit): TurnResult + adapters
+- bc6a19f010: progress-log Phase 2 partial
+- cbd1fe6ff8: Phase 2-ENGINE-07/08 useCommandLayer flag injection
+- 60797c74e8: Phase 2-ENGINE-09 sessionStore CAS helpers
+
+**Completamento stimato**: ~22% del totale plan.
+
+**Test counts**: 633/633 verdi
+- 6 storage primitives integration
+- 9 interpreter end-to-end integration
+- 261 shared unit
+- 357 engine unit
+
+**Next milestone**: Phase 2-ENGINE-10 (finalize/rollback handshake post-DAG)
++ P2-ENGINE-11 (StatusRenderer engine-side) + P3-FRONTEND (TurnEvent
+hook + reducer + chat timeline extension).
