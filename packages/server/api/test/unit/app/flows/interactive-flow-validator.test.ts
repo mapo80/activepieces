@@ -201,4 +201,41 @@ describe('validateInteractiveFlow', () => {
         expect(result.valid).toBe(true)
         expect(result.errors).toEqual([])
     })
+
+    describe('useCommandLayer compatibility', () => {
+        const baseSettings = { nodes: [], stateFields: [] }
+
+        it('accepts useCommandLayer=true on POSTGRES', () => {
+            const result = validateInteractiveFlow({ ...baseSettings, useCommandLayer: true }, { dbType: 'POSTGRES' })
+            expect(result.valid).toBe(true)
+        })
+
+        it('accepts useCommandLayer=true on PGLITE', () => {
+            const result = validateInteractiveFlow({ ...baseSettings, useCommandLayer: true }, { dbType: 'PGLITE' })
+            expect(result.valid).toBe(true)
+        })
+
+        it('rejects useCommandLayer=true on SQLITE3 with i18n key', () => {
+            const result = validateInteractiveFlow({ ...baseSettings, useCommandLayer: true }, { dbType: 'SQLITE3' })
+            expect(result.valid).toBe(false)
+            const err = result.errors.find(e => e.code === 'COMMAND_LAYER_REQUIRES_POSTGRES')
+            expect(err).toBeDefined()
+            expect(err?.message).toBe('validation.commandLayer.requiresPostgres')
+        })
+
+        it('skips check when dbType is undefined (preserves pure-validator callers)', () => {
+            const result = validateInteractiveFlow({ ...baseSettings, useCommandLayer: true })
+            expect(result.errors.find(e => e.code === 'COMMAND_LAYER_REQUIRES_POSTGRES')).toBeUndefined()
+        })
+
+        it('does not enforce when useCommandLayer is false', () => {
+            const result = validateInteractiveFlow({ ...baseSettings, useCommandLayer: false }, { dbType: 'SQLITE3' })
+            expect(result.errors.find(e => e.code === 'COMMAND_LAYER_REQUIRES_POSTGRES')).toBeUndefined()
+        })
+
+        it('does not enforce when useCommandLayer is omitted', () => {
+            const result = validateInteractiveFlow(baseSettings, { dbType: 'SQLITE3' })
+            expect(result.errors.find(e => e.code === 'COMMAND_LAYER_REQUIRES_POSTGRES')).toBeUndefined()
+        })
+    })
 })

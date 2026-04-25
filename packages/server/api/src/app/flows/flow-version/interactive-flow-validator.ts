@@ -5,17 +5,6 @@ import {
     isNil,
 } from '@activepieces/shared'
 
-export type InteractiveFlowValidationError = {
-    code: 'INVALID_SCHEMA' | 'DUPLICATE_OUTPUT' | 'ORPHAN_INPUT' | 'UNREACHABLE_OUTPUT' | 'CYCLE' | 'UNKNOWN_BRANCH_TARGET' | 'UNKNOWN_COMPONENT' | 'MISSING_STATE_FIELD' | 'DUPLICATE_NODE_ID' | 'DUPLICATE_STATE_FIELD'
-    path?: string
-    message: string
-}
-
-export type InteractiveFlowValidationResult = {
-    valid: boolean
-    errors: InteractiveFlowValidationError[]
-}
-
 const KNOWN_COMPONENT_IDS: ReadonlySet<string> = new Set([
     'TextInput',
     'DataTable',
@@ -25,7 +14,12 @@ const KNOWN_COMPONENT_IDS: ReadonlySet<string> = new Set([
     'DocumentCard',
 ])
 
-export function validateInteractiveFlow(rawSettings: unknown): InteractiveFlowValidationResult {
+const COMMAND_LAYER_SUPPORTED_DB_TYPES: ReadonlySet<string> = new Set(['POSTGRES', 'PGLITE'])
+
+export function validateInteractiveFlow(
+    rawSettings: unknown,
+    options?: InteractiveFlowValidationOptions,
+): InteractiveFlowValidationResult {
     const parsed = InteractiveFlowActionSettings.safeParse(rawSettings)
     if (!parsed.success) {
         return {
@@ -49,6 +43,7 @@ export function validateInteractiveFlow(rawSettings: unknown): InteractiveFlowVa
     errors.push(...checkBranchTargets(settings.nodes))
     errors.push(...checkComponentWhitelist(settings.nodes))
     errors.push(...checkCycles(settings.nodes))
+    errors.push(...checkCommandLayerCompatibility(settings, options?.dbType))
 
     return { valid: errors.length === 0, errors }
 }
@@ -272,4 +267,33 @@ function checkCycles(nodes: readonly InteractiveFlowNode[]): InteractiveFlowVali
         path: 'nodes',
         message: `Cycle detected in dependency graph among nodes: ${Array.from(cyclicNodes).sort().join(', ')}`,
     }]
+}
+
+function checkCommandLayerCompatibility(
+    settings: { useCommandLayer?: boolean },
+    dbType: string | undefined,
+): InteractiveFlowValidationError[] {
+    if (settings.useCommandLayer !== true) return []
+    if (isNil(dbType)) return []
+    if (COMMAND_LAYER_SUPPORTED_DB_TYPES.has(dbType)) return []
+    return [{
+        code: 'COMMAND_LAYER_REQUIRES_POSTGRES',
+        path: 'useCommandLayer',
+        message: 'validation.commandLayer.requiresPostgres',
+    }]
+}
+
+export type InteractiveFlowValidationError = {
+    code: 'INVALID_SCHEMA' | 'DUPLICATE_OUTPUT' | 'ORPHAN_INPUT' | 'UNREACHABLE_OUTPUT' | 'CYCLE' | 'UNKNOWN_BRANCH_TARGET' | 'UNKNOWN_COMPONENT' | 'MISSING_STATE_FIELD' | 'DUPLICATE_NODE_ID' | 'DUPLICATE_STATE_FIELD' | 'COMMAND_LAYER_REQUIRES_POSTGRES'
+    path?: string
+    message: string
+}
+
+export type InteractiveFlowValidationResult = {
+    valid: boolean
+    errors: InteractiveFlowValidationError[]
+}
+
+export type InteractiveFlowValidationOptions = {
+    dbType?: string
 }

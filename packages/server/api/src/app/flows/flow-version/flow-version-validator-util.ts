@@ -21,6 +21,8 @@ import {
 } from '@activepieces/shared'
 import { FastifyBaseLogger } from 'fastify'
 import { z } from 'zod'
+import { system } from '../../helper/system/system'
+import { AppSystemProp } from '../../helper/system/system-props'
 import { pieceMetadataService } from '../../pieces/metadata/piece-metadata-service'
 import { validateInteractiveFlow } from './interactive-flow-validator'
 
@@ -80,6 +82,7 @@ export const flowVersionValidationUtil = (log: FastifyBaseLogger): FlowVersionVa
                     case FlowActionType.INTERACTIVE_FLOW:
                         clonedRequest.request.action.valid = validateInteractiveFlow(
                             clonedRequest.request.action.settings,
+                            { dbType: system.get(AppSystemProp.DB_TYPE) },
                         ).valid
                         break
                 }
@@ -115,6 +118,7 @@ export const flowVersionValidationUtil = (log: FastifyBaseLogger): FlowVersionVa
                     case FlowActionType.INTERACTIVE_FLOW:
                         clonedRequest.request.valid = validateInteractiveFlow(
                             clonedRequest.request.settings,
+                            { dbType: system.get(AppSystemProp.DB_TYPE) },
                         ).valid
                         break
                 }
