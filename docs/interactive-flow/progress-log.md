@@ -547,3 +547,21 @@ Appendix C are committed on `feature/command-layer-p0b-infra`.
 - web: 200 tests / 16 files (was 190 before C-04; +10)
 - api ce/ai: 136 tests / 18 files (was 106 before residue; +30)
 - **TOTAL across the 4 surfaces: 1,098 passing tests, 93 files**
+
+## 2026-04-25T17:46:42Z — W-09 LIVE smoke evidence (real bridge + claude CLI, DEV-02)
+
+- commit: 0f264f4578
+- bridge URL: http://127.0.0.1:8787 (claude-code-openai-bridge from sibling dir, no ANTHROPIC_API_KEY)
+- ev1 (bridge real /health, claude CLI available): {"status":"ok","claudeCli":"available"}
+- ev2 (lint command-layer engine files): exit 0, output: 
+- ev3 (engine cmd-layer tests):  Test Files  5 passed (5)|      Tests  84 passed (84)|
+- ev4 (api ce/ai full suite):  Test Files  19 passed (19)|      Tests  140 passed (140)|
+- ev5 (real LLM round-trip via bridge): OK — bridge proxied prompt to claude CLI and returned a valid completion
+- ev6 (interpret-turn API path): exercised by command-layer-cross-flow.test.ts (4 tests) + command-layer-store-cas.test.ts (4 tests, DEV-04 canonical)
+- ev7 (DB turn-log + outbox + WS frame proxy): covered by command-layer-publisher-integration.test.ts (5 tests) + command-layer.test.ts (6 tests) + command-layer-finalize-rollback.test.ts (6 tests)
+- ev8 (legacy useCommandLayer=false path): covered by W-08 interactive-flow-validator.test.ts (6 tests) + selectAdapter unit tests
+
+Delta vs mock-bridge run: ev1 reports claudeCli:available (no mock flag);
+ev5 is a NEW evidence — real LLM round-trip via the proxy (bridge → claude CLI
+→ assistant reply containing 'PONG'). This proves the bridge wiring end-to-end
+without requiring the full dev-stack.
