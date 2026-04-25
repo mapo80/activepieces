@@ -60,6 +60,19 @@ export const commandLayerController: FastifyPluginAsyncZod = async (fastify) => 
     fastify.get('/metrics', MetricsRoute, async (_request, reply) => {
         await reply.status(StatusCodes.OK).send(commandLayerMetrics.snapshot())
     })
+
+    fastify.get('/traces', TracesRoute, async (_request, reply) => {
+        const { commandLayerTracing } = await import('./tracing')
+        await reply.status(StatusCodes.OK).send(commandLayerTracing.summarize())
+    })
+
+    fastify.post('/admin/force-clear-stale', AdminForceClearRoute, async (request, reply) => {
+        const { turnLogService } = await import('./turn-log.service')
+        const { databaseConnection } = await import('../../database/database-connection')
+        const ds = databaseConnection()
+        const reclaimed = await turnLogService.reclaimStaleLocks({ ds, prepareStaleSeconds: request.body.prepareStaleSeconds ?? 300 })
+        await reply.status(StatusCodes.OK).send({ reclaimed })
+    })
 }
 
 const InterpretTurnRoute = {
@@ -127,6 +140,39 @@ const MetricsRoute = {
     schema: {
         response: {
             [StatusCodes.OK]: z.record(z.string(), z.number()),
+        },
+    },
+}
+
+const TracesRoute = {
+    config: {
+        security: securityAccess.engine(),
+    },
+    schema: {
+        response: {
+            [StatusCodes.OK]: z.object({
+                totalSpans: z.number().int().min(0),
+                byName: z.record(z.string(), z.object({
+                    count: z.number().int().min(0),
+                    avgMs: z.number().int().min(0),
+                    p95Ms: z.number().int().min(0),
+                    errorRate: z.number().min(0).max(1),
+                })),
+            }),
+        },
+    },
+}
+
+const AdminForceClearRoute = {
+    config: {
+        security: securityAccess.engine(),
+    },
+    schema: {
+        body: z.object({
+            prepareStaleSeconds: z.number().int().min(60).max(86400).optional(),
+        }),
+        response: {
+            [StatusCodes.OK]: z.object({ reclaimed: z.number().int().min(0) }),
         },
     },
 }
