@@ -447,3 +447,18 @@ exceeding the G-E2E-API target of 104+. All gate-relevant suites green:
 3. Add coverage thresholds to engine/shared/web vitest.config (C-02..C-04).
 4. Implement H-HARDEN tasks (i18n locale fan-out, Prometheus metrics
    format, PII redactor in outbox insert).
+
+## 2026-04-25T14:59:29Z — W-09 smoke evidence (in-process, mock bridge)
+
+- commit: cbded91dd7
+- ev1 (bridge /health): {"ok":true,"mock":true}
+- ev2 (lint command-layer engine files): exit 0, output: 
+- ev3 (engine cmd-layer tests):  Test Files  5 passed (5)|      Tests  84 passed (84)|
+- ev4 (api ce/ai full suite):  Test Files  17 passed (17)|      Tests  131 passed (131)|
+- ev5 (flow fixtures): MISSING_DIR (env-bound — will be loaded via REST in live smoke)
+- ev6 (interpret-turn API path): exercised by command-layer-cross-flow.test.ts (4/4 passing)
+- ev7 (DB turn-log + outbox + WS frame surrogate): covered by command-layer-publisher-integration.test.ts (5 tests) + command-layer.test.ts (6 tests)
+- ev8 (legacy useCommandLayer=false path): covered by W-08 interactive-flow-validator.test.ts (6 tests) + selectAdapter unit tests in turn-interpreter-adapter.test.ts
+
+Live dev-stack execution remains documented in
+[w09-smoke-checklist.md](w09-smoke-checklist.md).
