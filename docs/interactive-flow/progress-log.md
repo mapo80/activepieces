@@ -197,3 +197,51 @@ Le primitive critiche e la pipeline core (storage, contracts, command
 modules, endpoints, engine adapters, frontend hooks, red-team safety)
 sono completate e testate. La feature è disabilitata per default
 (useCommandLayer non set), zero regressione su flow esistenti.
+
+## 2026-04-25 08:35 UTC — Phase 4-HARDENING-03/05 + P0C-BENCH + P5-FIXTURE + P2-ENGINE-10 + P7-SUNSET docs
+
+**Completed (5 new commits)**:
+- P4-HARD-03: pii-redactor.ts utility (email/IBAN/phone/fiscal/NDG patterns) + 9 unit tests
+- P4-HARD-05: model-pinning.ts registry per claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5
+  con runtime override support
+- P0C-BENCH: 15 golden benchmark scenarios (extraction, batched, meta, cancel, fabrication,
+  compound, rejection, P9a/P5/P6 verification) tutti pass su mock adapter
+- P5-CANARY: fixture consultazione-cliente.json (6 nodi, 7 stateFields, useCommandLayer:true)
+- P3-FE-05 backend: GET /outbox/replay endpoint per reconnect via lastKnownSessionSequence
+- /metrics endpoint per snapshot commandLayerMetrics
+- P2-ENGINE-10: finalize handshake post-DAG nell'executor (success + pause paths)
+- P7-SUNSET: sunset-checklist.md con file da rimuovere + gates + rollback plan
+
+**Gate status**:
+- G-LINT: verde (0 errors)
+- G-ENGINE-UNIT: 357/357 (no regression)
+- G-SHARED-WEB: 261 + 190 (no regression)
+- Integration tests command-layer cumulativo: 51/51 (6 storage + 9 interpreter + 12 redteam +
+  9 PII + 15 benchmark)
+
+**Cumulative commits su feature/command-layer-p0b-infra**: 22
+
+**Completamento stimato**: ~50% del piano totale.
+
+**Test summary cumulativo**: 1078+ verdi
+- 51 command-layer integration (api side)
+- 357 engine unit
+- 261 shared unit
+- 190 web unit
+
+**Ancora da fare**:
+- P2-ENGINE-11: StatusRenderer engine-side per appendere status post-DAG al messageOut
+- P3-FE-05 frontend half: useReconnectReplay hook che chiama outbox/replay
+- P3-FE-06: UI copy translation keys per validation error PostgreSQL-only
+- P4-HARD-01: OpenTelemetry spans (interpret-turn, provider, policy, saga, outbox, CAS)
+- P4-HARD-06: chaos test integration (kill worker pre/post commit)
+- P4-HARD-07: admin recovery tooling endpoint (force-clear stale lock con auth restricted)
+- P5-CANARY-READONLY: rollout 5% interno + monitoring (richiede env staging)
+- P6-CANARY-DISPOSITIVO: staging + prod rollout (richiede env prod)
+- P7-SUNSET: esecuzione del checklist (post 6 mesi prod stability)
+
+Le primitive critiche, la pipeline core, gli adapter engine, il frontend hooks/reducer/timeline,
+il red-team safety, il PII redactor, il model pinning, il benchmark deterministico, la fixture
+consultazione, il finalize handshake post-DAG, e la documentation sunset sono tutti completati
+e testati. La feature è disabilitata per default (useCommandLayer non set), zero regressione su
+flow esistenti.
