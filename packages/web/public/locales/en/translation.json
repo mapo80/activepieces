@@ -1544,5 +1544,10 @@
   "Required": "Required",
   "Description": "Description",
   "Cancel": "Cancel",
-  "Select": "Select"
+  "Select": "Select",
+  "validation.commandLayer.requiresPostgres": "The command layer feature requires PostgreSQL. Disable useCommandLayer or switch to a PostgreSQL deployment.",
+  "validation.commandLayer.featureDisabled": "The command layer is disabled on this installation.",
+  "validation.bigint.format": "Invalid sequence format (expected positive bigint).",
+  "validation.conversationCommand.field.required": "Command requires a field name.",
+  "validation.conversationCommand.evidence.tooShort": "Evidence too short (minimum 2 characters)."
 }
