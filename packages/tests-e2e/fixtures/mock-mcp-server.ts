@@ -29,9 +29,13 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+export type MockMcpMode = 'happy' | 'catalog-fail' | 'slow' | 'crash';
+
 export type StartMockMcpOptions = {
   port: number;
   tools: MockMcpTool[];
+  mode?: MockMcpMode;
+  slowMs?: number;
 };
 
 export type MockMcpServer = {
@@ -39,7 +43,9 @@ export type MockMcpServer = {
   close: () => Promise<void>;
 };
 
-export async function startMockMcpServer({ port, tools }: StartMockMcpOptions): Promise<MockMcpServer> {
+const DEFAULT_SLOW_MS = 5_000;
+
+export async function startMockMcpServer({ port, tools, mode = 'happy', slowMs = DEFAULT_SLOW_MS }: StartMockMcpOptions): Promise<MockMcpServer> {
   const byName = new Map(tools.map((t) => [t.name, t]));
 
   const server = createServer(async (req, res) => {
@@ -47,6 +53,15 @@ export async function startMockMcpServer({ port, tools }: StartMockMcpOptions): 
       res.writeHead(404);
       res.end();
       return;
+    }
+
+    if (mode === 'crash') {
+      req.socket.destroy();
+      return;
+    }
+
+    if (mode === 'slow') {
+      await new Promise((resolve) => setTimeout(resolve, slowMs));
     }
 
     let request: JsonRpcRequest;
@@ -83,6 +98,15 @@ export async function startMockMcpServer({ port, tools }: StartMockMcpOptions): 
           jsonrpc: '2.0',
           id: request.id,
           error: { code: -32601, message: `Unknown tool: ${params.name}` },
+        }));
+        return;
+      }
+      if (mode === 'catalog-fail' && /list_|catalog/i.test(tool.name)) {
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({
+          jsonrpc: '2.0',
+          id: request.id,
+          error: { code: -32001, message: `[mock-mcp:catalog-fail] ${tool.name} unavailable` },
         }));
         return;
       }
