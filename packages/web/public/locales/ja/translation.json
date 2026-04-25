@@ -1460,5 +1460,10 @@
   "+{count} more": "+{count} 以上",
   "You have {count} {count, plural, one {flow} other {flows}} without time saved per run. Add it to see your complete automation impact!_other": "",
   "{count} flows created successfully in a new folder_other": "",
-  "This template includes {count} flows with all dependencies. A new folder will be created to organize them._other": ""
+  "This template includes {count} flows with all dependencies. A new folder will be created to organize them._other": "",
+  "validation.bigint.format": "シーケンス形式が無効です（正の bigint を期待）。",
+  "validation.commandLayer.featureDisabled": "このインストールではコマンドレイヤーが無効です。",
+  "validation.commandLayer.requiresPostgres": "コマンドレイヤー機能には PostgreSQL が必要です。useCommandLayer を無効にするか、PostgreSQL 環境に切り替えてください。",
+  "validation.conversationCommand.evidence.tooShort": "エビデンスが短すぎます（最小2文字）。",
+  "validation.conversationCommand.field.required": "コマンドにはフィールド名が必要です。"
 }

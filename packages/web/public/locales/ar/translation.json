@@ -1189,5 +1189,10 @@
   "Select a project role": "اختر دور المشروع",
   "Steps in this flow": "الخطوات في هذا التدفق",
   "Invalid Access": "Invalid Access",
-  "Either the project does not exist or you do not have access to it.": "Either the project does not exist or you do not have access to it."
+  "Either the project does not exist or you do not have access to it.": "Either the project does not exist or you do not have access to it.",
+  "validation.bigint.format": "تنسيق التسلسل غير صالح (متوقع bigint موجب).",
+  "validation.commandLayer.featureDisabled": "طبقة الأوامر معطلة على هذا التثبيت.",
+  "validation.commandLayer.requiresPostgres": "ميزة طبقة الأوامر تتطلب PostgreSQL. قم بتعطيل useCommandLayer أو انتقل إلى نشر PostgreSQL.",
+  "validation.conversationCommand.evidence.tooShort": "الدليل قصير جدًا (الحد الأدنى حرفان).",
+  "validation.conversationCommand.field.required": "الأمر يتطلب اسم حقل."
 }

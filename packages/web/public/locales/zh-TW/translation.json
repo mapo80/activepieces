@@ -1395,5 +1395,10 @@
   "License activated successfully!": "",
   "Activation failed, invalid license key": "",
   "Today": "",
-  "Yesterday": ""
+  "Yesterday": "",
+  "validation.bigint.format": "序列格式無效（應為正 bigint）。",
+  "validation.commandLayer.featureDisabled": "此安裝上的命令層已停用。",
+  "validation.commandLayer.requiresPostgres": "命令層功能需要 PostgreSQL。請停用 useCommandLayer 或切換到 PostgreSQL 部署。",
+  "validation.conversationCommand.evidence.tooShort": "證據過短（最少 2 個字元）。",
+  "validation.conversationCommand.field.required": "命令需要欄位名稱。"
 }

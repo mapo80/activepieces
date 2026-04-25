@@ -1463,5 +1463,10 @@
   "{count} flows created successfully in a new folder_one": "",
   "{count} flows created successfully in a new folder_other": "",
   "This template includes {count} flows with all dependencies. A new folder will be created to organize them._one": "",
-  "This template includes {count} flows with all dependencies. A new folder will be created to organize them._other": ""
+  "This template includes {count} flows with all dependencies. A new folder will be created to organize them._other": "",
+  "validation.bigint.format": "Format de séquence non valide (bigint positif attendu).",
+  "validation.commandLayer.featureDisabled": "Le Command Layer est désactivé sur cette installation.",
+  "validation.commandLayer.requiresPostgres": "La fonctionnalité Command Layer nécessite PostgreSQL. Désactivez useCommandLayer ou passez à une installation PostgreSQL.",
+  "validation.conversationCommand.evidence.tooShort": "Preuve trop courte (minimum 2 caractères).",
+  "validation.conversationCommand.field.required": "La commande nécessite un nom de champ."
 }

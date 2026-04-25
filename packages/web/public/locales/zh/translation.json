@@ -1460,5 +1460,10 @@
   "+{count} more": "+{count} more",
   "You have {count} {count, plural, one {flow} other {flows}} without time saved per run. Add it to see your complete automation impact!_other": "",
   "{count} flows created successfully in a new folder_other": "",
-  "This template includes {count} flows with all dependencies. A new folder will be created to organize them._other": ""
+  "This template includes {count} flows with all dependencies. A new folder will be created to organize them._other": "",
+  "validation.bigint.format": "序列格式无效（应为正 bigint）。",
+  "validation.commandLayer.featureDisabled": "此安装上的命令层已禁用。",
+  "validation.commandLayer.requiresPostgres": "命令层功能需要 PostgreSQL。请禁用 useCommandLayer 或切换到 PostgreSQL 部署。",
+  "validation.conversationCommand.evidence.tooShort": "证据过短（最少 2 个字符）。",
+  "validation.conversationCommand.field.required": "命令需要字段名称。"
 }
