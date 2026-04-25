@@ -17,10 +17,10 @@ export default defineConfig({
       thresholds: {
         'src/features/interactive-flow/hooks/use-interactive-flow-turn-events.ts':
           {
-            statements: 0,
-            branches: 0,
-            functions: 0,
-            lines: 0,
+            statements: 85,
+            branches: 80,
+            functions: 90,
+            lines: 85,
           },
         'src/features/interactive-flow/hooks/interactive-flow-turn-reducer.ts':
           {
