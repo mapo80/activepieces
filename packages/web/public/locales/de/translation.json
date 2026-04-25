@@ -1468,5 +1468,16 @@
   "validation.commandLayer.featureDisabled": "Der Command Layer ist auf dieser Installation deaktiviert.",
   "validation.commandLayer.requiresPostgres": "Die Command-Layer-Funktion erfordert PostgreSQL. Deaktivieren Sie useCommandLayer oder wechseln Sie zu einer PostgreSQL-Installation.",
   "validation.conversationCommand.evidence.tooShort": "Beleg zu kurz (mindestens 2 Zeichen).",
-  "validation.conversationCommand.field.required": "Befehl erfordert einen Feldnamen."
+  "validation.conversationCommand.field.required": "Befehl erfordert einen Feldnamen.",
+  "interactiveFlow.timeline.cancelConfirmed": "Flow abgebrochen",
+  "interactiveFlow.timeline.cancelRejected": "Abbruch widerrufen",
+  "interactiveFlow.timeline.cancelRequested": "Abbruch vorgeschlagen",
+  "interactiveFlow.timeline.cancelTtlExpired": "Abbruch abgelaufen",
+  "interactiveFlow.timeline.fieldExtracted": "Extrahiert: {{field}} = {{value}}",
+  "interactiveFlow.timeline.infoAnswered": "Informative Antwort: {{infoIntent}}",
+  "interactiveFlow.timeline.metaAnswered": "Konversationelle Antwort ({{kind}})",
+  "interactiveFlow.timeline.repromptEmitted": "Reformulierung angefragt ({{reason}})",
+  "interactiveFlow.timeline.turnCommitted": "Runde committet",
+  "interactiveFlow.timeline.turnFailed": "Runde fehlgeschlagen",
+  "interactiveFlow.timeline.turnRolledBack": "Runde zurückgesetzt"
 }

@@ -1,4 +1,5 @@
 import { InteractiveFlowTurnEvent } from '@activepieces/shared';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
 
@@ -9,6 +10,8 @@ import {
   runtimeStepLabelColor,
   RuntimeStepIcon,
 } from './runtime-step-icon';
+
+type Translator = (key: string, opts?: Record<string, unknown>) => string;
 
 type ChatRuntimeTimelineProps = {
   active: boolean;
@@ -23,6 +26,7 @@ export function ChatRuntimeTimeline({
   turnEvents,
   nodeLabels,
 }: ChatRuntimeTimelineProps): React.ReactElement | null {
+  const { t } = useTranslation();
   const hasContent = entries.length > 0 || (turnEvents?.length ?? 0) > 0;
   if (!active && !hasContent) return null;
   if (!hasContent) {
@@ -57,7 +61,9 @@ export function ChatRuntimeTimeline({
           className="flex items-center gap-2"
         >
           <span aria-hidden="true">{turnEventEmoji(event.kind)}</span>
-          <span className="text-muted-foreground">{turnEventLabel(event)}</span>
+          <span className="text-muted-foreground">
+            {turnEventLabel(event, t)}
+          </span>
         </div>
       ))}
       {active && <InlineDots className="pt-1" />}
@@ -104,33 +110,43 @@ function turnEventEmoji(kind: InteractiveFlowTurnEvent['kind']): string {
   }
 }
 
-function turnEventLabel(event: InteractiveFlowTurnEvent): string {
+function turnEventLabel(
+  event: InteractiveFlowTurnEvent,
+  t: Translator,
+): string {
   const payload = event.payload as Record<string, unknown>;
   switch (event.kind) {
     case 'FIELD_EXTRACTED':
-      return `Estratto: ${String(payload.field ?? '')} = ${formatValue(
-        payload.value,
-      )}`;
+      return t('interactiveFlow.timeline.fieldExtracted', {
+        field: String(payload.field ?? ''),
+        value: formatValue(payload.value),
+      });
     case 'META_ANSWERED':
-      return `Risposta conversazionale (${String(payload.kind ?? '')})`;
+      return t('interactiveFlow.timeline.metaAnswered', {
+        kind: String(payload.kind ?? ''),
+      });
     case 'INFO_ANSWERED':
-      return `Risposta informativa: ${String(payload.infoIntent ?? '')}`;
+      return t('interactiveFlow.timeline.infoAnswered', {
+        infoIntent: String(payload.infoIntent ?? ''),
+      });
     case 'CANCEL_REQUESTED':
-      return 'Annullamento proposto';
+      return t('interactiveFlow.timeline.cancelRequested');
     case 'CANCEL_CONFIRMED':
-      return 'Flusso annullato';
+      return t('interactiveFlow.timeline.cancelConfirmed');
     case 'CANCEL_REJECTED':
-      return 'Annullamento revocato';
+      return t('interactiveFlow.timeline.cancelRejected');
     case 'CANCEL_TTL_EXPIRED':
-      return 'Annullamento scaduto';
+      return t('interactiveFlow.timeline.cancelTtlExpired');
     case 'REPROMPT_EMITTED':
-      return `Richiesta riformulazione (${String(payload.reason ?? '')})`;
+      return t('interactiveFlow.timeline.repromptEmitted', {
+        reason: String(payload.reason ?? ''),
+      });
     case 'TURN_COMMITTED':
-      return 'Turno acquisito';
+      return t('interactiveFlow.timeline.turnCommitted');
     case 'TURN_ROLLED_BACK':
-      return 'Turno annullato (rollback)';
+      return t('interactiveFlow.timeline.turnRolledBack');
     case 'TURN_FAILED':
-      return 'Turno fallito';
+      return t('interactiveFlow.timeline.turnFailed');
     default:
       return event.kind;
   }

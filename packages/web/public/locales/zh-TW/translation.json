@@ -1400,5 +1400,16 @@
   "validation.commandLayer.featureDisabled": "此安裝上的命令層已停用。",
   "validation.commandLayer.requiresPostgres": "命令層功能需要 PostgreSQL。請停用 useCommandLayer 或切換到 PostgreSQL 部署。",
   "validation.conversationCommand.evidence.tooShort": "證據過短（最少 2 個字元）。",
-  "validation.conversationCommand.field.required": "命令需要欄位名稱。"
+  "validation.conversationCommand.field.required": "命令需要欄位名稱。",
+  "interactiveFlow.timeline.cancelConfirmed": "流程已取消",
+  "interactiveFlow.timeline.cancelRejected": "取消已撤銷",
+  "interactiveFlow.timeline.cancelRequested": "已提議取消",
+  "interactiveFlow.timeline.cancelTtlExpired": "取消已過期",
+  "interactiveFlow.timeline.fieldExtracted": "已提取：{{field}} = {{value}}",
+  "interactiveFlow.timeline.infoAnswered": "資訊回覆：{{infoIntent}}",
+  "interactiveFlow.timeline.metaAnswered": "對話回覆 ({{kind}})",
+  "interactiveFlow.timeline.repromptEmitted": "請求重新表述 ({{reason}})",
+  "interactiveFlow.timeline.turnCommitted": "回合已提交",
+  "interactiveFlow.timeline.turnFailed": "回合失敗",
+  "interactiveFlow.timeline.turnRolledBack": "回合已回滾"
 }

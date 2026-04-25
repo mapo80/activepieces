@@ -1345,5 +1345,16 @@
   "validation.commandLayer.featureDisabled": "Command Layer отключен на этой установке.",
   "validation.commandLayer.requiresPostgres": "Функция Command Layer требует PostgreSQL. Отключите useCommandLayer или перейдите на установку PostgreSQL.",
   "validation.conversationCommand.evidence.tooShort": "Доказательство слишком короткое (минимум 2 символа).",
-  "validation.conversationCommand.field.required": "Команде требуется имя поля."
+  "validation.conversationCommand.field.required": "Команде требуется имя поля.",
+  "interactiveFlow.timeline.cancelConfirmed": "Поток отменён",
+  "interactiveFlow.timeline.cancelRejected": "Отмена отозвана",
+  "interactiveFlow.timeline.cancelRequested": "Отмена предложена",
+  "interactiveFlow.timeline.cancelTtlExpired": "Отмена истекла",
+  "interactiveFlow.timeline.fieldExtracted": "Извлечено: {{field}} = {{value}}",
+  "interactiveFlow.timeline.infoAnswered": "Информационный ответ: {{infoIntent}}",
+  "interactiveFlow.timeline.metaAnswered": "Разговорный ответ ({{kind}})",
+  "interactiveFlow.timeline.repromptEmitted": "Запрошена переформулировка ({{reason}})",
+  "interactiveFlow.timeline.turnCommitted": "Ход зафиксирован",
+  "interactiveFlow.timeline.turnFailed": "Ход не удался",
+  "interactiveFlow.timeline.turnRolledBack": "Ход откачен"
 }

@@ -1468,5 +1468,16 @@
   "validation.commandLayer.featureDisabled": "Le Command Layer est désactivé sur cette installation.",
   "validation.commandLayer.requiresPostgres": "La fonctionnalité Command Layer nécessite PostgreSQL. Désactivez useCommandLayer ou passez à une installation PostgreSQL.",
   "validation.conversationCommand.evidence.tooShort": "Preuve trop courte (minimum 2 caractères).",
-  "validation.conversationCommand.field.required": "La commande nécessite un nom de champ."
+  "validation.conversationCommand.field.required": "La commande nécessite un nom de champ.",
+  "interactiveFlow.timeline.cancelConfirmed": "Flux annulé",
+  "interactiveFlow.timeline.cancelRejected": "Annulation révoquée",
+  "interactiveFlow.timeline.cancelRequested": "Annulation proposée",
+  "interactiveFlow.timeline.cancelTtlExpired": "Annulation expirée",
+  "interactiveFlow.timeline.fieldExtracted": "Extrait : {{field}} = {{value}}",
+  "interactiveFlow.timeline.infoAnswered": "Réponse informative : {{infoIntent}}",
+  "interactiveFlow.timeline.metaAnswered": "Réponse conversationnelle ({{kind}})",
+  "interactiveFlow.timeline.repromptEmitted": "Reformulation demandée ({{reason}})",
+  "interactiveFlow.timeline.turnCommitted": "Tour validé",
+  "interactiveFlow.timeline.turnFailed": "Tour échoué",
+  "interactiveFlow.timeline.turnRolledBack": "Tour annulé"
 }

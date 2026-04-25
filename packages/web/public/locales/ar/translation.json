@@ -1194,5 +1194,16 @@
   "validation.commandLayer.featureDisabled": "طبقة الأوامر معطلة على هذا التثبيت.",
   "validation.commandLayer.requiresPostgres": "ميزة طبقة الأوامر تتطلب PostgreSQL. قم بتعطيل useCommandLayer أو انتقل إلى نشر PostgreSQL.",
   "validation.conversationCommand.evidence.tooShort": "الدليل قصير جدًا (الحد الأدنى حرفان).",
-  "validation.conversationCommand.field.required": "الأمر يتطلب اسم حقل."
+  "validation.conversationCommand.field.required": "الأمر يتطلب اسم حقل.",
+  "interactiveFlow.timeline.cancelConfirmed": "تم إلغاء التدفق",
+  "interactiveFlow.timeline.cancelRejected": "تم التراجع عن الإلغاء",
+  "interactiveFlow.timeline.cancelRequested": "تم اقتراح الإلغاء",
+  "interactiveFlow.timeline.cancelTtlExpired": "انتهت صلاحية الإلغاء",
+  "interactiveFlow.timeline.fieldExtracted": "تم الاستخراج: {{field}} = {{value}}",
+  "interactiveFlow.timeline.infoAnswered": "رد إعلامي: {{infoIntent}}",
+  "interactiveFlow.timeline.metaAnswered": "رد محادثي ({{kind}})",
+  "interactiveFlow.timeline.repromptEmitted": "طُلبت إعادة الصياغة ({{reason}})",
+  "interactiveFlow.timeline.turnCommitted": "تم تأكيد الجولة",
+  "interactiveFlow.timeline.turnFailed": "فشلت الجولة",
+  "interactiveFlow.timeline.turnRolledBack": "تم التراجع عن الجولة"
 }

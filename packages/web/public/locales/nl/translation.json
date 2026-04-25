@@ -1468,5 +1468,16 @@
   "validation.commandLayer.featureDisabled": "Command Layer is uitgeschakeld op deze installatie.",
   "validation.commandLayer.requiresPostgres": "De Command Layer-functie vereist PostgreSQL. Schakel useCommandLayer uit of stap over op een PostgreSQL-installatie.",
   "validation.conversationCommand.evidence.tooShort": "Bewijs te kort (minimaal 2 tekens).",
-  "validation.conversationCommand.field.required": "Commando vereist een veldnaam."
+  "validation.conversationCommand.field.required": "Commando vereist een veldnaam.",
+  "interactiveFlow.timeline.cancelConfirmed": "Flow geannuleerd",
+  "interactiveFlow.timeline.cancelRejected": "Annulering ingetrokken",
+  "interactiveFlow.timeline.cancelRequested": "Annulering voorgesteld",
+  "interactiveFlow.timeline.cancelTtlExpired": "Annulering verlopen",
+  "interactiveFlow.timeline.fieldExtracted": "Geëxtraheerd: {{field}} = {{value}}",
+  "interactiveFlow.timeline.infoAnswered": "Informatieve reactie: {{infoIntent}}",
+  "interactiveFlow.timeline.metaAnswered": "Conversationele reactie ({{kind}})",
+  "interactiveFlow.timeline.repromptEmitted": "Herformulering gevraagd ({{reason}})",
+  "interactiveFlow.timeline.turnCommitted": "Beurt vastgelegd",
+  "interactiveFlow.timeline.turnFailed": "Beurt mislukt",
+  "interactiveFlow.timeline.turnRolledBack": "Beurt teruggedraaid"
 }

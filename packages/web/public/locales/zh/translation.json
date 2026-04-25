@@ -1465,5 +1465,16 @@
   "validation.commandLayer.featureDisabled": "此安装上的命令层已禁用。",
   "validation.commandLayer.requiresPostgres": "命令层功能需要 PostgreSQL。请禁用 useCommandLayer 或切换到 PostgreSQL 部署。",
   "validation.conversationCommand.evidence.tooShort": "证据过短（最少 2 个字符）。",
-  "validation.conversationCommand.field.required": "命令需要字段名称。"
+  "validation.conversationCommand.field.required": "命令需要字段名称。",
+  "interactiveFlow.timeline.cancelConfirmed": "流程已取消",
+  "interactiveFlow.timeline.cancelRejected": "取消已撤销",
+  "interactiveFlow.timeline.cancelRequested": "已提议取消",
+  "interactiveFlow.timeline.cancelTtlExpired": "取消已过期",
+  "interactiveFlow.timeline.fieldExtracted": "已提取：{{field}} = {{value}}",
+  "interactiveFlow.timeline.infoAnswered": "信息回复：{{infoIntent}}",
+  "interactiveFlow.timeline.metaAnswered": "对话回复 ({{kind}})",
+  "interactiveFlow.timeline.repromptEmitted": "请求重新表述 ({{reason}})",
+  "interactiveFlow.timeline.turnCommitted": "回合已提交",
+  "interactiveFlow.timeline.turnFailed": "回合失败",
+  "interactiveFlow.timeline.turnRolledBack": "回合已回滚"
 }
