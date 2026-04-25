@@ -142,3 +142,8 @@ function adaptCommandLayerResponseToTurnResult(response: InterpretTurnResponse):
 export function selectAdapter({ useCommandLayer }: { useCommandLayer: boolean | undefined }): TurnInterpreterAdapter {
     return useCommandLayer === true ? commandLayerClientAdapter : legacyFieldExtractorAdapter
 }
+
+export async function interpretTurn(args: AdapterInterpretArgs & { useCommandLayer: boolean | undefined }): Promise<TurnResult> {
+    const adapter = selectAdapter({ useCommandLayer: args.useCommandLayer })
+    return adapter.interpret(args)
+}
