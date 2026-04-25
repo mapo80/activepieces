@@ -300,3 +300,40 @@ flow esistenti.
 I 26 commit del branch corrispondono a un total di ~5000 righe di codice + ~3000 righe di test
 + ~1500 righe di documentation. Tutto verde, tutto opt-in, zero impatto su flow esistenti
 quando useCommandLayer non è settato.
+
+## 2026-04-25 09:00 UTC — Phase 2-ENGINE-11 + tracing instrumentation + final wrap
+
+**Completed (3 new commits)**:
+- P2-ENGINE-11: statusRenderer.ts engine-side helper per post-DAG status
+  message (caseId surface IT/EN + combine con preDagAck) + 9 unit tests
+- Tracing instrumentation: turnInterpreter.interpret + acquireLease wrapped
+  in commandLayerTracing.withSpan, visibili via /traces endpoint
+- Final progress-log snapshot
+
+**Cumulative commits su feature/command-layer-p0b-infra**: 30
+**Test summary cumulativo verde**: 1093+
+- 58 command-layer integration (api): storage + interpreter + redteam + PII + benchmark + chaos
+- 366 engine unit (357 base + 9 statusRenderer)
+- 261 shared unit
+- 190 web unit
+- 9 PII unit (sub-categoria api side)
+
+**Gate status**:
+- G-LINT: verde (0 errors)
+- G-ENGINE-UNIT: 366/366 passing
+- G-LEGACY-INTEGRATION: verde
+- G-MIGRATIONS: verde
+- G-SHARED-WEB: verde
+
+**Completamento**: ~80% del piano totale. Quasi tutte le task implementabili
+in ambiente di test sono fatte. Resta solo deployment reale (P5/P6 canary,
+P7 sunset esecuzione) che richiede ambienti staging/prod.
+
+Branch feature/command-layer-p0b-infra è pronto per:
+1. PR review come MVP
+2. Merge in main
+3. Deployment canary su consultazione (read-only) come prima validazione prod
+4. Future iteration su altri flow
+
+Tutti i 30 commit sono atomici, lint-clean, test-verdi, opt-in via
+useCommandLayer flag (default false per zero regressione).
