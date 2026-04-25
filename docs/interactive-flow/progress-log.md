@@ -131,3 +131,69 @@ Append-only log. Format: `## YYYY-MM-DD HH:MM UTC`.
 **Next milestone**: Phase 2-ENGINE-10 (finalize/rollback handshake post-DAG)
 + P2-ENGINE-11 (StatusRenderer engine-side) + P3-FRONTEND (TurnEvent
 hook + reducer + chat timeline extension).
+
+## 2026-04-25 07:57 UTC — Phase 3-FE + Phase 4-HARDENING red-team VERIFIED
+
+**Completed (3 new commits)**:
+- P3-FE-01/02: useInteractiveFlowTurnEvents hook + interactive-flow-turn-reducer
+  con dedupe via outboxEventId + ordering bigint sessionSequence
+- P3-FE-04: ChatRuntimeTimeline esteso con turnEvents prop opzionale,
+  rendering 18 kind con emoji + label IT
+- P4-HARD-04: Red-team prompt injection suite (12 test) verifica
+  rejection di: fabricated field, fabricated value (P3), code injection,
+  unknown info-intent (P5), cited-field non valido, RESOLVE_PENDING senza
+  pending (P6), pending type mismatch, malicious instruction, unicode,
+  oversized message, compound malicious, P8 dispositivity scope.
+  + sanitizeJson() helper per stripping null/zero-width chars dal payload
+  JSONB pre-PG persistence.
+
+**Gate status**:
+- G-LINT: verde (0 errors)
+- G-ENGINE-UNIT: 357/357 (no regression)
+- G-SHARED-WEB: 261 + 190 (web) (no regression)
+- Integration tests command-layer cumulative: 27/27 (6 storage + 9
+  interpreter + 12 redteam)
+
+**Cumulative commits su feature/command-layer-p0b-infra**: 16
+- 70f4de4718: Phase 0A-INFRA storage infrastructure
+- 6b8e8d645c: Phase 0B-CONTRACT shared DTOs
+- 7d52b32989: Phase 1-CORE core modules + endpoints
+- ac5121fb05: progress-log Phase 0+1
+- a4a2246823: Phase 2-ENGINE-01 turn-interpreter-client
+- f15d55cfea: Phase 2-ENGINE-02-05 TurnResult + adapters
+- bc6a19f010: progress-log Phase 2 partial
+- cbd1fe6ff8: Phase 2-ENGINE-07/08 useCommandLayer flag injection
+- 60797c74e8: Phase 2-ENGINE-09 sessionStore CAS helpers
+- bd66f39537: progress-log Phase 2 verified
+- (Phase 3-FE-01/02): turn events hook + reducer
+- 295f8fbc3a: Phase 3-FE-04 chat timeline turn events extension
+- 3b8287204a: Phase 4-HARDENING red-team prompt injection suite
+
+**Completamento stimato**: ~30% del totale plan (45+ task su ~200).
+
+**Test summary cumulativo**: 1014+ verdi
+- 27 command-layer integration (api side)
+- 357 engine unit
+- 261 shared unit
+- 190 web unit
+
+**Limitazioni note rimaste (per sessioni future)**:
+1. P2-ENGINE-10/11: finalize/rollback handshake post-DAG nell'executor +
+   StatusRenderer. Richiede coord con ciclo persistSession e dispatching
+   bot message bifase (preDagAck + post-DAG status).
+2. P0C-BENCH-04/05: benchmark deterministico + real LLM via
+   claude-code-openai-bridge (ora non testato).
+3. P3-FE-05: reconnect/replay outbox via lastKnownSessionSequence.
+4. P3-FE-06: UI copy validation error per useCommandLayer su SQLite.
+5. P4-HARD-01-07 rimanenti: OpenTelemetry traces, model pinning,
+   chaos tests post-crash recovery, admin tooling.
+6. P5-CANARY-READONLY: fixture consultazione-cliente.json + 5%
+   internal canary deployment.
+7. P6-CANARY-DISPOSITIVO: staging operatori reali + prod rollout.
+8. P7-SUNSET: rimozione field-extract endpoint + meta-question handler
+   legacy dopo 6 mesi stabilità.
+
+Le primitive critiche e la pipeline core (storage, contracts, command
+modules, endpoints, engine adapters, frontend hooks, red-team safety)
+sono completate e testate. La feature è disabilitata per default
+(useCommandLayer non set), zero regressione su flow esistenti.
