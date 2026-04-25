@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { QueryRunner } from 'typeorm'
 import { databaseConnection } from '../../database/database-connection'
 import { InteractiveFlowOutboxSchema, OutboxEventStatus } from './entities/outbox-entity'
+import { piiRedactor } from './pii-redactor'
 import { sessionSequenceService } from './session-sequence.service'
 
 async function insertPending({ turnId, sessionId, flowRunId, events, queryRunner }: InsertPendingInput): Promise<InteractiveFlowOutboxSchema[]> {
@@ -16,6 +17,9 @@ async function insertPending({ turnId, sessionId, flowRunId, events, queryRunner
             const event = events[i]
             const sequence = (from + BigInt(i)).toString()
             const id = randomUUID()
+            const safePayload = (event.payload && typeof event.payload === 'object' && !Array.isArray(event.payload))
+                ? piiRedactor.redactPayload(event.payload as Record<string, unknown>)
+                : event.payload
             await runner.query(
                 `
                 INSERT INTO "interactive_flow_outbox" (
@@ -24,7 +28,7 @@ async function insertPending({ turnId, sessionId, flowRunId, events, queryRunner
                 )
                 VALUES ($1,$2,$3,$4,$5,$6,'pending',$7::jsonb, NOW())
                 `,
-                [id, turnId, sessionId, flowRunId, sequence, event.eventType, JSON.stringify(event.payload)],
+                [id, turnId, sessionId, flowRunId, sequence, event.eventType, JSON.stringify(safePayload)],
             )
             created.push({
                 outboxEventId: id,
@@ -34,7 +38,7 @@ async function insertPending({ turnId, sessionId, flowRunId, events, queryRunner
                 sessionSequence: sequence,
                 eventType: event.eventType,
                 eventStatus: 'pending',
-                payload: event.payload,
+                payload: safePayload,
                 createdAt: new Date(),
                 publishedAt: null,
                 attempts: 0,
