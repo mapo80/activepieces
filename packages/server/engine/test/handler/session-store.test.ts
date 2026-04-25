@@ -1,6 +1,6 @@
 import { InteractiveFlowStateField } from '@activepieces/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_HISTORY_MAX_TURNS, sessionStore, SessionRecord } from '../../src/lib/handler/session-store'
+import { DEFAULT_HISTORY_MAX_TURNS, SessionRecord, sessionStore } from '../../src/lib/handler/session-store'
 import { generateMockEngineConstants } from './test-helper'
 
 type FetchCall = { url: string, init: RequestInit | undefined }
@@ -101,8 +101,12 @@ describe('sessionStore.makeSessionKey', () => {
 
 describe('sessionStore.load', () => {
     let fetchMock: ReturnType<typeof installFetchMock>
-    beforeEach(() => { fetchMock = installFetchMock() })
-    afterEach(() => { vi.restoreAllMocks() })
+    beforeEach(() => {
+        fetchMock = installFetchMock() 
+    })
+    afterEach(() => {
+        vi.restoreAllMocks() 
+    })
 
     it('returns {record:null} when store responds 404 (first turn)', async () => {
         fetchMock.respondNotFound()
@@ -152,8 +156,12 @@ describe('sessionStore.load', () => {
 
 describe('sessionStore.save', () => {
     let fetchMock: ReturnType<typeof installFetchMock>
-    beforeEach(() => { fetchMock = installFetchMock() })
-    afterEach(() => { vi.restoreAllMocks() })
+    beforeEach(() => {
+        fetchMock = installFetchMock() 
+    })
+    afterEach(() => {
+        vi.restoreAllMocks() 
+    })
 
     it('posts full record with lastTurnAt ISO timestamp', async () => {
         fetchMock.respondPut()
@@ -223,8 +231,12 @@ describe('sessionStore.save', () => {
 
 describe('sessionStore.clear', () => {
     let fetchMock: ReturnType<typeof installFetchMock>
-    beforeEach(() => { fetchMock = installFetchMock() })
-    afterEach(() => { vi.restoreAllMocks() })
+    beforeEach(() => {
+        fetchMock = installFetchMock() 
+    })
+    afterEach(() => {
+        vi.restoreAllMocks() 
+    })
 
     it('issues DELETE on the store-entries endpoint', async () => {
         fetchMock.respondDelete()
@@ -331,5 +343,201 @@ describe('sessionStore.appendHistory', () => {
         const base = [{ role: 'user' as const, text: 'ciao' }]
         const updated = sessionStore.appendHistory({ history: base, role: 'assistant', text: '   ', historyMaxTurns: 10 })
         expect(updated).toBe(base)
+    })
+})
+
+describe('sessionStore.loadWithRevision (CAS GET)', () => {
+    let fetchMock: ReturnType<typeof installFetchMock>
+    beforeEach(() => {
+        fetchMock = installFetchMock() 
+    })
+    afterEach(() => {
+        vi.restoreAllMocks() 
+    })
+
+    it('returns sessionRevision=0 + record=null on 404', async () => {
+        fetchMock.respondNotFound()
+        const result = await sessionStore.loadWithRevision({
+            key: 'ifsession:e:abc',
+            constants: generateMockEngineConstants(),
+            currentFlowVersionId: 'v1',
+        })
+        expect(result.record).toBeNull()
+        expect(result.versionMismatch).toBe(false)
+        expect(result.sessionRevision).toBe(0)
+    })
+
+    it('returns versionMismatch=true with retained version when flowVersionId differs', async () => {
+        const stale: SessionRecord = {
+            state: {}, history: [], flowVersionId: 'v-OLD', lastTurnAt: '2026-01-01T00:00:00Z',
+        }
+        fetchMock.respondGet({ value: stale, version: 7 })
+        const result = await sessionStore.loadWithRevision({
+            key: 'ifsession:e:abc',
+            constants: generateMockEngineConstants(),
+            currentFlowVersionId: 'v-NEW',
+        })
+        expect(result.versionMismatch).toBe(true)
+        expect(result.sessionRevision).toBe(7)
+    })
+
+    it('returns matching record + version when flowVersionId equals', async () => {
+        const current: SessionRecord = {
+            state: { customerName: 'Polito' }, history: [],
+            flowVersionId: 'v1', lastTurnAt: '2026-04-25T10:00:00Z',
+        }
+        fetchMock.respondGet({ value: current, version: 5 })
+        const result = await sessionStore.loadWithRevision({
+            key: 'ifsession:e:abc',
+            constants: generateMockEngineConstants(),
+            currentFlowVersionId: 'v1',
+        })
+        expect(result.record).toEqual(current)
+        expect(result.sessionRevision).toBe(5)
+        expect(result.versionMismatch).toBe(false)
+    })
+
+    it('falls back to legacy load on 5xx', async () => {
+        fetchMock.respondGet(null, 500)
+        fetchMock.respondNotFound()
+        const result = await sessionStore.loadWithRevision({
+            key: 'ifsession:e:abc',
+            constants: generateMockEngineConstants(),
+            currentFlowVersionId: 'v1',
+        })
+        expect(result.sessionRevision).toBe(0)
+        expect(result.record).toBeNull()
+    })
+
+    it('falls back to legacy load on fetch throw', async () => {
+        let calls = 0
+        const spy = vi.fn(async () => {
+            calls++
+            if (calls === 1) throw new Error('ECONNREFUSED')
+            return { ok: false, status: 404, json: async () => null, text: async () => '' } as unknown as Response
+        })
+        globalThis.fetch = spy as unknown as typeof fetch
+        const result = await sessionStore.loadWithRevision({
+            key: 'ifsession:e:abc',
+            constants: generateMockEngineConstants(),
+            currentFlowVersionId: 'v1',
+        })
+        expect(result.sessionRevision).toBe(0)
+        expect(result.record).toBeNull()
+    })
+})
+
+describe('sessionStore.saveWithCAS (CAS PUT)', () => {
+    let fetchMock: ReturnType<typeof installFetchMock>
+    beforeEach(() => {
+        fetchMock = installFetchMock() 
+    })
+    afterEach(() => {
+        vi.restoreAllMocks() 
+    })
+
+    it('returns ok with newRevision when server responds with version', async () => {
+        fetchMock.respondGet({ version: 3 })
+        const result = await sessionStore.saveWithCAS({
+            key: 'ifsession:e:abc',
+            constants: generateMockEngineConstants(),
+            state: { customerName: 'Polito' },
+            history: [],
+            flowVersionId: 'v1',
+            historyMaxTurns: 20,
+            expectedRevision: 2,
+        })
+        expect(result.status).toBe('ok')
+        expect(result.newRevision).toBe(3)
+    })
+
+    it('returns conflict on 412 with currentVersion', async () => {
+        fetchMock.respondGet({ currentVersion: 9 }, 412)
+        const result = await sessionStore.saveWithCAS({
+            key: 'ifsession:e:abc',
+            constants: generateMockEngineConstants(),
+            state: {}, history: [], flowVersionId: 'v1', historyMaxTurns: 20, expectedRevision: 0,
+        })
+        expect(result.status).toBe('conflict')
+        expect(result.currentRevision).toBe(9)
+    })
+
+    it('falls back to legacy save on non-412/5xx (e.g. 500)', async () => {
+        fetchMock.respondGet(null, 500)
+        fetchMock.respondPut()
+        const result = await sessionStore.saveWithCAS({
+            key: 'ifsession:e:abc',
+            constants: generateMockEngineConstants(),
+            state: {}, history: [], flowVersionId: 'v1', historyMaxTurns: 20, expectedRevision: 0,
+        })
+        expect(result.status).toBe('ok')
+    })
+
+    it('falls back to legacy save on fetch throw', async () => {
+        let calls = 0
+        const spy = vi.fn(async () => {
+            calls++
+            if (calls === 1) throw new Error('boom')
+            return { ok: true, status: 200, json: async () => ({}), text: async () => '' } as unknown as Response
+        })
+        globalThis.fetch = spy as unknown as typeof fetch
+        const result = await sessionStore.saveWithCAS({
+            key: 'ifsession:e:abc',
+            constants: generateMockEngineConstants(),
+            state: {}, history: [], flowVersionId: 'v1', historyMaxTurns: 20, expectedRevision: 0,
+        })
+        expect(result.status).toBe('ok')
+    })
+
+    it('caps history before put when over historyMaxTurns', async () => {
+        fetchMock.respondGet({ version: 1 })
+        const longHistory = Array.from({ length: 30 }, (_, i) => ({ role: 'user' as const, text: `m${i}` }))
+        await sessionStore.saveWithCAS({
+            key: 'ifsession:e:abc',
+            constants: generateMockEngineConstants(),
+            state: {}, history: longHistory, flowVersionId: 'v1', historyMaxTurns: 5, expectedRevision: 0,
+        })
+        const body = JSON.parse(String(fetchMock.calls[0].init?.body))
+        expect(body.value.history).toHaveLength(5)
+        expect(body.expectedVersion).toBe(0)
+    })
+
+    it('persists pendingInteraction when provided', async () => {
+        fetchMock.respondGet({ version: 1 })
+        await sessionStore.saveWithCAS({
+            key: 'ifsession:e:abc',
+            constants: generateMockEngineConstants(),
+            state: {}, history: [], flowVersionId: 'v1', historyMaxTurns: 20, expectedRevision: 0,
+            pendingInteraction: { type: 'pending_cancel', createdAt: '2026-04-25T10:00:00Z' } as never,
+        })
+        const body = JSON.parse(String(fetchMock.calls[0].init?.body))
+        expect(body.value.pendingInteraction).toBeDefined()
+    })
+
+    it('uses expectedRevision+1 when server omits version', async () => {
+        fetchMock.respondGet({})
+        const result = await sessionStore.saveWithCAS({
+            key: 'ifsession:e:abc',
+            constants: generateMockEngineConstants(),
+            state: {}, history: [], flowVersionId: 'v1', historyMaxTurns: 20, expectedRevision: 4,
+        })
+        expect(result.newRevision).toBe(5)
+    })
+})
+
+describe('sessionStore.buildDependencyGraph', () => {
+    it('returns empty map for empty nodes', () => {
+        const g = sessionStore.buildDependencyGraph({ nodes: [] })
+        expect(g.size).toBe(0)
+    })
+    it('builds direct + transitive dependents for chained nodes', () => {
+        const nodes = [
+            { id: 'n1', stateInputs: ['customerName'], stateOutputs: ['accounts'] },
+            { id: 'n2', stateInputs: ['accounts'], stateOutputs: ['caseId'] },
+        ] as never
+        const g = sessionStore.buildDependencyGraph({ nodes })
+        expect(g.get('customerName')?.has('accounts')).toBe(true)
+        expect(g.get('customerName')?.has('caseId')).toBe(true)
+        expect(g.get('accounts')?.has('caseId')).toBe(true)
     })
 })
