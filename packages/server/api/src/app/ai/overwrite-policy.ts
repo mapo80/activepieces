@@ -49,12 +49,19 @@ function valuesEqual({ a, b }: { a: unknown, b: unknown }): boolean {
     if (typeof a === 'string' && typeof b === 'string') {
         return normalization.normalize(a) === normalization.normalize(b)
     }
+    if (isPrimitiveScalar(a) && isPrimitiveScalar(b)) {
+        return normalization.normalize(String(a)) === normalization.normalize(String(b))
+    }
     try {
         return JSON.stringify(a) === JSON.stringify(b)
     }
     catch {
         return false
     }
+}
+
+function isPrimitiveScalar(v: unknown): boolean {
+    return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'
 }
 
 function shouldPromoteTurnAffirmed({ pendingOverwriteActive }: {

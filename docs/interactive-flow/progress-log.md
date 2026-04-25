@@ -597,3 +597,63 @@ without requiring the full dev-stack.
 DEV-03 deviation residuum: live Playwright run requires dev-stack +
 Postgres URL. The API-equivalent coverage is in place; a real-UI run
 is a future on-call activity. No code change needed.
+
+## 2026-04-25T22:30Z — DEV-03-LIVE-ESTINZIONE: live e2e regression run
+
+### Stack boot
+`./dev-start.sh` con `START_CLAUDE_BRIDGE=true START_AEP=true AP_LLM_VIA_BRIDGE=true`:
+- bridge http://127.0.0.1:8787 → `{"status":"ok","claudeCli":"available"}` (no mock)
+- api http://localhost:3000 → /api/v1/flags 200
+- web http://localhost:4200 → /api/v1/flags 200
+- worker started, polling
+
+### Run 1: 22 spec attesi (5 file estinzione)
+Comando: `npx playwright test scenarios/ce/flows/interactive-flow/estinzione*.local.spec.ts --reporter=line`
+Risultato: **4 passed / 3 failed / 15 did not run** (Playwright si ferma su soglia fail).
+
+Pattern del fail: dopo il turno 2 (`NDG 11255521`), al turno 3 il bot risponde
+`"Ho capito che ora vuoi cambiare ndg da 11255521 a 11255521. Confermi il cambiamento?"`
+invece di proseguire al prossimo step (chiedere rapportoId/motivazione).
+
+### Root cause individuata: type-coercion bug in `valuesEqual`
+File: `packages/server/api/src/app/ai/overwrite-policy.ts:47-58`.
+
+Il LLM real `claude-cli` (via bridge) occasionalmente ritorna valori NUMERICI per
+campi state typed `string` (es. `ndg: 11255521` invece di `ndg: "11255521"`). Lo
+stato salvato post-turno 2 contiene `'11255521'` (string). `valuesEqual` confrontava
+via `JSON.stringify` che restituisce stringhe diverse (`'"11255521"'` vs `'11255521'`),
+quindi `decideOverwrite` ritornava `confirm` invece di `accept` con `no-op` →
+spurious pending_overwrite trigger.
+
+### Fix applicato (commit pendente)
+Aggiunto un branch `isPrimitiveScalar` (string|number|boolean) in `valuesEqual`
+che coerce entrambi i lati a `String(...)` prima del confronto normalizzato.
+3 regression tests aggiunti in `overwrite-policy.test.ts`:
+- `string oldValue + number newValue same digits` → accept no-op
+- `number oldValue + string newValue same digits` → accept no-op (symmetric)
+- `boolean true + string 'true'` → accept no-op
+
+47/47 unit tests verdi.
+
+### Run 2 (post-fix in-process, dev-stack hot-reload)
+Risultato: **1 passed / 5 failed / 16 did not run**, slow (5min/file).
+- Il fail `chat-ciao` che prima passava ora fallisce → segnale che `tsx watch`
+  potrebbe non aver hot-reloaded il modulo `overwrite-policy.ts` (TypeORM/Fastify
+  layer is heavy to reload), o nuovi problemi sotto carico Playwright concurrent
+  (4 worker default).
+- Errore `applyOperation ... failed` su `estinzione.local.spec.ts:748` indica
+  problema diverso (REST 4xx su LOCK_AND_PUBLISH durante test setup).
+
+### Status conclusivo
+
+- Stack live + bridge real: **OK** (DEV-02 confermato canonical)
+- Fix overwrite same-value coercion: **OK** (3 unit test green, da committare)
+- Estinzione regression: **non green canonical** — richiede:
+  - Restart pulito del dev-stack post-fix per validare che il fix elimini il
+    pattern overwrite
+  - Investigazione separata su `applyOperation` fail e timeout 5min/file
+    (probabilmente test isolation o carico LLM bridge sequential)
+
+Le 14 spec command-layer (DEV-03 fixme) restano non eseguite — sono blocked
+sul baseline estinzione che deve essere stabile prima di provare scenari
+più complessi.

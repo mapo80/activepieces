@@ -93,6 +93,35 @@ describe('overwritePolicy.decideOverwrite', () => {
         expect(r.action).toBe('accept')
     })
 
+    it('REGR estinzione DEV-LIVE: no-op when oldValue is string and newValue is number with same digits', () => {
+        // The real claude-cli LLM occasionally returns numeric values for string-typed
+        // state fields (e.g. ndg "11255521" → number 11255521). Without scalar coercion
+        // in valuesEqual the policy triggers a spurious pending_overwrite, breaking the
+        // estinzione e2e suite at turn 3.
+        const r = overwritePolicy.decideOverwrite({
+            field: 'ndg', oldValue: '11255521', newValue: 11255521,
+            cuePresent: false, plausible: true,
+        })
+        expect(r.action).toBe('accept')
+        if (r.action === 'accept') expect(r.reason).toBe('no-op')
+    })
+
+    it('REGR estinzione DEV-LIVE: no-op number→string symmetric', () => {
+        const r = overwritePolicy.decideOverwrite({
+            field: 'ndg', oldValue: 11255521, newValue: '11255521',
+            cuePresent: false, plausible: true,
+        })
+        expect(r.action).toBe('accept')
+    })
+
+    it('REGR estinzione DEV-LIVE: no-op boolean→string', () => {
+        const r = overwritePolicy.decideOverwrite({
+            field: 'confirmed', oldValue: true, newValue: 'true',
+            cuePresent: false, plausible: true,
+        })
+        expect(r.action).toBe('accept')
+    })
+
     it('rejects when new value not plausible (no cue)', () => {
         const r = overwritePolicy.decideOverwrite({
             field: 'customerName', oldValue: 'Bellafronte', newValue: 'procedere',
