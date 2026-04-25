@@ -337,3 +337,41 @@ Branch feature/command-layer-p0b-infra è pronto per:
 
 Tutti i 30 commit sono atomici, lint-clean, test-verdi, opt-in via
 useCommandLayer flag (default false per zero regressione).
+
+## 2026-04-24 — W-WIRING tasks W-01..W-08 VERIFIED
+
+**Completed (5 new commits sul branch `feature/command-layer-p0b-infra`)**:
+- W-01: VercelAIAdapter — real LLM provider integration (ProviderAdapter
+  via Vercel AI SDK generateText + tools registry derivata da
+  ConversationCommandSchema). 4 unit tests (happy path, empty toolCalls,
+  Zod parse failure, generateText error).
+- W-02/03/04: worker-module wiring — overrideProviderAdapter conditional
+  su `AP_LLM_VIA_BRIDGE=true`, outboxPublisher.start con WS fan-out su
+  `WebsocketClientEvent.INTERACTIVE_FLOW_TURN_EVENT`, lockRecoveryDaemon.start
+  (10s default), tutti stoppati su `app.addHook('onClose')`.
+- W-05/06: statusRenderer wired in interactive-flow-executor —
+  TurnResult.messageOut (preDagAck) propagated, success path now combines
+  preDagAck + post-DAG status via statusRenderer.combine.
+- W-07: useInteractiveFlowTurnEvents subscribed in flow-chat.tsx —
+  turnEventsSnapshot.events passed to ChatRuntimeTimeline alongside
+  node-state runtime entries.
+- W-08: PostgreSQL guard validation — interactive-flow-validator accepts
+  optional dbType to enforce POSTGRES/PGLITE compatibility for
+  useCommandLayer flows. flow-version-validator-util reads
+  `system.get(AppSystemProp.DB_TYPE)` and passes it on ADD_ACTION/
+  UPDATE_ACTION for INTERACTIVE_FLOW. Returns
+  COMMAND_LAYER_REQUIRES_POSTGRES with i18n key
+  `validation.commandLayer.requiresPostgres` on unsupported DB types.
+  6 new unit tests.
+
+**W-09 status**: BLOCKED — bridge `curl /health` returns exit 7
+(connection refused). Manual smoke evidence pending bridge availability.
+Per plan W-09 Environment Skip Handling, marked BLOCKED awaits bridge.
+T-PLAYWRIGHT phase deferred until W-09 partial-VERIFIED.
+
+**Cumulative commits su feature/command-layer-p0b-infra**: 35
+**Tests verde**: 17 validator unit (existing 11 + 6 new) + 4 VercelAIAdapter
++ 366 engine + 1093+ pre-existing tests.
+
+**Next**: C-COVERAGE (G-UNIT-90 ≥ 90% on changed modules) in parallel
+with T-API tests (A-01..12). T-PLAYWRIGHT requires running app stack.
