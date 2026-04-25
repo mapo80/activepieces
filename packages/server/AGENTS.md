@@ -39,3 +39,37 @@ You are working in the Activepieces server API (`packages/server/api`).
 - Follow the existing controller/service pattern when adding new endpoints
 - Write database migrations for schema changes, never modify entities directly without a migration
 - Keep enterprise features isolated in `src/app/ee/`
+
+## Command Layer (`src/app/ai/command-layer`)
+
+Server-governed conversation runtime for INTERACTIVE_FLOW steps with
+`useCommandLayer: true`. The flow validator
+(`src/app/flows/flow-version/interactive-flow-validator.ts`) refuses publish
+on unsupported DB types with i18n key `validation.commandLayer.requiresPostgres`.
+
+Key modules:
+
+| File | Purpose |
+|---|---|
+| `turn-interpreter.ts` | Orchestrates a single turn: lease → propose → policy → prepare → outbox INSERT. |
+| `command-dispatcher.ts` | Applies accepted ConversationCommands to state + side-effects (topic change, pending). |
+| `policy-engine.ts` | Validates proposed commands (P0..P5: schema, evidence, identity, allowed-fields). |
+| `provider-adapter.ts` | `MockProviderAdapter` (default for tests). |
+| `vercel-ai-adapter.ts` | Real LLM via Vercel AI SDK + dynamic tools registry from `ConversationCommandSchema`. |
+| `outbox-publisher.ts` | Background daemon: claims publishable events and emits `INTERACTIVE_FLOW_TURN_EVENT` via WebSocket. |
+| `lock-recovery.ts` | Background daemon: reclaims expired in-progress + stale prepared rows. |
+
+Endpoints (all under `/v1/engine/interactive-flow-ai/command-layer/`,
+`securityAccess.engine()`):
+`/interpret-turn`, `/interpret-turn/finalize`, `/interpret-turn/rollback`,
+`/outbox/replay`, `/metrics`, `/traces`, `/admin/force-clear-stale`.
+
+Wiring at boot lives in `src/app/workers/worker-module.ts`:
+
+- `AP_LLM_VIA_BRIDGE=true` → registers `VercelAIAdapter` via
+  `overrideProviderAdapter`. Default adapter is `MockProviderAdapter`.
+- `outboxPublisher.start({ pollIntervalMs: AP_OUTBOX_POLL_MS ?? 500 })`
+- `lockRecoveryDaemon.start({ pollIntervalMs: AP_LOCK_RECOVERY_POLL_MS ?? 10_000 })`
+
+Feature docs: see `docs/interactive-flow/command-layer-developer-guide.md`
+and `command-layer-migration-guide.md`.
