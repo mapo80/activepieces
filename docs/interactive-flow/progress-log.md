@@ -744,3 +744,76 @@ con cooldown 30s tra file. **Risultato: 22 passed / 0 failed / 0 flaky**.
 - Estinzione e2e: **22/22** verde (live LLM real via bridge)
 - Engine session-store unit: 36/36 verde (+ 2 regression DEV-LIVE)
 - API overwrite-policy unit: 47/47 verde (+ 3 regression DEV-LIVE)
+
+## 2026-04-26 12:00 UTC — DEV-03 complete: 14 Playwright specs + P3 evidence fix + 5 API tests
+
+### Root cause fixed: P3 evidence policy check
+
+SET_FIELDS commands were silently rejected because Claude was generating
+provenance descriptions (`"User provided X as input"`) instead of
+verbatim substrings. `candidatePolicy.verifyEvidence` → `normalization.locateEvidence`
+uses `haystack.indexOf(needle)` — provenance strings never appear in the
+user message → ALL SET_FIELDS rejected → `stateDiff = {}`, `turnAffirmed: false`.
+
+Fix: `vercel-ai-adapter.ts` SET_FIELDS tool description now says
+`evidence MUST be a verbatim substring copied exactly from the user's most recent message`
+and the evidence parameter has an explicit JSON schema description. Claude
+now correctly passes `"Bellafronte"` for input `"Bellafronte"`.
+
+### VercelAIAdapter rewrite
+
+Adapter rewritten from Vercel AI SDK `generateText()` to direct `fetch()`
+to the bridge's `/chat/completions` endpoint. Removes dependency on
+`@ai-sdk/openai-compatible`, gives full OpenAI-wire control, eliminates
+SDK compatibility issues. Worker boot updated accordingly.
+
+### Bridge system prompt
+
+claude-code-openai-bridge now extracts `system` field (or system role message)
+from the request body and passes it via `--system-prompt` flag. This ensures
+the command-layer system prompt (field schemas, locale, infoIntents,
+catalogReadiness) reaches Claude during LLM inference.
+
+### Shared schema update
+
+`packages/shared` v0.69.1: `InteractiveFlowUserInputNode.message` and
+`.render` are now optional/nullable; same for `InteractiveFlowConfirmNode`.
+Enables command-layer flows without static template messages in node definitions.
+
+### Test additions
+
+- 12 tests in `vercel-ai-adapter.test.ts` (rewritten, fetch-based)
+- 5 tests in `command-layer-mid-conversation.test.ts` (new, MockProviderAdapter):
+  meta-question, info-question, topic-change, compound, cancel
+- 14 Playwright specs `command-layer-*.local.spec.ts` implemented with
+  real test bodies (T-04 through T-15 + H-02). T-12 saga-recovery remains
+  `test.describe.fixme` (requires SIGKILL seam architecture).
+- `consultazione-spec-helpers.ts` shared fixture helpers for all command-layer
+  browser specs.
+
+### Gate status
+
+- G-LINT: verde (0 errors)
+- G-ENGINE-UNIT: 423/423 verde
+- G-API-E2E: 146/146 verde (20 test files)
+- G-PLAYWRIGHT-LIST: 15/15 specs load (14 executable + 1 fixme)
+- Bridge: commit `3738d83` — system prompt passthrough
+
+### Commits (session)
+
+- `22602897af` feat(shared): 0.69.1 — message/render optional
+- `0ab1eb558a` fix(api): VercelAIAdapter direct fetch + verbatim evidence
+- `01bcb538b0` fix(api): worker-module align VercelAIAdapter constructor
+- `ecdae14a23` test(api): vercel-ai-adapter.test.ts rewrite (12 tests)
+- `9628278000` test(api): command-layer-mid-conversation (5 tests)
+- `1101ec9605` feat(engine): ifDebug trace points first-turn routing
+- `779bc863b8` test(e2e): 14 Playwright specs + consultazione helpers
+- `9dcf4d6c3a` chore(dev): .env.dev AP_LLM_VIA_BRIDGE=true
+- bridge `3738d83` feat(bridge): system prompt passthrough
+
+### Cumulative test state
+
+- API ce/ai integration: **146/146** verde (20 files)
+- Engine unit: **423/423** verde
+- Playwright specs loaded: **15/15** (14 executable, T-12 fixme)
+- Estinzione e2e: **22/22** verde (live LLM)
