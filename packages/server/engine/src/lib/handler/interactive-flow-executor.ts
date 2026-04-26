@@ -1705,6 +1705,11 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             if (!isNil(rejectionHint) && !isNil(message)) {
                 message = `${rejectionHint}\n\n${message}`
             }
+            if (!isNil(commandLayerPreDagAck) && commandLayerPreDagAck.trim().length > 0) {
+                message = message
+                    ? `${commandLayerPreDagAck}\n\n${message}`
+                    : commandLayerPreDagAck
+            }
             ifDebug('handle:pause:message', {
                 nodeId: nextPauseNode.id,
                 messagePreview: (message ?? '').slice(0, 120),
