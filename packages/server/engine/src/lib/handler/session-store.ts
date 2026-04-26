@@ -220,12 +220,19 @@ function appendHistory({ history, role, text, historyMaxTurns }: {
 
 function isEqualValue(a: unknown, b: unknown): boolean {
     if (a === b) return true
+    if (isPrimitiveScalar(a) && isPrimitiveScalar(b)) {
+        return String(a).trim().toLowerCase() === String(b).trim().toLowerCase()
+    }
     try {
         return JSON.stringify(a) === JSON.stringify(b)
     }
     catch {
         return false
     }
+}
+
+function isPrimitiveScalar(v: unknown): boolean {
+    return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'
 }
 
 async function loadWithRevision({ key, constants, currentFlowVersionId }: {

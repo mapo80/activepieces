@@ -285,6 +285,29 @@ describe('sessionStore.detectTopicChange', () => {
         })
         expect(changed).toBe(false)
     })
+
+    it('REGR DEV-LIVE: returns false when oldValue is string and newValue is number with same digits', () => {
+        // The real claude-cli LLM occasionally returns numeric values for string-typed
+        // state fields (e.g. ndg "11255521" → number 11255521). Without scalar coercion
+        // in isEqualValue, detectTopicChange would treat them as different values and
+        // wipe downstream extractable state, breaking the estinzione e2e suite at
+        // turn 2 (when the user re-confirms the NDG).
+        const changed = sessionStore.detectTopicChange({
+            previousState: { customerName: '11255521' },
+            incoming: { customerName: 11255521 as unknown as string },
+            fields: FIELDS,
+        })
+        expect(changed).toBe(false)
+    })
+
+    it('REGR DEV-LIVE: returns true when string and number truly differ', () => {
+        const changed = sessionStore.detectTopicChange({
+            previousState: { customerName: '11255521' },
+            incoming: { customerName: 99999999 as unknown as string },
+            fields: FIELDS,
+        })
+        expect(changed).toBe(true)
+    })
 })
 
 describe('sessionStore.applyStateOverwriteWithTopicChange', () => {
