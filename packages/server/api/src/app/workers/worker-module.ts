@@ -1,5 +1,4 @@
 import { WebsocketClientEvent } from '@activepieces/shared'
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { FastifyInstance } from 'fastify'
 import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { aiProviderWorkerController } from '../ai/ai-provider-worker.controller'
@@ -49,13 +48,13 @@ export const workerModule: FastifyPluginAsyncZod = async (app) => {
 
     if (process.env.AP_LLM_VIA_BRIDGE === 'true') {
         const modelHint = process.env.AP_COMMAND_LAYER_MODEL ?? 'claude-sonnet-4-6'
-        const baseURL = process.env.OPENAI_BASE_URL ?? 'http://localhost:8787'
+        const baseURL = process.env.OPENAI_BASE_URL ?? 'http://localhost:8787/v1'
         const apiKey = process.env.OPENAI_API_KEY ?? 'sk-bridge-dev'
-        const compat = createOpenAICompatible({ name: 'command-layer-bridge', apiKey, baseURL })
         overrideProviderAdapter(new VercelAIAdapter({
             modelHint,
+            baseURL,
+            apiKey,
             log: app.log,
-            resolveModel: async () => compat.chatModel(modelHint),
         }))
         app.log.info({ modelHint, baseURL }, '[command-layer] VercelAIAdapter registered')
     }
