@@ -346,6 +346,10 @@ async function executeToolWithPolicy({ node, params, gateway, policy }: {
                 throw new EngineGenericError('McpToolCallFailed', `MCP tool call failed with status ${response.status}`)
             }
             const json = await response.json() as Record<string, unknown>
+            if (json.error != null) {
+                const rpcErr = json.error as Record<string, unknown>
+                throw new EngineGenericError('McpToolCallFailed', `MCP tool returned JSON-RPC error: ${rpcErr.message ?? JSON.stringify(rpcErr)}`)
+            }
             const result = json.result as Record<string, unknown> | undefined
             const content = result?.content as Array<Record<string, unknown>> | undefined
             if (content?.[0]?.text && typeof content[0].text === 'string') {

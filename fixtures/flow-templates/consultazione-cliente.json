@@ -83,9 +83,9 @@
                 "tool": "search_customer",
                 "stateInputs": ["customerName"],
                 "stateOutputs": ["customerMatches"],
-                "params": [
-                  { "name": "name", "binding": { "kind": "state", "field": "customerName" } }
-                ]
+                "toolParams": {
+                  "name": { "kind": "state", "field": "customerName" }
+                }
               },
               {
                 "id": "pick_ndg",
@@ -94,7 +94,7 @@
                 "nodeType": "USER_INPUT",
                 "stateInputs": ["customerMatches"],
                 "stateOutputs": ["ndg"],
-                "renderHint": {
+                "render": {
                   "component": "DataTable",
                   "props": {
                     "sourceField": "customerMatches",
@@ -112,9 +112,9 @@
                 "tool": "get_profile",
                 "stateInputs": ["ndg"],
                 "stateOutputs": ["profile"],
-                "params": [
-                  { "name": "ndg", "binding": { "kind": "state", "field": "ndg" } }
-                ]
+                "toolParams": {
+                  "ndg": { "kind": "state", "field": "ndg" }
+                }
               },
               {
                 "id": "load_accounts",
@@ -124,9 +124,9 @@
                 "tool": "list_accounts",
                 "stateInputs": ["ndg"],
                 "stateOutputs": ["accounts"],
-                "params": [
-                  { "name": "ndg", "binding": { "kind": "state", "field": "ndg" } }
-                ]
+                "toolParams": {
+                  "ndg": { "kind": "state", "field": "ndg" }
+                }
               },
               {
                 "id": "generate_report",
@@ -136,9 +136,9 @@
                 "tool": "generate_customer_report",
                 "stateInputs": ["profile", "accounts"],
                 "stateOutputs": ["reportBase64"],
-                "params": [
-                  { "name": "ndg", "binding": { "kind": "state", "field": "ndg" } }
-                ]
+                "toolParams": {
+                  "ndg": { "kind": "state", "field": "ndg" }
+                }
               },
               {
                 "id": "confirm_shared",
@@ -147,7 +147,7 @@
                 "nodeType": "CONFIRM",
                 "stateInputs": ["reportBase64", "profile"],
                 "stateOutputs": ["sharedConfirmed"],
-                "renderHint": {
+                "render": {
                   "component": "ConfirmCard",
                   "props": {
                     "title": "Conferma condivisione report",
