@@ -42,6 +42,7 @@
               "model": "claude-cli",
               "styleTemplate": "banking_formal_it"
             },
+            "infoIntents": [],
             "stateFields": [
               { "name": "customerName", "type": "string", "extractable": true,
                 "minLength": 2, "maxLength": 80, "pattern": "^[A-Za-zÀ-ÿ'\\- ]+$",
@@ -88,7 +89,8 @@
                 "tool": "banking-customers/search_customer",
                 "toolParams": {
                   "name": { "kind": "state", "field": "customerName" }
-                }
+                },
+                "errorPolicy": { "onFailure": "SKIP" }
               },
               {
                 "id": "pick_ndg",
@@ -229,7 +231,8 @@
                     "fields": ["ndg", "rapportoId", "closureReasonCode", "closureDate"]
                   }
                 },
-                "outputMap": { "moduleBase64": "base64" }
+                "outputMap": { "moduleBase64": "base64" },
+                "errorPolicy": { "onFailure": "SKIP" }
               },
               {
                 "id": "confirm_closure",

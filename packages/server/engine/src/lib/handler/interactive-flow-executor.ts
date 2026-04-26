@@ -30,7 +30,7 @@ import { workerSocket } from '../worker-socket'
 import { BaseExecutor } from './base-executor'
 import { EngineConstants } from './context/engine-constants'
 import { FlowExecutorContext } from './context/flow-execution-context'
-import { fieldExtractor, PolicyDecision } from './field-extractor'
+import { PolicyDecision } from './field-extractor'
 import { interactiveFlowEvents } from './interactive-flow-events'
 import { questionGenerator } from './question-generator'
 import { DEFAULT_HISTORY_MAX_TURNS, HistoryEntry, sessionStore } from './session-store'
@@ -1054,51 +1054,32 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 incomingKeys: Object.keys(incoming),
                 userMessagePreview: userMessage?.slice(0, 80),
             })
-            if (!isNil(userMessage) && !isNil(settings.fieldExtractor)) {
+            if (!isNil(userMessage)) {
                 const pauseHint = findNextUserOrConfirmNode({ nodes, state: flowState, executedNodeIds, skippedNodeIds })
-                const extractResult = settings.useCommandLayer === true
-                    ? adaptTurnResultToExtractResult(await commandLayerClientAdapter.interpret({
-                        constants,
-                        message: userMessage,
-                        systemPrompt: settings.systemPrompt,
-                        locale: resolveLocale({ constants, settings }),
-                        flowLabel: resolveFlowLabel({ settings }),
-                        state: flowState,
-                        history,
-                        stateFields: fields,
-                        nodes,
-                        currentNode: pauseHint ? {
-                            nodeId: pauseHint.id,
-                            nodeType: pauseHint.nodeType === 'CONFIRM' ? 'CONFIRM' : 'USER_INPUT',
-                            displayName: pauseHint.displayName,
-                            stateOutputs: pauseHint.stateOutputs,
-                            allowedExtraFields: pauseHint.allowedExtraFields,
-                        } : null,
-                        pendingInteraction: previousPendingInteraction ?? null,
-                        identityFields: ['customerName'],
-                        infoIntents: settings.infoIntents ?? [],
-                        sessionId: sessionId ?? '__noop__',
-                        sessionRevision: 0,
-                        flowVersionId: constants.flowVersionId,
-                    }))
-                    : await fieldExtractor.extractWithPolicy({
-                        constants,
-                        config: settings.fieldExtractor,
-                        message: userMessage,
-                        stateFields: fields,
-                        currentState: flowState,
-                        systemPrompt: settings.systemPrompt,
-                        locale: resolveLocale({ constants, settings }),
-                        currentNode: pauseHint ? {
-                            nodeId: pauseHint.id,
-                            nodeType: pauseHint.nodeType === 'CONFIRM' ? 'CONFIRM' : 'USER_INPUT',
-                            displayName: pauseHint.displayName,
-                            stateOutputs: pauseHint.stateOutputs,
-                            allowedExtraFields: pauseHint.allowedExtraFields,
-                        } : undefined,
-                        identityFields: ['customerName'],
-                        pendingInteraction: previousPendingInteraction ?? undefined,
-                    })
+                const extractResult = adaptTurnResultToExtractResult(await commandLayerClientAdapter.interpret({
+                    constants,
+                    message: userMessage,
+                    systemPrompt: settings.systemPrompt,
+                    locale: resolveLocale({ constants, settings }),
+                    flowLabel: resolveFlowLabel({ settings }),
+                    state: flowState,
+                    history,
+                    stateFields: fields,
+                    nodes,
+                    currentNode: pauseHint ? {
+                        nodeId: pauseHint.id,
+                        nodeType: pauseHint.nodeType === 'CONFIRM' ? 'CONFIRM' : 'USER_INPUT',
+                        displayName: pauseHint.displayName,
+                        stateOutputs: pauseHint.stateOutputs,
+                        allowedExtraFields: pauseHint.allowedExtraFields,
+                    } : null,
+                    pendingInteraction: previousPendingInteraction ?? null,
+                    identityFields: ['customerName'],
+                    infoIntents: settings.infoIntents ?? [],
+                    sessionId: sessionId ?? '__noop__',
+                    sessionRevision: 0,
+                    flowVersionId: constants.flowVersionId,
+                }))
                 pendingOverwriteSignal = pendingOverwriteFromPolicyDecisions({
                     policyDecisions: extractResult.policyDecisions,
                     nodeId: pauseHint?.id ?? '__pending_overwrite__',
@@ -1150,7 +1131,6 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
         else if (
             isNil(prevFlowOutput)
             && !isNil(settings.messageInput)
-            && !isNil(settings.fieldExtractor)
         ) {
             const userMessage = resolveMessageInputFromTrigger({
                 template: settings.messageInput,
@@ -1190,50 +1170,30 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 }
                 try {
                     const pauseHint = findNextUserOrConfirmNode({ nodes, state: flowState, executedNodeIds, skippedNodeIds })
-                    ifDebug('handle:first-turn:extract-routing', { useCommandLayer: settings.useCommandLayer, fieldExtractorSet: !isNil(settings.fieldExtractor), sessionId })
-                    const extractResult = settings.useCommandLayer === true
-                        ? adaptTurnResultToExtractResult(await commandLayerClientAdapter.interpret({
-                            constants,
-                            message: userMessage,
-                            systemPrompt: settings.systemPrompt,
-                            locale: resolveLocale({ constants, settings }),
-                            flowLabel: resolveFlowLabel({ settings }),
-                            state: flowState,
-                            history,
-                            stateFields: fields,
-                            nodes,
-                            currentNode: pauseHint ? {
-                                nodeId: pauseHint.id,
-                                nodeType: pauseHint.nodeType === 'CONFIRM' ? 'CONFIRM' : 'USER_INPUT',
-                                displayName: pauseHint.displayName,
-                                stateOutputs: pauseHint.stateOutputs,
-                                allowedExtraFields: pauseHint.allowedExtraFields,
-                            } : null,
-                            pendingInteraction: previousPendingInteraction ?? null,
-                            identityFields: ['customerName'],
-                            infoIntents: settings.infoIntents ?? [],
-                            sessionId: sessionId ?? '__noop__',
-                            sessionRevision: 0,
-                            flowVersionId: constants.flowVersionId,
-                        }))
-                        : await fieldExtractor.extractWithPolicy({
-                            constants,
-                            config: settings.fieldExtractor,
-                            message: userMessage,
-                            stateFields: fields,
-                            currentState: flowState,
-                            systemPrompt: settings.systemPrompt,
-                            locale: resolveLocale({ constants, settings }),
-                            currentNode: pauseHint ? {
-                                nodeId: pauseHint.id,
-                                nodeType: pauseHint.nodeType === 'CONFIRM' ? 'CONFIRM' : 'USER_INPUT',
-                                displayName: pauseHint.displayName,
-                                stateOutputs: pauseHint.stateOutputs,
-                                allowedExtraFields: pauseHint.allowedExtraFields,
-                            } : undefined,
-                            identityFields: ['customerName'],
-                            pendingInteraction: previousPendingInteraction ?? undefined,
-                        })
+                    const extractResult = adaptTurnResultToExtractResult(await commandLayerClientAdapter.interpret({
+                        constants,
+                        message: userMessage,
+                        systemPrompt: settings.systemPrompt,
+                        locale: resolveLocale({ constants, settings }),
+                        flowLabel: resolveFlowLabel({ settings }),
+                        state: flowState,
+                        history,
+                        stateFields: fields,
+                        nodes,
+                        currentNode: pauseHint ? {
+                            nodeId: pauseHint.id,
+                            nodeType: pauseHint.nodeType === 'CONFIRM' ? 'CONFIRM' : 'USER_INPUT',
+                            displayName: pauseHint.displayName,
+                            stateOutputs: pauseHint.stateOutputs,
+                            allowedExtraFields: pauseHint.allowedExtraFields,
+                        } : null,
+                        pendingInteraction: previousPendingInteraction ?? null,
+                        identityFields: ['customerName'],
+                        infoIntents: settings.infoIntents ?? [],
+                        sessionId: sessionId ?? '__noop__',
+                        sessionRevision: 0,
+                        flowVersionId: constants.flowVersionId,
+                    }))
                     pendingOverwriteSignal = pendingOverwriteFromPolicyDecisions({
                         policyDecisions: extractResult.policyDecisions,
                         nodeId: pauseHint?.id ?? '__pending_overwrite__',

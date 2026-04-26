@@ -1,62 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { InfoIntent, InteractiveFlowNode, InteractiveFlowStateField, InterpretTurnRequest, InterpretTurnResponse, PendingInteraction } from '@activepieces/shared'
 import { EngineConstants } from './context/engine-constants'
-import { ExtractResult, fieldExtractor, PolicyDecision } from './field-extractor'
 import { turnInterpreterClient } from './turn-interpreter-client'
 import { emptyTurnResult, TurnResult } from './turn-result'
-
-export type TurnInterpreterAdapter = {
-    interpret(args: AdapterInterpretArgs): Promise<TurnResult>
-}
-
-export type AdapterInterpretArgs = {
-    constants: EngineConstants
-    message: string
-    systemPrompt?: string
-    locale?: string
-    flowLabel?: string
-    state: Record<string, unknown>
-    history: Array<{ role: 'user' | 'assistant', text: string }>
-    stateFields: InteractiveFlowStateField[]
-    nodes: InteractiveFlowNode[]
-    currentNode: CurrentNode | null
-    pendingInteraction: PendingInteraction | null
-    identityFields: string[]
-    infoIntents: InfoIntent[]
-    sessionId: string
-    sessionRevision: number
-    flowVersionId: string
-}
-
-export type CurrentNode = {
-    nodeId: string
-    nodeType: 'USER_INPUT' | 'CONFIRM' | 'TOOL' | 'BRANCH'
-    displayName?: string
-    stateOutputs?: string[]
-    allowedExtraFields?: string[]
-    prompt?: string
-    displayField?: string
-    nextMissingField?: string
-}
-
-export const legacyFieldExtractorAdapter: TurnInterpreterAdapter = {
-    async interpret(args: AdapterInterpretArgs): Promise<TurnResult> {
-        const legacyResult = await fieldExtractor.extractWithPolicy({
-            constants: args.constants,
-            config: { aiProviderId: '', model: '' },
-            message: args.message,
-            stateFields: args.stateFields,
-            currentState: args.state,
-            systemPrompt: args.systemPrompt,
-            locale: args.locale,
-            currentNode: args.currentNode ?? undefined,
-            identityFields: args.identityFields,
-            pendingInteraction: args.pendingInteraction,
-            flowLabel: args.flowLabel,
-        })
-        return adaptLegacyToTurnResult(legacyResult)
-    },
-}
 
 export const commandLayerClientAdapter: TurnInterpreterAdapter = {
     async interpret(args: AdapterInterpretArgs): Promise<TurnResult> {
@@ -97,26 +43,8 @@ export const commandLayerClientAdapter: TurnInterpreterAdapter = {
     },
 }
 
-function adaptLegacyToTurnResult(legacy: ExtractResult): TurnResult {
-    return {
-        extractedFields: legacy.extractedFields,
-        turnAffirmed: legacy.turnAffirmed,
-        policyDecisions: legacy.policyDecisions,
-        metaAnswer: legacy.metaAnswer,
-        clarifyReason: legacy.clarifyReason,
-        topicChange: { topicChanged: false, clearedKeys: [] },
-        pendingOverwriteSignal: pendingOverwriteFromLegacy(legacy.policyDecisions),
-        rejectionHint: legacy.policyDecisions.find((d: PolicyDecision) => d.action === 'reject')?.reason ?? null,
-    }
-}
-
-function pendingOverwriteFromLegacy(decisions: PolicyDecision[]): unknown {
-    for (const d of decisions) {
-        if (d.action === 'confirm' && d.pendingOverwrite) {
-            return { field: d.pendingOverwrite.field, oldValue: d.pendingOverwrite.oldValue, newValue: d.pendingOverwrite.newValue }
-        }
-    }
-    return null
+export async function interpretTurn(args: AdapterInterpretArgs): Promise<TurnResult> {
+    return commandLayerClientAdapter.interpret(args)
 }
 
 function adaptCommandLayerResponseToTurnResult(response: InterpretTurnResponse): TurnResult {
@@ -139,11 +67,36 @@ function adaptCommandLayerResponseToTurnResult(response: InterpretTurnResponse):
     }
 }
 
-export function selectAdapter({ useCommandLayer }: { useCommandLayer: boolean | undefined }): TurnInterpreterAdapter {
-    return useCommandLayer === true ? commandLayerClientAdapter : legacyFieldExtractorAdapter
+export type TurnInterpreterAdapter = {
+    interpret(args: AdapterInterpretArgs): Promise<TurnResult>
 }
 
-export async function interpretTurn(args: AdapterInterpretArgs & { useCommandLayer: boolean | undefined }): Promise<TurnResult> {
-    const adapter = selectAdapter({ useCommandLayer: args.useCommandLayer })
-    return adapter.interpret(args)
+export type AdapterInterpretArgs = {
+    constants: EngineConstants
+    message: string
+    systemPrompt?: string
+    locale?: string
+    flowLabel?: string
+    state: Record<string, unknown>
+    history: Array<{ role: 'user' | 'assistant', text: string }>
+    stateFields: InteractiveFlowStateField[]
+    nodes: InteractiveFlowNode[]
+    currentNode: CurrentNode | null
+    pendingInteraction: PendingInteraction | null
+    identityFields: string[]
+    infoIntents: InfoIntent[]
+    sessionId: string
+    sessionRevision: number
+    flowVersionId: string
+}
+
+export type CurrentNode = {
+    nodeId: string
+    nodeType: 'USER_INPUT' | 'CONFIRM' | 'TOOL' | 'BRANCH'
+    displayName?: string
+    stateOutputs?: string[]
+    allowedExtraFields?: string[]
+    prompt?: string
+    displayField?: string
+    nextMissingField?: string
 }
