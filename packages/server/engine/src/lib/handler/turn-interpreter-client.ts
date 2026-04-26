@@ -1,10 +1,23 @@
+import nodeFs from 'node:fs'
 import { InteractiveFlowStateField, InterpretTurnRequest, InterpretTurnResponse, PendingInteraction } from '@activepieces/shared'
 import { EngineConstants } from './context/engine-constants'
 
 const COMMAND_LAYER_BASE = 'v1/engine/interactive-flow-ai/command-layer'
+const DEBUG_LOG_PATH = process.env.AP_IF_DEBUG_LOG
+
+function debugLog(data: Record<string, unknown>): void {
+    try {
+        const line = JSON.stringify({ ts: new Date().toISOString(), module: 'turn-interpreter-client', ...data }) + '\n'
+        if (DEBUG_LOG_PATH) {
+            nodeFs.appendFileSync(DEBUG_LOG_PATH, line)
+        }
+    }
+    catch { /* best-effort */ }
+}
 
 async function interpret({ constants, request }: InterpretArgs): Promise<InterpretTurnResponse | null> {
     const url = `${constants.internalApiUrl}${COMMAND_LAYER_BASE}/interpret-turn`
+    debugLog({ stage: 'interpret:begin', url, turnId: request.turnId, sessionId: request.sessionId })
     try {
         const response = await fetch(url, {
             method: 'POST',
@@ -16,12 +29,16 @@ async function interpret({ constants, request }: InterpretArgs): Promise<Interpr
             body: JSON.stringify(request),
         })
         if (!response.ok && response.status !== 409) {
+            const errBody = await response.text().catch(() => '(unreadable)')
+            debugLog({ stage: 'interpret:http-error', status: response.status, body: errBody.slice(0, 500) })
             return null
         }
         const body = await response.json().catch(() => null) as InterpretTurnResponse | null
+        debugLog({ stage: 'interpret:success', status: response.status, hasTurnStatus: !!body?.turnStatus })
         return body
     }
-    catch {
+    catch (err) {
+        debugLog({ stage: 'interpret:fetch-error', error: String(err) })
         return null
     }
 }

@@ -1158,6 +1158,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 userMessagePreview: userMessage?.slice(0, 80),
             })
             if (!isNil(userMessage) && userMessage.trim().length > 0) {
+                ifDebug('handle:first-turn:userMessage-ok', { len: userMessage.length })
                 history = sessionStore.appendHistory({ history, role: 'user', text: userMessage, historyMaxTurns })
                 // Pre-run truly-stateless catalog tools (stateInputs === [])
                 // so enum-backed fields (closureReasonCode, closureReasonText)
@@ -1185,6 +1186,7 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 }
                 try {
                     const pauseHint = findNextUserOrConfirmNode({ nodes, state: flowState, executedNodeIds, skippedNodeIds })
+                    ifDebug('handle:first-turn:extract-routing', { useCommandLayer: settings.useCommandLayer, fieldExtractorSet: !isNil(settings.fieldExtractor), sessionId })
                     const extractResult = settings.useCommandLayer === true
                         ? adaptTurnResultToExtractResult(await commandLayerClientAdapter.interpret({
                             constants,
