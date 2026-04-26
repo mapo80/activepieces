@@ -95,7 +95,7 @@
                 "nodeType": "USER_INPUT",
                 "stateInputs": ["customerMatches"],
                 "stateOutputs": ["ndg"],
-                "message": "Scegli il cliente dalla lista",
+                "message": { "it": "Scegli il cliente dalla lista", "en": "Select customer from the list" },
                 "render": {
                   "component": "DataTable",
                   "props": {
@@ -150,7 +150,7 @@
                 "nodeType": "CONFIRM",
                 "stateInputs": ["reportBase64", "profile"],
                 "stateOutputs": ["sharedConfirmed"],
-                "message": "Hai condiviso il report PDF con il cliente?",
+                "message": { "it": "Hai condiviso il report PDF con il cliente?", "en": "Did you share the PDF report with the customer?" },
                 "render": {
                   "component": "ConfirmCard",
                   "props": {
