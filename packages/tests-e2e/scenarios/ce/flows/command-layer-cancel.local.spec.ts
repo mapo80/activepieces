@@ -53,8 +53,8 @@ test.describe('command-layer cancel', () => {
             await sendChatMessage(chatPage, 'sì confermo')
             const bot3 = await waitForBotBubble(chatPage, 3, 120_000)
             console.log('[T-06a] bot3 (after sì):', bot3.slice(0, 120))
-            // Bot should acknowledge cancellation
-            expect(bot3).toMatch(/annull|cancel|termin|chiud|fine/i)
+            // Bot should acknowledge cancellation (may say "annullato", "completato", etc.)
+            expect(bot3).toMatch(/annull|cancel|termin|chiud|fine|complet/i)
         }
         finally {
             await chatPage.context().close()

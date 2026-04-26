@@ -85,7 +85,8 @@
                 "stateOutputs": ["customerMatches"],
                 "toolParams": {
                   "name": { "kind": "state", "field": "customerName" }
-                }
+                },
+                "errorPolicy": { "onFailure": "SKIP" }
               },
               {
                 "id": "pick_ndg",
@@ -94,6 +95,7 @@
                 "nodeType": "USER_INPUT",
                 "stateInputs": ["customerMatches"],
                 "stateOutputs": ["ndg"],
+                "message": "Scegli il cliente dalla lista",
                 "render": {
                   "component": "DataTable",
                   "props": {
@@ -148,6 +150,7 @@
                 "nodeType": "CONFIRM",
                 "stateInputs": ["reportBase64", "profile"],
                 "stateOutputs": ["sharedConfirmed"],
+                "message": "Hai condiviso il report PDF con il cliente?",
                 "render": {
                   "component": "ConfirmCard",
                   "props": {

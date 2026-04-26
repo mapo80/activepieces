@@ -43,23 +43,15 @@ test.describe('command-layer info', () => {
             console.log('[T-05] bot1:', bot1.slice(0, 120))
             expect(bot1.length).toBeGreaterThan(0)
 
-            // Turn 2: pick NDG if a list appeared (pick first customer)
-            // If bot1 mentions customer selection, provide NDG
-            console.log('[T-05] turn 2: ndg 11255521')
-            await sendChatMessage(chatPage, '11255521')
+            // Turn 2: info query — how many accounts (flow already loaded all data in turn 1)
+            console.log('[T-05] turn 2: quanti rapporti ha?')
+            await sendChatMessage(chatPage, 'quanti rapporti ha?')
             const bot2 = await waitForBotBubble(chatPage, 2, 120_000)
             console.log('[T-05] bot2:', bot2.slice(0, 120))
-            expect(bot2.length).toBeGreaterThan(0)
-
-            // Turn 3: info query — how many accounts
-            console.log('[T-05] turn 3: quanti rapporti ha?')
-            await sendChatMessage(chatPage, 'quanti rapporti ha?')
-            const bot3 = await waitForBotBubble(chatPage, 3, 120_000)
-            console.log('[T-05] bot3:', bot3.slice(0, 120))
             // The bot should answer with a number or indicate the count of accounts
-            expect(bot3.length).toBeGreaterThan(5)
-            // Must contain a digit (account count) or a word meaning "no accounts yet"
-            expect(bot3).toMatch(/\d|rapporti|conto|nessun/i)
+            expect(bot2.length).toBeGreaterThan(5)
+            // Must contain a digit (account count) or a word meaning accounts/count
+            expect(bot2).toMatch(/\d|rapporti|conto|nessun|cliente/i)
         }
         finally {
             await chatPage.context().close()

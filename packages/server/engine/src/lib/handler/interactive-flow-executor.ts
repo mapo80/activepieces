@@ -1702,8 +1702,8 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     message = `Please provide ${label ?? nextPauseNode.stateOutputs[0] ?? 'the requested information'}`
                 }
             }
-            if (!isNil(rejectionHint) && !isNil(message)) {
-                message = `${rejectionHint}\n\n${message}`
+            if (!isNil(rejectionHint)) {
+                message = message ? `${rejectionHint}\n\n${message}` : rejectionHint
             }
             if (!isNil(commandLayerPreDagAck) && commandLayerPreDagAck.trim().length > 0) {
                 message = message

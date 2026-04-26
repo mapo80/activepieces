@@ -38,16 +38,16 @@ test.describe('command-layer compound', () => {
 
         try {
             // Turn 1: compound message — name + info query
-            console.log('[T-08] turn 1: Rossi quanti rapporti ha?')
-            await sendChatMessage(chatPage, 'Rossi quanti rapporti ha?')
+            // Using Bellafronte (valid AEP customer) for a compound SET_FIELDS + ANSWER_INFO turn
+            console.log('[T-08] turn 1: Bellafronte quanti rapporti ha?')
+            await sendChatMessage(chatPage, 'Bellafronte quanti rapporti ha?')
             const bot1 = await waitForBotBubble(chatPage, 1, 120_000)
             console.log('[T-08] bot1:', bot1.slice(0, 150))
             // Bot should either: answer the info OR acknowledge the name and then answer info
             // Both are valid compound outcomes. The response must be non-empty and meaningful.
             expect(bot1.length).toBeGreaterThan(5)
-            // At minimum, the bot should have processed the customer name "Rossi"
-            // and responded with something about accounts or customer search
-            expect(bot1).toMatch(/Rossi|rapporti|conti|cliente|ricerca|cerco/i)
+            // Must reference accounts, customer, or search result
+            expect(bot1).toMatch(/rapporti|conti|cliente|ricerca|cerco|Bellafronte/i)
         }
         finally {
             await chatPage.context().close()
