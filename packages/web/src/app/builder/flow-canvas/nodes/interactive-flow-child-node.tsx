@@ -93,7 +93,7 @@ function TypeBadge({
   ) {
     const component = (
       node as InteractiveFlowUserInputNode | InteractiveFlowConfirmNode
-    ).render.component;
+    ).render?.component;
     return (
       <span className="truncate rounded bg-purple-100 px-1.5 py-0.5 font-mono text-[10px] text-purple-700 dark:bg-purple-900 dark:text-purple-200">
         {component}
