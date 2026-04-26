@@ -41,12 +41,17 @@ export type StartMockMcpOptions = {
 export type MockMcpServer = {
   server: Server;
   close: () => Promise<void>;
+  setMode: (newMode: MockMcpMode, newSlowMs?: number) => void;
 };
 
 const DEFAULT_SLOW_MS = 5_000;
 
 export async function startMockMcpServer({ port, tools, mode = 'happy', slowMs = DEFAULT_SLOW_MS }: StartMockMcpOptions): Promise<MockMcpServer> {
   const byName = new Map(tools.map((t) => [t.name, t]));
+  // Captured by closure; setMode() mutates these so the request handler
+  // sees the new value at next request.
+  let currentMode: MockMcpMode = mode;
+  let currentSlowMs: number = slowMs;
 
   const server = createServer(async (req, res) => {
     if (req.method !== 'POST' || req.url !== '/mcp') {
@@ -55,13 +60,13 @@ export async function startMockMcpServer({ port, tools, mode = 'happy', slowMs =
       return;
     }
 
-    if (mode === 'crash') {
+    if (currentMode === 'crash') {
       req.socket.destroy();
       return;
     }
 
-    if (mode === 'slow') {
-      await new Promise((resolve) => setTimeout(resolve, slowMs));
+    if (currentMode === 'slow') {
+      await new Promise((resolve) => setTimeout(resolve, currentSlowMs));
     }
 
     let request: JsonRpcRequest;
@@ -101,7 +106,7 @@ export async function startMockMcpServer({ port, tools, mode = 'happy', slowMs =
         }));
         return;
       }
-      if (mode === 'catalog-fail' && /list_|catalog/i.test(tool.name)) {
+      if (currentMode === 'catalog-fail' && /list_|catalog|search/i.test(tool.name)) {
         res.writeHead(500, { 'content-type': 'application/json' });
         res.end(JSON.stringify({
           jsonrpc: '2.0',
@@ -144,5 +149,9 @@ export async function startMockMcpServer({ port, tools, mode = 'happy', slowMs =
   return {
     server,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+    setMode: (newMode: MockMcpMode, newSlowMs?: number) => {
+      currentMode = newMode;
+      if (newSlowMs != null) currentSlowMs = newSlowMs;
+    },
   };
 }

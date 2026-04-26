@@ -159,6 +159,64 @@ export async function waitForBotBubble(
     throw new Error(`timed out waiting for bot bubble #${expectedCount} (${timeoutMs}ms)`)
 }
 
+/**
+ * Wait until at least `minCount` non-empty bot bubbles are present AND the
+ * Nth (indexed by minCount) matches the regex. Useful when the bubble at
+ * a specific position changes content over time (e.g. PDF loading).
+ */
+export async function waitForBotBubbleMatching(
+    page: Page,
+    minCount: number,
+    regex: RegExp,
+    timeoutMs = 120_000,
+): Promise<string> {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+        const bubbles = await page
+            .locator('div.self-start')
+            .evaluateAll((els) => els.map((e) => (e as HTMLElement).innerText.trim()))
+        const nonEmpty = bubbles.filter((t) => t.length > 0)
+        if (nonEmpty.length >= minCount) {
+            const target = nonEmpty[minCount - 1]
+            if (regex.test(target)) return target
+        }
+        await new Promise((r) => setTimeout(r, 1_500))
+    }
+    throw new Error(`timed out waiting for bot bubble #${minCount} matching ${regex} (${timeoutMs}ms)`)
+}
+
+/**
+ * Wrapper try/finally that incapsulates signIn + import + chat-page open
+ * + cleanup. Reduces duplication across mega-journey specs.
+ */
+export async function withChatSession<T>(
+    args: {
+        request: APIRequestContext
+        browser: Browser
+        fixturePath: string
+        flowName: string
+        useMockMcpPort?: number
+    },
+    fn: (ctx: { page: Page; token: string; projectId: string; flowId: string }) => Promise<T>,
+): Promise<T> {
+    const { token, projectId } = await signIn(args.request)
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
+    const flowId = await importAndPublishFlow(
+        args.request, token, projectId,
+        args.fixturePath,
+        `${args.flowName} ${suffix}`,
+        args.useMockMcpPort != null ? { useMockMcpPort: args.useMockMcpPort } : undefined,
+    )
+    const page = await openChatPage(args.browser, flowId)
+    try {
+        return await fn({ page, token, projectId, flowId })
+    }
+    finally {
+        await page.context().close().catch(() => undefined)
+        await deleteFlow(args.request, token, flowId).catch(() => undefined)
+    }
+}
+
 // ─── internal helpers ────────────────────────────────────────────────────────
 
 function resolvePlaceholders<T>(node: T, reps: Record<string, string>): T {
