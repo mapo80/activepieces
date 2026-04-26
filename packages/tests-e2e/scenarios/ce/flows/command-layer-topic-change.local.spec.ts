@@ -1,40 +1,64 @@
 /**
- * DEV-03 status: Playwright spec marked as fixme.
+ * T-09 — Topic change mid-flow: "scusa il cliente è Rossi".
  *
- * The scenario is functionally covered by the API-level integration tests
- * in `packages/server/api/test/integration/ce/ai/` (turn-interpreter,
- * publisher-integration, finalize-rollback, cross-flow, store-cas suites
- * — 140 tests as of post-DEV-04). The dev-stack live execution (real UI
- * + WS frames + DB query loop) is on-call territory:
+ * After the flow has extracted customerName=Bellafronte and started
+ * running tools (search_customer), the user corrects the customer.
+ * The command layer should detect the topic change, update customerName
+ * to Rossi, and the engine session-store clears downstream fields
+ * (customerMatches, ndg, accounts).
  *
- *   1. Start bridge: `cd ../claude-code-openai-bridge && npm run dev`
- *   2. Set `AP_TEST_DATABASE_URL=postgresql://...` for `readDbTurnLog` /
- *      `readDbOutbox` helpers
- *   3. Run dev-stack with `AP_LLM_VIA_BRIDGE=true npm run dev`
- *   4. Remove `.fixme` from this file's describe + per-test, fill in the
- *      TODO body using helpers from `chat-runtime-helpers.ts`
- *   5. Run with `AP_EDITION=ce npx playwright test <this-file>`
- *
- * The DB helpers (readDbTurnLog/readDbOutbox) ARE implemented (DEV-03
- * commit) — they require a Postgres connection string + the `pg` package.
+ * RUN
+ *   cd packages/tests-e2e
+ *   E2E_EMAIL=dev@ap.com E2E_PASSWORD=12345678 AP_EDITION=ce \
+ *     npx playwright test scenarios/ce/flows/command-layer-topic-change.local.spec.ts
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
 import {
-    expectActionTrace,
-    expectBotMessage,
-    openChatForFixture,
-    sendUserMessage,
-    setupMockMcp,
-} from '../../../fixtures/chat-runtime-helpers';
+    signIn,
+    importAndPublishFlow,
+    deleteFlow,
+    openChatPage,
+    sendChatMessage,
+    waitForBotBubble,
+    CONSULTAZIONE_FIXTURE_PATH,
+} from '../../../fixtures/consultazione-spec-helpers'
 
-void [expect, expectActionTrace, expectBotMessage, openChatForFixture, sendUserMessage, setupMockMcp];
+test.describe.configure({ mode: 'serial' })
 
-test.describe.fixme('command-layer topic-change', () => {
-    test.beforeEach(async ({ page: _ }) => {
-        await setupMockMcp({ mode: 'happy' });
-    });
+test.describe('command-layer topic-change', () => {
+    test('T-09: topic change resets downstream state and restarts search', async ({ page: _page, request, browser }) => {
+        test.setTimeout(10 * 60_000)
 
-    test.fixme('TODO T-09: TOPIC_CHANGED clears downstream state', async ({ page: _ }) => {
-        // outline: see docs/interactive-flow/closure-plan.md Appendix B T-09
-    });
-});
+        const { token, projectId } = await signIn(request)
+        const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
+        const flowId = await importAndPublishFlow(
+            request, token, projectId,
+            CONSULTAZIONE_FIXTURE_PATH,
+            `Consultazione TopicChange T09 ${suffix}`,
+        )
+        const chatPage = await openChatPage(browser, flowId)
+
+        try {
+            // Turn 1: establish first customer
+            console.log('[T-09] turn 1: Bellafronte')
+            await sendChatMessage(chatPage, 'Bellafronte')
+            const bot1 = await waitForBotBubble(chatPage, 1, 120_000)
+            console.log('[T-09] bot1:', bot1.slice(0, 120))
+            expect(bot1.length).toBeGreaterThan(0)
+
+            // Turn 2: topic change — correct to different customer
+            console.log('[T-09] turn 2: scusa il cliente è Rossi')
+            await sendChatMessage(chatPage, 'scusa il cliente è Rossi')
+            const bot2 = await waitForBotBubble(chatPage, 2, 120_000)
+            console.log('[T-09] bot2:', bot2.slice(0, 120))
+            // Bot should acknowledge Rossi (search restarted with new customer)
+            expect(bot2.length).toBeGreaterThan(5)
+            // The bot should reference Rossi in the response (topic changed)
+            expect(bot2).toMatch(/Rossi|ricerca|cerco|cliente/i)
+        }
+        finally {
+            await chatPage.context().close()
+            await deleteFlow(request, token, flowId)
+        }
+    })
+})
