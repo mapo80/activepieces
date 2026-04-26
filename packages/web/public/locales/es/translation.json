@@ -1465,8 +1465,6 @@
   "This template includes {count} flows with all dependencies. A new folder will be created to organize them._one": "",
   "This template includes {count} flows with all dependencies. A new folder will be created to organize them._other": "",
   "validation.bigint.format": "Formato de secuencia no válido (se esperaba bigint positivo).",
-  "validation.commandLayer.featureDisabled": "Command Layer está deshabilitado en esta instalación.",
-  "validation.commandLayer.requiresPostgres": "La función Command Layer requiere PostgreSQL. Desactive useCommandLayer o cambie a una instalación PostgreSQL.",
   "validation.conversationCommand.evidence.tooShort": "Evidencia demasiado corta (mínimo 2 caracteres).",
   "validation.conversationCommand.field.required": "El comando requiere un nombre de campo.",
   "interactiveFlow.timeline.cancelConfirmed": "Flujo cancelado",
@@ -1479,5 +1477,6 @@
   "interactiveFlow.timeline.repromptEmitted": "Reformulación solicitada ({{reason}})",
   "interactiveFlow.timeline.turnCommitted": "Turno confirmado",
   "interactiveFlow.timeline.turnFailed": "Turno fallido",
-  "interactiveFlow.timeline.turnRolledBack": "Turno revertido"
+  "interactiveFlow.timeline.turnRolledBack": "Turno revertido",
+  "validation.interactiveFlow.requiresPostgres": "INTERACTIVE_FLOW requiere PostgreSQL. Cambie a una instalación PostgreSQL."
 }

@@ -78,5 +78,5 @@
 
 - [Database Migrations Playbook](https://www.activepieces.com/docs/handbook/engineering/playbooks/database-migration)
 - [TypeORM Migrations Docs](https://orkhan.gitbook.io/typeorm/docs/migrations)
-- [Command Layer Developer Guide](docs/interactive-flow/command-layer-developer-guide.md) — when/how to enable `useCommandLayer: true` on INTERACTIVE_FLOW steps
-- [Command Layer Migration Guide](docs/interactive-flow/command-layer-migration-guide.md) — migrating existing flows from legacy field-extractor to the command layer
+- [INTERACTIVE_FLOW Developer Guide](docs/interactive-flow/command-layer-developer-guide.md) — building flows on the command-layer runtime
+- [Architecture: Command Layer vs Previous](docs/interactive-flow/architecture-command-layer-vs-previous.md) — design rationale + record of the legacy fallback removal (2026-04-26)

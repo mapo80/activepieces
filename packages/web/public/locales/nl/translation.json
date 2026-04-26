@@ -1465,8 +1465,6 @@
   "This template includes {count} flows with all dependencies. A new folder will be created to organize them._one": "",
   "This template includes {count} flows with all dependencies. A new folder will be created to organize them._other": "",
   "validation.bigint.format": "Ongeldig volgnummerformaat (verwacht: positieve bigint).",
-  "validation.commandLayer.featureDisabled": "Command Layer is uitgeschakeld op deze installatie.",
-  "validation.commandLayer.requiresPostgres": "De Command Layer-functie vereist PostgreSQL. Schakel useCommandLayer uit of stap over op een PostgreSQL-installatie.",
   "validation.conversationCommand.evidence.tooShort": "Bewijs te kort (minimaal 2 tekens).",
   "validation.conversationCommand.field.required": "Commando vereist een veldnaam.",
   "interactiveFlow.timeline.cancelConfirmed": "Flow geannuleerd",
@@ -1479,5 +1477,6 @@
   "interactiveFlow.timeline.repromptEmitted": "Herformulering gevraagd ({{reason}})",
   "interactiveFlow.timeline.turnCommitted": "Beurt vastgelegd",
   "interactiveFlow.timeline.turnFailed": "Beurt mislukt",
-  "interactiveFlow.timeline.turnRolledBack": "Beurt teruggedraaid"
+  "interactiveFlow.timeline.turnRolledBack": "Beurt teruggedraaid",
+  "validation.interactiveFlow.requiresPostgres": "INTERACTIVE_FLOW vereist PostgreSQL. Stap over op een PostgreSQL-installatie."
 }

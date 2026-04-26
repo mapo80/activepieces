@@ -1,8 +1,7 @@
 /**
  * Shared helpers for command-layer browser/API Playwright specs.
  *
- * All specs that exercise the consultazione flow (useCommandLayer:true)
- * share these functions. The pattern mirrors estinzione-chat.local.spec.ts.
+ * All specs that exercise the consultazione flow share these functions.
  */
 import * as fs from 'fs'
 import * as path from 'path'

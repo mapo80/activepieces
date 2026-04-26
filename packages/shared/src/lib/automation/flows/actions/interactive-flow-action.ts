@@ -247,6 +247,5 @@ export const InteractiveFlowActionSettings = z.object({
     cleanupOnSuccess: z.boolean().optional(),
     historyMaxTurns: z.number().int().min(1).max(100).optional(),
     infoIntents: z.array(InfoIntentSchema).optional(),
-    useCommandLayer: z.boolean().optional(),
 })
 export type InteractiveFlowActionSettings = z.infer<typeof InteractiveFlowActionSettings>

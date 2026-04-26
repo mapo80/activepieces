@@ -42,10 +42,12 @@ You are working in the Activepieces server API (`packages/server/api`).
 
 ## Command Layer (`src/app/ai/command-layer`)
 
-Server-governed conversation runtime for INTERACTIVE_FLOW steps with
-`useCommandLayer: true`. The flow validator
-(`src/app/flows/flow-version/interactive-flow-validator.ts`) refuses publish
-on unsupported DB types with i18n key `validation.commandLayer.requiresPostgres`.
+Server-governed conversation runtime for INTERACTIVE_FLOW steps. The flow
+validator (`src/app/flows/flow-version/interactive-flow-validator.ts`) refuses
+publish on unsupported DB types with i18n key
+`validation.interactiveFlow.requiresPostgres`. The legacy fallback path
+was removed on 2026-04-26 — every INTERACTIVE_FLOW turn goes through the
+command layer.
 
 Key modules:
 
@@ -64,6 +66,10 @@ Endpoints (all under `/v1/engine/interactive-flow-ai/command-layer/`,
 `/interpret-turn`, `/interpret-turn/finalize`, `/interpret-turn/rollback`,
 `/outbox/replay`, `/metrics`, `/traces`, `/admin/force-clear-stale`.
 
+A separate endpoint `POST /v1/engine/interactive-flow-ai/question-generate`
+is used by the engine executor to render dynamic messages on
+USER_INPUT/CONFIRM nodes (when `message.dynamic === true`).
+
 Wiring at boot lives in `src/app/workers/worker-module.ts`:
 
 - `AP_LLM_VIA_BRIDGE=true` → registers `VercelAIAdapter` via
@@ -71,5 +77,4 @@ Wiring at boot lives in `src/app/workers/worker-module.ts`:
 - `outboxPublisher.start({ pollIntervalMs: AP_OUTBOX_POLL_MS ?? 500 })`
 - `lockRecoveryDaemon.start({ pollIntervalMs: AP_LOCK_RECOVERY_POLL_MS ?? 10_000 })`
 
-Feature docs: see `docs/interactive-flow/command-layer-developer-guide.md`
-and `command-layer-migration-guide.md`.
+Feature docs: see `docs/interactive-flow/command-layer-developer-guide.md`.

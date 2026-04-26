@@ -61,16 +61,12 @@ operatore → WebSocket → interactiveFlowExecutor.handle()
 
 ---
 
-### 2.2 Command Layer v3.3 (implementazione attuale)
+### 2.2 Command Layer v3.3 (implementazione attuale, fallback rimosso il 2026-04-26)
 
 ```
 operatore → WebSocket → interactiveFlowExecutor.handle()
                               │
-                              ├─ [useCommandLayer=false] → Legacy path invariato
-                              │
-                              └─ [useCommandLayer=true]
-                                    │
-                                    ▼
+                              ▼
                             turnInterpreterClient.interpret()
                                     │
                                     ▼
@@ -161,7 +157,7 @@ operatore → WebSocket → interactiveFlowExecutor.handle()
 | **WebSocket delivery** | Emit in-process sincrono | Outbox table → `outboxPublisher.poll()` → emit |
 | **Pending interactions** | `pick_from_list`, `confirm_binary` | Idem + `open_text` (fallback), `pending_cancel` |
 | **ErrorPolicy su tool node** | Nessuna (eccezione → FAIL) | `errorPolicy.onFailure: "SKIP"` → flow continua |
-| **Guards DB** | Nessuno | W-08: reject `useCommandLayer=true` su SQLite |
+| **Guards DB** | Nessuno | Validator: reject INTERACTIVE_FLOW publish su SQLite (Postgres/PGLite richiesto) |
 | **Test coverage** | e2e spec su fixture reale | Unit + integration (146 API) + e2e Playwright (14 spec) |
 
 ---
@@ -222,26 +218,28 @@ operatore → WebSocket → interactiveFlowExecutor.handle()
 
 ---
 
-## 7. Migration path dalla soluzione precedente
+## 7. Migration path
 
-### 7.1 Coesistenza garantita
+Il fallback legacy è stato **rimosso il 2026-04-26**. Non c'è più migrazione da fare: tutti i flow INTERACTIVE_FLOW passano per il command layer di default. Le fixture esistenti devono essere conformi al contratto strutturale:
 
-Il flag `useCommandLayer: true` è per-flow. Flows con `useCommandLayer: false` (o assente) continuano esattamente come prima — l'executor usa `fieldExtractor.extractWithPolicy()`. Nessuna modifica ai fixture esistenti (estinzione, copilot) è richiesta per la retrocompatibilità.
+1. Nodi `USER_INPUT` e `CONFIRM` con `message` come oggetto localizzato `{ "it": "...", "en": "..." }` (o `{ "dynamic": true, "fallback": {...}, "systemPromptAddendum": "..." }`).
+2. `"errorPolicy": { "onFailure": "SKIP" }` sui nodi TOOL che possono fallire in modo recuperabile.
+3. `infoIntents: []` (o lista delle intent disponibili) — campo richiesto.
+4. `mcpGatewayId` nel flow settings (già obbligatorio per TOOL nodes).
 
-### 7.2 Passi di migrazione per un flow esistente
+Per aggiungere un nuovo flow vedi [command-layer-developer-guide.md](command-layer-developer-guide.md).
 
-1. Aggiungere `"useCommandLayer": true` in `settings` del fixture JSON
-2. Verificare che i nodi `USER_INPUT` e `CONFIRM` abbiano `message` come oggetto localizzato `{ "it": "...", "en": "..." }` (non stringa)
-3. Aggiungere `"errorPolicy": { "onFailure": "SKIP" }` ai nodi TOOL che possono fallire in modo recuperabile
-4. Dichiarare `infoIntents[]` per le info-question del flow
-5. Aggiungere `mcpGatewayId` al flow settings (già obbligatorio per TOOL nodes)
-6. Testare con `AP_LLM_VIA_BRIDGE=true` e il bridge attivo
+### 7.1 Fallback rimosso (2026-04-26)
 
-Guida completa: [command-layer-migration-guide.md](command-layer-migration-guide.md)
+Il dual-path è stato eliminato in 5 fasi (vedi [progress-log.md](progress-log.md)):
 
-### 7.3 Rollback
+- **Fase 1**: eliminati ~32 file di test legacy (13 e2e + 4 API unit + 11 engine unit + 1 R-RO.4 integration + cleanup blocchi del flag-toggle nel validator test).
+- **Fase 2**: rimossi i ternari di branching nell'executor (resume + first-turn) e `selectAdapter` in `turn-interpreter-adapter.ts`. Migrata `estinzione.json` strutturalmente. Nuovo spec `command-layer-estinzione.local.spec.ts`.
+- **Fase 3**: eliminati 4 moduli runtime legacy (`field-extractor`, `overwrite-policy`, `pending-interaction-resolver`, `meta-question-handler`), endpoint `/field-extract` (~600 LoC). Validator: `checkCommandLayerCompatibility` → `checkPostgresRequired` (universale).
+- **Fase 4**: rimosso il campo flag-toggle dallo schema `InteractiveFlowActionSettings`. Bump `@activepieces/shared` 0.69.1 → 0.70.0. Ripulita `consultazione-cliente.json`.
+- **Fase 5**: rinominata i18n key `validation.commandLayer.*` → `validation.interactiveFlow.*` in 12 locales. Eliminata `featureDisabled`. Archiviati 14 doc storici in `docs/interactive-flow/archive/`. Aggiornati CLAUDE.md/AGENTS.md.
 
-Istantaneo: impostare `useCommandLayer: false` nel fixture. Il legacy path è invariato.
+Done condition: 0 residui del flag-toggle nel codice attivo (`packages/`, `fixtures/`, root markdown).
 
 ---
 
@@ -249,12 +247,9 @@ Istantaneo: impostare `useCommandLayer: false` nel fixture. Il legacy path è in
 
 | Suite | Totale | Passati | Falliti | Skip |
 |---|---|---|---|---|
-| Engine (Vitest) | 423 | 423 | 0 | 0 |
-| API integration (Vitest) | 146 | 146 | 0 | 0 |
-| Playwright command-layer | 15 | 14 | 0 | 1* |
-| Playwright estinzione (legacy regression) | 1 | 1 | 0 | 0 |
-
-\* T-12 saga-recovery documentato come `test.fixme` — richiede seam SIGKILL non disponibile in dev-stack. Coperto funzionalmente dal chaos test `command-layer-chaos.test.ts > prepared zombie compensate`.
+| Engine (Vitest) | 351 | 351 | 0 | 0 |
+| API integration (Vitest) | 354 | 354 | 0 | 0 |
+| Playwright command-layer (incluso `estinzione`) | 14 | 14 | 0 | 0 |
 
 ---
 

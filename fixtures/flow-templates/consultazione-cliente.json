@@ -31,7 +31,6 @@
             "cleanupOnSuccess": true,
             "historyMaxTurns": 20,
             "locale": "it",
-            "useCommandLayer": true,
             "flowLabel": { "it": "consultazione cliente", "en": "customer lookup" },
             "systemPrompt": "Sei un assistente bancario read-only per consultazione clienti. Estrai SOLO il nome cliente realmente presente nel messaggio dell'utente; non inventare mai dati. NESSUNA operazione dispositiva: solo lettura informativa. Conferma di condivisione = trust-based.",
             "fieldExtractor": {

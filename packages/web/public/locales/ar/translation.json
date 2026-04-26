@@ -1191,8 +1191,6 @@
   "Invalid Access": "Invalid Access",
   "Either the project does not exist or you do not have access to it.": "Either the project does not exist or you do not have access to it.",
   "validation.bigint.format": "تنسيق التسلسل غير صالح (متوقع bigint موجب).",
-  "validation.commandLayer.featureDisabled": "طبقة الأوامر معطلة على هذا التثبيت.",
-  "validation.commandLayer.requiresPostgres": "ميزة طبقة الأوامر تتطلب PostgreSQL. قم بتعطيل useCommandLayer أو انتقل إلى نشر PostgreSQL.",
   "validation.conversationCommand.evidence.tooShort": "الدليل قصير جدًا (الحد الأدنى حرفان).",
   "validation.conversationCommand.field.required": "الأمر يتطلب اسم حقل.",
   "interactiveFlow.timeline.cancelConfirmed": "تم إلغاء التدفق",
@@ -1205,5 +1203,6 @@
   "interactiveFlow.timeline.repromptEmitted": "طُلبت إعادة الصياغة ({{reason}})",
   "interactiveFlow.timeline.turnCommitted": "تم تأكيد الجولة",
   "interactiveFlow.timeline.turnFailed": "فشلت الجولة",
-  "interactiveFlow.timeline.turnRolledBack": "تم التراجع عن الجولة"
+  "interactiveFlow.timeline.turnRolledBack": "تم التراجع عن الجولة",
+  "validation.interactiveFlow.requiresPostgres": "يتطلب INTERACTIVE_FLOW استخدام PostgreSQL. قم بالتبديل إلى نشر PostgreSQL."
 }

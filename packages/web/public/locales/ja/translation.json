@@ -1462,8 +1462,6 @@
   "{count} flows created successfully in a new folder_other": "",
   "This template includes {count} flows with all dependencies. A new folder will be created to organize them._other": "",
   "validation.bigint.format": "シーケンス形式が無効です（正の bigint を期待）。",
-  "validation.commandLayer.featureDisabled": "このインストールではコマンドレイヤーが無効です。",
-  "validation.commandLayer.requiresPostgres": "コマンドレイヤー機能には PostgreSQL が必要です。useCommandLayer を無効にするか、PostgreSQL 環境に切り替えてください。",
   "validation.conversationCommand.evidence.tooShort": "エビデンスが短すぎます（最小2文字）。",
   "validation.conversationCommand.field.required": "コマンドにはフィールド名が必要です。",
   "interactiveFlow.timeline.cancelConfirmed": "フローをキャンセルしました",
@@ -1476,5 +1474,6 @@
   "interactiveFlow.timeline.repromptEmitted": "再表現を要求 ({{reason}})",
   "interactiveFlow.timeline.turnCommitted": "ターン確定",
   "interactiveFlow.timeline.turnFailed": "ターン失敗",
-  "interactiveFlow.timeline.turnRolledBack": "ターンロールバック"
+  "interactiveFlow.timeline.turnRolledBack": "ターンロールバック",
+  "validation.interactiveFlow.requiresPostgres": "INTERACTIVE_FLOW には PostgreSQL が必要です。PostgreSQL 環境に切り替えてください。"
 }

@@ -99,18 +99,17 @@ cd packages/server/engine
 npm run test:coverage
 ```
 
-## Command Layer integration (`useCommandLayer: true`)
+## Command Layer integration
 
-When the INTERACTIVE_FLOW step settings carry `useCommandLayer: true`, the
-executor delegates each turn to the API-side command layer instead of running
-the legacy `field-extractor + question-generator` chain. The integration
-points are:
+The executor delegates each INTERACTIVE_FLOW turn to the API-side command
+layer (the legacy `field-extractor` chain was removed on 2026-04-26).
+The integration points are:
 
 - `turn-interpreter-client.ts` — HTTP wrapper around
   `POST /v1/engine/interactive-flow-ai/command-layer/interpret-turn` (and
   `/finalize` / `/rollback`).
 - `turn-interpreter-adapter.ts` — converts the `InterpretTurnResponse` into
-  the legacy `extractResult`-shaped object the executor consumes (preserving
+  the executor-consumed extractResult shape (preserving
   `pendingOverwriteSignal`, `rejectionHint`, `topicChange`, executed-node
   reset semantics).
 - `status-renderer.ts` — composes the post-DAG bot message in two parts:
@@ -118,8 +117,11 @@ points are:
   derived from final state.
 - `turn-result.ts` — shared TurnResult shape; carries `messageOut` so the
   executor can surface the bifase bot message.
+- `question-generator.ts` — calls `POST /v1/engine/interactive-flow-ai/question-generate`
+  to render dynamic messages on USER_INPUT/CONFIRM nodes (when
+  `message.dynamic === true`). Distinct from the command-layer saga.
 
-The executor reads `useCommandLayer` from the step settings; if true, it
-calls `turnInterpreterClient.interpret`, then `finalize` (or `rollback` on
-save-failure). All side-effects (state diff, executed node reset on topic
-change, pending interactions) are applied identically to the legacy path.
+For each turn, the executor calls `commandLayerClientAdapter.interpret`,
+then `finalize` (or `rollback` on save-failure). State diff, executed node
+reset on topic change, and pending interactions are applied to the runtime
+state by the executor based on `InterpretTurnResponse`.

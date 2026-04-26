@@ -1342,8 +1342,6 @@
   "Invalid Access": "Неправильный доступ",
   "Either the project does not exist or you do not have access to it.": "Проект не существует или у вас нет доступа к нему.",
   "validation.bigint.format": "Неверный формат последовательности (ожидался положительный bigint).",
-  "validation.commandLayer.featureDisabled": "Command Layer отключен на этой установке.",
-  "validation.commandLayer.requiresPostgres": "Функция Command Layer требует PostgreSQL. Отключите useCommandLayer или перейдите на установку PostgreSQL.",
   "validation.conversationCommand.evidence.tooShort": "Доказательство слишком короткое (минимум 2 символа).",
   "validation.conversationCommand.field.required": "Команде требуется имя поля.",
   "interactiveFlow.timeline.cancelConfirmed": "Поток отменён",
@@ -1356,5 +1354,6 @@
   "interactiveFlow.timeline.repromptEmitted": "Запрошена переформулировка ({{reason}})",
   "interactiveFlow.timeline.turnCommitted": "Ход зафиксирован",
   "interactiveFlow.timeline.turnFailed": "Ход не удался",
-  "interactiveFlow.timeline.turnRolledBack": "Ход откачен"
+  "interactiveFlow.timeline.turnRolledBack": "Ход откачен",
+  "validation.interactiveFlow.requiresPostgres": "INTERACTIVE_FLOW требует PostgreSQL. Перейдите на установку PostgreSQL."
 }
