@@ -710,3 +710,37 @@ i timeout delle chat call individuali.
 - engine session-store unit: 36 tests green (+ 2 regression DEV-LIVE)
 - api overwrite-policy unit: 47 tests green (+ 3 regression DEV-LIVE)
 - estinzione e2e: 19/22 stable (best-effort con retries)
+
+## 2026-04-26 — DEV-LIVE estinzione 22/22 GREEN
+
+### Esecuzione final
+`bash scripts/run-estinzione-e2e.sh` → 5 file × `--workers=1 --retries=2`
+con cooldown 30s tra file. **Risultato: 22 passed / 0 failed / 0 flaky**.
+
+| File | Pass | Note |
+|---|---|---|
+| estinzione-chat-ciao.local.spec.ts | 1/1 | "ciao" produce risposta bot (no pending) |
+| estinzione-chat.local.spec.ts | 1/1 | 5 turni completi via /chats/:flowId |
+| estinzione-chat-multiturn.local.spec.ts | 5/5 | UI-T1..UI-T5 incluso UI-T5 (turno 1 multi-field) |
+| estinzione-chat-multiturn-api.local.spec.ts | 13/13 | API-T1..API-T15 incluso API-T15 (batch first turn) |
+| estinzione.local.spec.ts | 2/2 | MCP gateway health + end-to-end webhook |
+
+### Cosa ha trasformato 4/22 -> 22/22
+
+1. **Fix overwrite-policy primitive coercion** (commit `a4d8fd196f`)
+   - risolve spurious pending_overwrite quando il LLM real ritorna numeric
+   per field di tipo string.
+2. **Fix session-store isEqualValue primitive coercion** (commit `ff18e6d509`)
+   - companion fix per detectTopicChange, previene wipe spurioso di state
+   downstream + engine bundle rebuilt.
+3. **Per-file execution con cooldown 30s** (script `scripts/run-estinzione-e2e.sh`)
+   - elimina cumulative load del bridge claude-cli che causava timeout
+   progressivi quando 5 file lunghi (totale 22 test multi-turn LLM real)
+   giravano back-to-back nella stessa playwright session.
+
+### Cumulative test state final
+
+- API e2e ce/ai: **140/140** verde (deterministic)
+- Estinzione e2e: **22/22** verde (live LLM real via bridge)
+- Engine session-store unit: 36/36 verde (+ 2 regression DEV-LIVE)
+- API overwrite-policy unit: 47/47 verde (+ 3 regression DEV-LIVE)
