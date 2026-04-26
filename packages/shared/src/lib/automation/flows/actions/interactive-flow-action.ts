@@ -120,8 +120,8 @@ export type InteractiveFlowSingleOptionStrategy = z.infer<typeof InteractiveFlow
 export const InteractiveFlowUserInputNodeSchema = z.object({
     ...NodeBaseSchema,
     nodeType: z.literal(InteractiveFlowNodeType.USER_INPUT),
-    message: NodeMessageSchema,
-    render: InteractiveFlowRenderHintSchema,
+    message: NodeMessageSchema.nullable().optional(),
+    render: InteractiveFlowRenderHintSchema.optional(),
     singleOptionStrategy: InteractiveFlowSingleOptionStrategySchema.optional(),
 })
 export type InteractiveFlowUserInputNode = z.infer<typeof InteractiveFlowUserInputNodeSchema>
@@ -129,9 +129,9 @@ export type InteractiveFlowUserInputNode = z.infer<typeof InteractiveFlowUserInp
 export const InteractiveFlowConfirmNodeSchema = z.object({
     ...NodeBaseSchema,
     nodeType: z.literal(InteractiveFlowNodeType.CONFIRM),
-    message: NodeMessageSchema,
+    message: NodeMessageSchema.nullable().optional(),
     summary: z.array(InteractiveFlowSummaryRowSchema).optional(),
-    render: InteractiveFlowRenderHintSchema,
+    render: InteractiveFlowRenderHintSchema.optional(),
 })
 export type InteractiveFlowConfirmNode = z.infer<typeof InteractiveFlowConfirmNodeSchema>
 
