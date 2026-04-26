@@ -30,8 +30,10 @@ const config: PlaywrightTestConfig = {
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? '100%' : undefined,
+  /* Serialize tests locally to avoid concurrent AEP backend overload.
+   * Every test hits the real AEP backend; running them in parallel
+   * causes 429/timeout "No response from the chatbot" failures. */
+  workers: process.env.CI ? '100%' : 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI ? 'github' : 'html',
   /* Global setup to run once before all tests */
