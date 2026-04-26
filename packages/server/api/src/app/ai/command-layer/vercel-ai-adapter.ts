@@ -1,141 +1,170 @@
 import { ConversationCommand, ConversationCommandSchema } from '@activepieces/shared'
-import { generateText, jsonSchema, LanguageModel, tool } from 'ai'
+import { jsonSchema, tool } from 'ai'
 import { FastifyBaseLogger } from 'fastify'
 import { ProposePromptInput, ProposeResult, ProviderAdapter } from './provider-adapter'
 
-const DEFAULT_TIMEOUT_MS = 20_000
+const DEFAULT_TIMEOUT_MS = 30_000
 
-async function callGenerateText({ model, systemPrompt, userMessage, conversationHistory, tools, abortSignal }: {
-    model: LanguageModel
-    systemPrompt: string
-    userMessage: string
-    conversationHistory: Array<{ role: 'user' | 'assistant', text: string }>
-    tools: Record<string, ReturnType<typeof tool>>
-    abortSignal: AbortSignal
-}): Promise<{ toolCalls?: Array<{ toolName: string, args: unknown }>, usage?: { promptTokens?: number, completionTokens?: number } }> {
-    const messages = [
-        ...conversationHistory.map(h => ({ role: h.role, content: h.text })),
-        { role: 'user' as const, content: userMessage },
-    ]
-    const result = await generateText({
-        model,
-        system: systemPrompt,
-        messages: messages as never,
-        tools: tools as never,
-        toolChoice: 'auto',
-        abortSignal,
-    })
-    return {
-        toolCalls: (result as unknown as { toolCalls?: Array<{ toolName: string, args: unknown }> }).toolCalls,
-        usage: (result as unknown as { usage?: { promptTokens?: number, completionTokens?: number } }).usage,
-    }
+type OpenAIToolCall = {
+    id: string
+    type: 'function'
+    function: { name: string, arguments: string }
 }
 
-function buildToolsRegistry({ allowedFields, allowedInfoIntents }: {
+type OpenAIChoice = {
+    message: {
+        role: string
+        content: string | null
+        tool_calls?: OpenAIToolCall[]
+    }
+    finish_reason: string
+}
+
+type OpenAIResponse = {
+    choices: OpenAIChoice[]
+    usage?: { prompt_tokens?: number, completion_tokens?: number }
+}
+
+function buildToolsSchema({ allowedFields, allowedInfoIntents }: {
     allowedFields: string[]
     allowedInfoIntents: string[]
-}): Record<string, ReturnType<typeof tool>> {
-    const fieldEnum = allowedFields.length > 0 ? { enum: allowedFields } : { type: 'string' as const }
-    const infoEnum = allowedInfoIntents.length > 0 ? { enum: allowedInfoIntents } : { type: 'string' as const }
-    return {
-        SET_FIELDS: tool({
-            description: 'Atomically set one or more state fields with evidence from the user message',
-            inputSchema: jsonSchema({
-                type: 'object',
-                properties: {
-                    updates: {
-                        type: 'array',
-                        minItems: 1,
-                        items: {
-                            type: 'object',
-                            required: ['field', 'value', 'evidence'],
-                            properties: {
-                                field: fieldEnum,
-                                value: {},
-                                evidence: { type: 'string', minLength: 2 },
-                                confidence: { type: 'number', minimum: 0, maximum: 1 },
+}): Array<{ type: 'function', function: { name: string, description: string, parameters: unknown } }> {
+    const fieldEnum = allowedFields.length > 0 ? { enum: allowedFields } : { type: 'string' }
+    const infoEnum = allowedInfoIntents.length > 0 ? { enum: allowedInfoIntents } : { type: 'string' }
+    return [
+        {
+            type: 'function',
+            function: {
+                name: 'SET_FIELDS',
+                description: 'Atomically set one or more state fields. evidence MUST be a verbatim substring copied exactly from the user\'s most recent message.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        updates: {
+                            type: 'array',
+                            minItems: 1,
+                            items: {
+                                type: 'object',
+                                required: ['field', 'value', 'evidence'],
+                                properties: {
+                                    field: fieldEnum,
+                                    value: {},
+                                    evidence: { type: 'string', minLength: 2, description: 'Verbatim substring from the user message that supports this field value. Must appear literally in the user message.' },
+                                    confidence: { type: 'number', minimum: 0, maximum: 1 },
+                                },
                             },
                         },
                     },
+                    required: ['updates'],
                 },
-                required: ['updates'],
-            }) as never,
-        }) as ReturnType<typeof tool>,
-        ASK_FIELD: tool({
-            description: 'Ask the user to provide a specific missing field',
-            inputSchema: jsonSchema({
-                type: 'object',
-                properties: { field: fieldEnum, reason: { type: 'string' } },
-                required: ['field'],
-            }) as never,
-        }) as ReturnType<typeof tool>,
-        ANSWER_META: tool({
-            description: 'Reply to a meta-question (re-ask, clarify, progress, help) without state advance',
-            inputSchema: jsonSchema({
-                type: 'object',
-                properties: {
-                    kind: { enum: ['ask-repeat', 'ask-clarify', 'ask-progress', 'ask-help'] },
-                    message: { type: 'string' },
+            },
+        },
+        {
+            type: 'function',
+            function: {
+                name: 'ASK_FIELD',
+                description: 'Ask the user to provide a specific missing field',
+                parameters: {
+                    type: 'object',
+                    properties: { field: fieldEnum, reason: { type: 'string' } },
+                    required: ['field'],
                 },
-                required: ['kind'],
-            }) as never,
-        }) as ReturnType<typeof tool>,
-        ANSWER_INFO: tool({
-            description: 'Reply to an info-question using a registered intent and citing fields',
-            inputSchema: jsonSchema({
-                type: 'object',
-                properties: {
-                    infoIntent: infoEnum,
-                    citedFields: { type: 'array', items: { type: 'string' }, minItems: 1 },
+            },
+        },
+        {
+            type: 'function',
+            function: {
+                name: 'ANSWER_META',
+                description: 'Reply to a meta-question (re-ask, clarify, progress, help) without state advance',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        kind: { enum: ['ask-repeat', 'ask-clarify', 'ask-progress', 'ask-help'] },
+                        message: { type: 'string' },
+                    },
+                    required: ['kind'],
                 },
-                required: ['infoIntent', 'citedFields'],
-            }) as never,
-        }) as ReturnType<typeof tool>,
-        REQUEST_CANCEL: tool({
-            description: 'Propose to cancel the current flow; creates a pending_cancel for confirmation',
-            inputSchema: jsonSchema({
-                type: 'object',
-                properties: { reason: { type: 'string' } },
-            }) as never,
-        }) as ReturnType<typeof tool>,
-        RESOLVE_PENDING: tool({
-            description: 'Accept or reject the active pending interaction',
-            inputSchema: jsonSchema({
-                type: 'object',
-                properties: {
-                    decision: { enum: ['accept', 'reject'] },
-                    pendingType: { enum: ['confirm_binary', 'pick_from_list', 'pending_overwrite', 'pending_cancel'] },
+            },
+        },
+        {
+            type: 'function',
+            function: {
+                name: 'ANSWER_INFO',
+                description: 'Reply to an info-question using a registered intent and citing fields',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        infoIntent: infoEnum,
+                        citedFields: { type: 'array', items: { type: 'string' }, minItems: 1 },
+                    },
+                    required: ['infoIntent', 'citedFields'],
                 },
-                required: ['decision', 'pendingType'],
-            }) as never,
-        }) as ReturnType<typeof tool>,
-        REPROMPT: tool({
-            description: 'Signal that the user input is unclear; ask for re-formulation',
-            inputSchema: jsonSchema({
-                type: 'object',
-                properties: {
-                    reason: { enum: ['low-confidence', 'policy-rejected', 'off-topic', 'ambiguous-input', 'provider-error', 'catalog-not-ready'] },
+            },
+        },
+        {
+            type: 'function',
+            function: {
+                name: 'REQUEST_CANCEL',
+                description: 'Propose to cancel the current flow; creates a pending_cancel for confirmation',
+                parameters: {
+                    type: 'object',
+                    properties: { reason: { type: 'string' } },
                 },
-                required: ['reason'],
-            }) as never,
-        }) as ReturnType<typeof tool>,
-    }
+            },
+        },
+        {
+            type: 'function',
+            function: {
+                name: 'RESOLVE_PENDING',
+                description: 'Accept or reject the active pending interaction',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        decision: { enum: ['accept', 'reject'] },
+                        pendingType: { enum: ['confirm_binary', 'pick_from_list', 'pending_overwrite', 'pending_cancel'] },
+                    },
+                    required: ['decision', 'pendingType'],
+                },
+            },
+        },
+        {
+            type: 'function',
+            function: {
+                name: 'REPROMPT',
+                description: 'Signal that the user input is unclear; ask for re-formulation',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        reason: { enum: ['low-confidence', 'policy-rejected', 'off-topic', 'ambiguous-input', 'provider-error', 'catalog-not-ready'] },
+                    },
+                    required: ['reason'],
+                },
+            },
+        },
+    ]
 }
 
 function parseToolCallsToCommands({ toolCalls, log }: {
-    toolCalls: Array<{ toolName: string, args: unknown }>
+    toolCalls: OpenAIToolCall[]
     log?: FastifyBaseLogger
 }): ConversationCommand[] {
     const commands: ConversationCommand[] = []
     for (const tc of toolCalls) {
-        const args = (tc.args ?? {}) as Record<string, unknown>
-        const candidate = { type: tc.toolName, ...args }
+        let args: Record<string, unknown>
+        try {
+            args = JSON.parse(tc.function.arguments) as Record<string, unknown>
+        }
+        catch {
+            log?.warn({ toolName: tc.function.name }, '[vercel-ai-adapter] failed to parse tool call arguments')
+            continue
+        }
+        const candidate = { type: tc.function.name, ...args }
         const parsed = ConversationCommandSchema.safeParse(candidate)
         if (parsed.success) {
             commands.push(parsed.data)
         }
         else {
-            log?.warn({ toolName: tc.toolName, errors: parsed.error.errors.slice(0, 3) }, '[vercel-ai-adapter] tool call rejected by Zod')
+            log?.warn({ toolName: tc.function.name, errors: parsed.error.errors.slice(0, 3) }, '[vercel-ai-adapter] tool call rejected by Zod')
         }
     }
     return commands
@@ -152,25 +181,43 @@ export class VercelAIAdapter implements ProviderAdapter {
         const abortController = new AbortController()
         const timeout = setTimeout(() => abortController.abort(), this.cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS)
         try {
-            const model = await this.cfg.resolveModel()
-            const tools = buildToolsRegistry({
+            const tools = buildToolsSchema({
                 allowedFields: input.allowedFields,
                 allowedInfoIntents: input.allowedInfoIntents,
             })
-            const result = await callGenerateText({
-                model,
-                systemPrompt: input.systemPrompt,
-                userMessage: input.userMessage,
-                conversationHistory: input.conversationHistory,
+            const messages = [
+                ...input.conversationHistory.map(h => ({ role: h.role, content: h.text })),
+                { role: 'user', content: input.userMessage },
+            ]
+            const body = {
+                model: this.cfg.modelHint,
+                system: input.systemPrompt,
+                messages,
                 tools,
-                abortSignal: abortController.signal,
+                tool_choice: 'auto',
+            }
+            const response = await fetch(`${this.cfg.baseURL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.cfg.apiKey}`,
+                },
+                body: JSON.stringify(body),
+                signal: abortController.signal,
             })
-            const commands = parseToolCallsToCommands({ toolCalls: result.toolCalls ?? [], log: this.log })
+            if (!response.ok) {
+                const errText = await response.text().catch(() => '(unreadable)')
+                throw new Error(`HTTP ${response.status}: ${errText.slice(0, 200)}`)
+            }
+            const data = await response.json() as OpenAIResponse
+            const toolCalls = data.choices[0]?.message?.tool_calls ?? []
+            this.log?.info({ toolCallCount: toolCalls.length, toolNames: toolCalls.map(t => t.function.name) }, '[vercel-ai-adapter] bridge response')
+            const commands = parseToolCallsToCommands({ toolCalls, log: this.log })
             return {
                 commands,
                 tokenUsage: {
-                    inputTokens: result.usage?.promptTokens ?? 0,
-                    outputTokens: result.usage?.completionTokens ?? 0,
+                    inputTokens: data.usage?.prompt_tokens ?? 0,
+                    outputTokens: data.usage?.completion_tokens ?? 0,
                 },
                 modelVersion: this.cfg.modelHint,
             }
@@ -189,11 +236,13 @@ export class VercelAIAdapter implements ProviderAdapter {
     }
 }
 
-export type ResolveModelFn = () => Promise<LanguageModel>
+// Keep re-exports for tests that import from this module
+export { jsonSchema, tool }
 
 export type VercelAIAdapterConfig = {
     modelHint: string
-    resolveModel: ResolveModelFn
+    baseURL: string
+    apiKey: string
     log?: FastifyBaseLogger
     timeoutMs?: number
 }
