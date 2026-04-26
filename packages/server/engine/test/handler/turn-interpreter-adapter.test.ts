@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fieldExtractor } from '../../src/lib/handler/field-extractor'
-import { commandLayerClientAdapter, interpretTurn, legacyFieldExtractorAdapter, selectAdapter } from '../../src/lib/handler/turn-interpreter-adapter'
+import { commandLayerClientAdapter, interpretTurn } from '../../src/lib/handler/turn-interpreter-adapter'
 import { generateMockEngineConstants } from './test-helper'
 
 const fetchMock = vi.fn()
@@ -28,21 +27,6 @@ const baseArgs = {
     sessionRevision: 0,
     flowVersionId: 'v-1',
 }
-
-describe('selectAdapter', () => {
-    it('returns commandLayerClientAdapter when useCommandLayer=true', () => {
-        const a = selectAdapter({ useCommandLayer: true })
-        expect(a).toBe(commandLayerClientAdapter)
-    })
-    it('returns legacy adapter when useCommandLayer=false', () => {
-        const a = selectAdapter({ useCommandLayer: false })
-        expect(a).not.toBe(commandLayerClientAdapter)
-    })
-    it('returns legacy adapter when useCommandLayer is undefined', () => {
-        const a = selectAdapter({ useCommandLayer: undefined })
-        expect(a).not.toBe(commandLayerClientAdapter)
-    })
-})
 
 describe('commandLayerClientAdapter.interpret', () => {
     const validResponse = {
@@ -118,71 +102,8 @@ describe('commandLayerClientAdapter.interpret', () => {
     })
 })
 
-describe('legacyFieldExtractorAdapter.interpret', () => {
-    afterEach(() => {
-        vi.restoreAllMocks() 
-    })
-
-    it('forwards extracted fields when fieldExtractor returns data', async () => {
-        vi.spyOn(fieldExtractor, 'extractWithPolicy').mockResolvedValue({
-            extractedFields: { customerName: 'Polito' },
-            turnAffirmed: true,
-            policyDecisions: [{ field: 'customerName', action: 'accept' }],
-            metaAnswer: undefined,
-            clarifyReason: undefined,
-        } as never)
-        const result = await legacyFieldExtractorAdapter.interpret(baseArgs as never)
-        expect(result.extractedFields).toEqual({ customerName: 'Polito' })
-        expect(result.turnAffirmed).toBe(true)
-    })
-
-    it('extracts pendingOverwriteSignal from confirm decision', async () => {
-        vi.spyOn(fieldExtractor, 'extractWithPolicy').mockResolvedValue({
-            extractedFields: {},
-            turnAffirmed: false,
-            policyDecisions: [{
-                field: 'customerName',
-                action: 'confirm',
-                pendingOverwrite: { field: 'customerName', oldValue: 'Old', newValue: 'New' },
-            }],
-        } as never)
-        const result = await legacyFieldExtractorAdapter.interpret(baseArgs as never)
-        expect(result.pendingOverwriteSignal).toEqual({
-            field: 'customerName', oldValue: 'Old', newValue: 'New',
-        })
-    })
-
-    it('returns null pendingOverwriteSignal when no confirm decisions', async () => {
-        vi.spyOn(fieldExtractor, 'extractWithPolicy').mockResolvedValue({
-            extractedFields: {},
-            turnAffirmed: false,
-            policyDecisions: [{ field: 'x', action: 'accept' }],
-        } as never)
-        const result = await legacyFieldExtractorAdapter.interpret(baseArgs as never)
-        expect(result.pendingOverwriteSignal).toBeNull()
-    })
-
-    it('extracts rejectionHint from reject decision reason', async () => {
-        vi.spyOn(fieldExtractor, 'extractWithPolicy').mockResolvedValue({
-            extractedFields: {},
-            turnAffirmed: false,
-            policyDecisions: [{ field: 'ndg', action: 'reject', reason: 'invalid-format' }],
-        } as never)
-        const result = await legacyFieldExtractorAdapter.interpret(baseArgs as never)
-        expect(result.rejectionHint).toBe('invalid-format')
-    })
-
-    it('routes useCommandLayer=false through legacy adapter', async () => {
-        const spy = vi.spyOn(fieldExtractor, 'extractWithPolicy').mockResolvedValue({
-            extractedFields: {}, turnAffirmed: false, policyDecisions: [],
-        } as never)
-        await interpretTurn({ ...baseArgs, useCommandLayer: false } as never)
-        expect(spy).toHaveBeenCalled()
-    })
-})
-
-describe('interpretTurn dispatcher', () => {
-    it('routes useCommandLayer=true to commandLayerClientAdapter', async () => {
+describe('interpretTurn', () => {
+    it('calls commandLayerClientAdapter', async () => {
         const validResponse = {
             turnStatus: 'prepared',
             messageOut: { preDagAck: 'ok', kind: 'ack-only' },

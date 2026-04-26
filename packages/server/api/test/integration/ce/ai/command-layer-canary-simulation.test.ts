@@ -1,9 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { InterpretTurnRequest } from '@activepieces/shared'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { commandLayerMetrics } from '../../../../src/app/ai/command-layer/metrics'
-import { MockProviderAdapter } from '../../../../src/app/ai/command-layer/provider-adapter'
-import { turnInterpreter } from '../../../../src/app/ai/command-layer/turn-interpreter'
 import { databaseConnection } from '../../../../src/app/database/database-connection'
 import { setupTestEnvironment, teardownTestEnvironment } from '../../../helpers/test-setup'
 
@@ -20,29 +17,6 @@ beforeEach(async () => {
     await ds.query('DELETE FROM "interactive_flow_turn_log"')
     commandLayerMetrics.reset()
 })
-
-function buildRequest(overrides: Partial<InterpretTurnRequest>): InterpretTurnRequest {
-    return {
-        turnId: `turn-${randomUUID()}`,
-        idempotencyKey: `idem-${randomUUID()}`,
-        sessionId: `sess-${randomUUID()}`,
-        sessionRevision: 0,
-        flowRunId: `run-${randomUUID()}`,
-        flowVersionId: 'v-1',
-        message: 'Bellafronte',
-        state: {},
-        history: [],
-        pendingInteraction: null,
-        stateFields: [{ name: 'customerName', type: 'string', extractable: true } as never],
-        nodes: [],
-        currentNodeHint: null,
-        infoIntents: [],
-        systemPrompt: undefined,
-        locale: 'it',
-        catalogReadiness: {},
-        ...overrides,
-    }
-}
 
 function rolloutGate({ percentage, sessionId }: { percentage: number, sessionId: string }): boolean {
     let h = 0
@@ -71,26 +45,6 @@ describe('R-RO canary rollout simulation', () => {
         const sessions = Array.from({ length: 200 }, () => `s-${randomUUID()}`)
         expect(sessions.every((s) => rolloutGate({ percentage: 100, sessionId: s }))).toBe(true)
         expect(sessions.every((s) => !rolloutGate({ percentage: 0, sessionId: s }))).toBe(true)
-    })
-
-    it('R-RO.4: error-rate spike triggers rollback path (useCommandLayer:false fallback)', async () => {
-        const provider = new MockProviderAdapter()
-        provider.setFallback({ commands: [], error: 'simulated-provider-error' })
-
-        const N = 20
-        const errorThreshold = 0.1
-        let errors = 0
-        for (let i = 0; i < N; i++) {
-            const result = await turnInterpreter.interpret({
-                request: buildRequest({}),
-                provider,
-                identityFields: ['customerName'],
-            })
-            if (result.acceptedCommands.length === 0) errors++
-        }
-        const errorRate = errors / N
-        const rollbackTriggered = errorRate > errorThreshold
-        expect(rollbackTriggered).toBe(true)
     })
 
     it('R-RO.5: lockRecoveryDaemon path covered — prepared turn beyond TTL is reclaimable', async () => {
