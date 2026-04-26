@@ -1,15 +1,7 @@
-import { LanguageModel } from 'ai'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const generateTextMock = vi.fn()
-
-vi.mock('ai', async (importActual) => {
-    const actual = await importActual<typeof import('ai')>()
-    return {
-        ...actual,
-        generateText: generateTextMock,
-    }
-})
+const fetchMock = vi.fn()
+vi.stubGlobal('fetch', fetchMock)
 
 const baseInput = {
     systemPrompt: 'You are a banking assistant.',
@@ -19,26 +11,53 @@ const baseInput = {
     allowedInfoIntents: ['count_accounts'],
 }
 
-const mockModel = { id: 'mock-model' } as unknown as LanguageModel
+function makeOpenAIResponse(toolCalls: Array<{ name: string, arguments: string }>, usage?: { prompt_tokens: number, completion_tokens: number }): Response {
+    const body = {
+        choices: [{
+            message: {
+                role: 'assistant',
+                content: null,
+                tool_calls: toolCalls.map((tc, i) => ({
+                    id: `call_${i}`,
+                    type: 'function',
+                    function: { name: tc.name, arguments: tc.arguments },
+                })),
+            },
+            finish_reason: toolCalls.length > 0 ? 'tool_calls' : 'stop',
+        }],
+        usage: usage ?? { prompt_tokens: 0, completion_tokens: 0 },
+    }
+    return {
+        ok: true,
+        status: 200,
+        json: async () => body,
+        text: async () => JSON.stringify(body),
+    } as unknown as Response
+}
+
+function makeErrorResponse(status: number, text: string): Response {
+    return {
+        ok: false,
+        status,
+        text: async () => text,
+    } as unknown as Response
+}
 
 describe('VercelAIAdapter', () => {
     beforeEach(() => {
-        generateTextMock.mockReset()
+        fetchMock.mockReset()
     })
     afterEach(() => {
-        generateTextMock.mockReset()
+        fetchMock.mockReset()
     })
 
     it('happy path: maps SET_FIELDS tool call to ConversationCommand', async () => {
-        generateTextMock.mockResolvedValueOnce({
-            toolCalls: [{
-                toolName: 'SET_FIELDS',
-                args: { updates: [{ field: 'customerName', value: 'Bellafronte', evidence: 'Bellafronte' }] },
-            }],
-            usage: { promptTokens: 100, completionTokens: 30 },
-        })
+        fetchMock.mockResolvedValueOnce(makeOpenAIResponse(
+            [{ name: 'SET_FIELDS', arguments: JSON.stringify({ updates: [{ field: 'customerName', value: 'Bellafronte', evidence: 'Bellafronte' }] }) }],
+            { prompt_tokens: 100, completion_tokens: 30 },
+        ))
         const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
-        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', resolveModel: async () => mockModel })
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', baseURL: 'http://mock/v1', apiKey: 'sk-test' })
         const result = await adapter.proposeCommands(baseInput)
         expect(result.commands).toHaveLength(1)
         expect(result.commands[0].type).toBe('SET_FIELDS')
@@ -46,54 +65,65 @@ describe('VercelAIAdapter', () => {
     })
 
     it('empty toolCalls → commands=[]', async () => {
-        generateTextMock.mockResolvedValueOnce({ toolCalls: [], usage: { promptTokens: 0, completionTokens: 0 } })
+        fetchMock.mockResolvedValueOnce(makeOpenAIResponse([], { prompt_tokens: 0, completion_tokens: 0 }))
         const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
-        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', resolveModel: async () => mockModel })
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', baseURL: 'http://mock/v1', apiKey: 'sk-test' })
         const result = await adapter.proposeCommands(baseInput)
         expect(result.commands).toEqual([])
     })
 
     it('Zod parse failure on one tool call → command skipped, others kept', async () => {
-        generateTextMock.mockResolvedValueOnce({
-            toolCalls: [
-                { toolName: 'SET_FIELDS', args: { updates: [{ field: 'customerName', value: 'X', evidence: 'XY' }] } },
-                { toolName: 'INVALID_TYPE', args: {} },
-                { toolName: 'REPROMPT', args: { reason: 'low-confidence' } },
-            ],
-            usage: { promptTokens: 50, completionTokens: 10 },
-        })
+        fetchMock.mockResolvedValueOnce(makeOpenAIResponse([
+            { name: 'SET_FIELDS', arguments: JSON.stringify({ updates: [{ field: 'customerName', value: 'X', evidence: 'XY' }] }) },
+            { name: 'INVALID_TYPE', arguments: '{}' },
+            { name: 'REPROMPT', arguments: JSON.stringify({ reason: 'low-confidence' }) },
+        ], { prompt_tokens: 50, completion_tokens: 10 }))
         const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
-        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', resolveModel: async () => mockModel })
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', baseURL: 'http://mock/v1', apiKey: 'sk-test' })
         const result = await adapter.proposeCommands(baseInput)
         const types = result.commands.map(c => c.type).sort()
         expect(types).toEqual(['REPROMPT', 'SET_FIELDS'])
     })
 
-    it('generateText throws → returns commands=[] with error', async () => {
-        generateTextMock.mockRejectedValueOnce(new Error('network down'))
+    it('fetch throws → returns commands=[] with error', async () => {
+        fetchMock.mockRejectedValueOnce(new Error('network down'))
         const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
-        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', resolveModel: async () => mockModel })
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', baseURL: 'http://mock/v1', apiKey: 'sk-test' })
         const result = await adapter.proposeCommands(baseInput)
         expect(result.commands).toEqual([])
         expect(result.error).toContain('network down')
         expect(result.modelVersion).toBe('claude-sonnet-4-6')
     })
 
-    it('toolCalls undefined and usage undefined → empty commands, zero tokens', async () => {
-        generateTextMock.mockResolvedValueOnce({})
+    it('HTTP error response → returns commands=[] with error', async () => {
+        fetchMock.mockResolvedValueOnce(makeErrorResponse(500, 'Internal Server Error'))
         const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
-        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', resolveModel: async () => mockModel })
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', baseURL: 'http://mock/v1', apiKey: 'sk-test' })
+        const result = await adapter.proposeCommands(baseInput)
+        expect(result.commands).toEqual([])
+        expect(result.error).toContain('500')
+    })
+
+    it('toolCalls missing → empty commands, zero tokens', async () => {
+        fetchMock.mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => ({ choices: [{ message: { role: 'assistant', content: null } }] }),
+        } as unknown as Response)
+        const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', baseURL: 'http://mock/v1', apiKey: 'sk-test' })
         const result = await adapter.proposeCommands(baseInput)
         expect(result.commands).toEqual([])
         expect(result.tokenUsage).toEqual({ inputTokens: 0, outputTokens: 0 })
     })
 
     it('respects explicit timeoutMs config (constructor passes through)', async () => {
-        generateTextMock.mockResolvedValueOnce({ toolCalls: [], usage: undefined })
+        fetchMock.mockResolvedValueOnce(makeOpenAIResponse([], { prompt_tokens: 0, completion_tokens: 0 }))
         const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
         const adapter = new VercelAIAdapter({
             modelHint: 'claude-sonnet-4-6',
-            resolveModel: async () => mockModel,
+            baseURL: 'http://mock/v1',
+            apiKey: 'sk-test',
             timeoutMs: 1000,
         })
         const result = await adapter.proposeCommands(baseInput)
@@ -101,15 +131,12 @@ describe('VercelAIAdapter', () => {
     })
 
     it('falls back to {type:string} when allowedFields/allowedInfoIntents are empty', async () => {
-        generateTextMock.mockResolvedValueOnce({
-            toolCalls: [{
-                toolName: 'SET_FIELDS',
-                args: { updates: [{ field: 'anyField', value: 'X', evidence: 'XY' }] },
-            }],
-            usage: { promptTokens: 1, completionTokens: 1 },
-        })
+        fetchMock.mockResolvedValueOnce(makeOpenAIResponse(
+            [{ name: 'SET_FIELDS', arguments: JSON.stringify({ updates: [{ field: 'anyField', value: 'X', evidence: 'XY' }] }) }],
+            { prompt_tokens: 1, completion_tokens: 1 },
+        ))
         const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
-        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', resolveModel: async () => mockModel })
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', baseURL: 'http://mock/v1', apiKey: 'sk-test' })
         const result = await adapter.proposeCommands({
             ...baseInput,
             allowedFields: [],
@@ -118,21 +145,21 @@ describe('VercelAIAdapter', () => {
         expect(result.commands).toHaveLength(1)
     })
 
-    it('tool call with args=undefined is parsed against empty object', async () => {
-        generateTextMock.mockResolvedValueOnce({
-            toolCalls: [{ toolName: 'INVALID_TYPE', args: undefined }],
-            usage: { promptTokens: 0, completionTokens: 0 },
-        })
+    it('tool call with malformed JSON arguments → command skipped', async () => {
+        fetchMock.mockResolvedValueOnce(makeOpenAIResponse(
+            [{ name: 'SET_FIELDS', arguments: 'NOT_JSON' }],
+            { prompt_tokens: 0, completion_tokens: 0 },
+        ))
         const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
-        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', resolveModel: async () => mockModel })
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', baseURL: 'http://mock/v1', apiKey: 'sk-test' })
         const result = await adapter.proposeCommands(baseInput)
         expect(result.commands).toEqual([])
     })
 
     it('error from non-Error value still produces sliced error string', async () => {
-        generateTextMock.mockRejectedValueOnce('x'.repeat(500))
+        fetchMock.mockRejectedValueOnce('x'.repeat(500))
         const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
-        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', resolveModel: async () => mockModel })
+        const adapter = new VercelAIAdapter({ modelHint: 'claude-sonnet-4-6', baseURL: 'http://mock/v1', apiKey: 'sk-test' })
         const result = await adapter.proposeCommands(baseInput)
         expect(result.commands).toEqual([])
         expect(result.error).toBeDefined()
@@ -140,30 +167,32 @@ describe('VercelAIAdapter', () => {
     })
 
     it('logs warning when log is provided and Zod parse fails', async () => {
-        generateTextMock.mockResolvedValueOnce({
-            toolCalls: [{ toolName: 'BAD_TOOL', args: {} }],
-            usage: { promptTokens: 0, completionTokens: 0 },
-        })
+        fetchMock.mockResolvedValueOnce(makeOpenAIResponse(
+            [{ name: 'BAD_TOOL', arguments: '{}' }],
+            { prompt_tokens: 0, completion_tokens: 0 },
+        ))
         const warn = vi.fn()
         const log = { warn, error: vi.fn(), info: vi.fn(), debug: vi.fn(), trace: vi.fn(), fatal: vi.fn(), child: vi.fn(), level: 'warn', silent: vi.fn(), bindings: vi.fn() }
         const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
         const adapter = new VercelAIAdapter({
             modelHint: 'claude-sonnet-4-6',
-            resolveModel: async () => mockModel,
+            baseURL: 'http://mock/v1',
+            apiKey: 'sk-test',
             log: log as never,
         })
         await adapter.proposeCommands(baseInput)
         expect(warn).toHaveBeenCalledTimes(1)
     })
 
-    it('logs warning on generateText throw when log is provided', async () => {
-        generateTextMock.mockRejectedValueOnce(new Error('boom'))
+    it('logs warning on fetch throw when log is provided', async () => {
+        fetchMock.mockRejectedValueOnce(new Error('boom'))
         const warn = vi.fn()
         const log = { warn, error: vi.fn(), info: vi.fn(), debug: vi.fn(), trace: vi.fn(), fatal: vi.fn(), child: vi.fn(), level: 'warn', silent: vi.fn(), bindings: vi.fn() }
         const { VercelAIAdapter } = await import('../../../../src/app/ai/command-layer/vercel-ai-adapter')
         const adapter = new VercelAIAdapter({
             modelHint: 'claude-sonnet-4-6',
-            resolveModel: async () => mockModel,
+            baseURL: 'http://mock/v1',
+            apiKey: 'sk-test',
             log: log as never,
         })
         const result = await adapter.proposeCommands(baseInput)
