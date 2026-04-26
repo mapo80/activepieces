@@ -206,26 +206,26 @@ describe('validateInteractiveFlow', () => {
         const baseSettings = { nodes: [], stateFields: [] }
 
         it('accepts on POSTGRES', () => {
-            const result = validateInteractiveFlow({ ...baseSettings, useCommandLayer: true }, { dbType: 'POSTGRES' })
+            const result = validateInteractiveFlow(baseSettings, { dbType: 'POSTGRES' })
             expect(result.valid).toBe(true)
         })
 
         it('accepts on PGLITE', () => {
-            const result = validateInteractiveFlow({ ...baseSettings, useCommandLayer: true }, { dbType: 'PGLITE' })
+            const result = validateInteractiveFlow(baseSettings, { dbType: 'PGLITE' })
             expect(result.valid).toBe(true)
         })
 
         it('rejects on SQLITE3 with i18n key', () => {
-            const result = validateInteractiveFlow({ ...baseSettings, useCommandLayer: true }, { dbType: 'SQLITE3' })
+            const result = validateInteractiveFlow(baseSettings, { dbType: 'SQLITE3' })
             expect(result.valid).toBe(false)
-            const err = result.errors.find(e => e.code === 'COMMAND_LAYER_REQUIRES_POSTGRES')
+            const err = result.errors.find(e => e.code === 'INTERACTIVE_FLOW_REQUIRES_POSTGRES')
             expect(err).toBeDefined()
-            expect(err?.message).toBe('validation.commandLayer.requiresPostgres')
+            expect(err?.message).toBe('validation.interactiveFlow.requiresPostgres')
         })
 
         it('skips check when dbType is undefined (preserves pure-validator callers)', () => {
-            const result = validateInteractiveFlow({ ...baseSettings, useCommandLayer: true })
-            expect(result.errors.find(e => e.code === 'COMMAND_LAYER_REQUIRES_POSTGRES')).toBeUndefined()
+            const result = validateInteractiveFlow(baseSettings)
+            expect(result.errors.find(e => e.code === 'INTERACTIVE_FLOW_REQUIRES_POSTGRES')).toBeUndefined()
         })
     })
 })

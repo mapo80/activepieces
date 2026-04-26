@@ -43,7 +43,7 @@ export function validateInteractiveFlow(
     errors.push(...checkBranchTargets(settings.nodes))
     errors.push(...checkComponentWhitelist(settings.nodes))
     errors.push(...checkCycles(settings.nodes))
-    errors.push(...checkCommandLayerCompatibility(settings, options?.dbType))
+    errors.push(...checkPostgresRequired(options?.dbType))
 
     return { valid: errors.length === 0, errors }
 }
@@ -269,22 +269,19 @@ function checkCycles(nodes: readonly InteractiveFlowNode[]): InteractiveFlowVali
     }]
 }
 
-function checkCommandLayerCompatibility(
-    settings: { useCommandLayer?: boolean },
+function checkPostgresRequired(
     dbType: string | undefined,
 ): InteractiveFlowValidationError[] {
-    if (settings.useCommandLayer !== true) return []
     if (isNil(dbType)) return []
     if (COMMAND_LAYER_SUPPORTED_DB_TYPES.has(dbType)) return []
     return [{
-        code: 'COMMAND_LAYER_REQUIRES_POSTGRES',
-        path: 'useCommandLayer',
-        message: 'validation.commandLayer.requiresPostgres',
+        code: 'INTERACTIVE_FLOW_REQUIRES_POSTGRES',
+        message: 'validation.interactiveFlow.requiresPostgres',
     }]
 }
 
 export type InteractiveFlowValidationError = {
-    code: 'INVALID_SCHEMA' | 'DUPLICATE_OUTPUT' | 'ORPHAN_INPUT' | 'UNREACHABLE_OUTPUT' | 'CYCLE' | 'UNKNOWN_BRANCH_TARGET' | 'UNKNOWN_COMPONENT' | 'MISSING_STATE_FIELD' | 'DUPLICATE_NODE_ID' | 'DUPLICATE_STATE_FIELD' | 'COMMAND_LAYER_REQUIRES_POSTGRES'
+    code: 'INVALID_SCHEMA' | 'DUPLICATE_OUTPUT' | 'ORPHAN_INPUT' | 'UNREACHABLE_OUTPUT' | 'CYCLE' | 'UNKNOWN_BRANCH_TARGET' | 'UNKNOWN_COMPONENT' | 'MISSING_STATE_FIELD' | 'DUPLICATE_NODE_ID' | 'DUPLICATE_STATE_FIELD' | 'INTERACTIVE_FLOW_REQUIRES_POSTGRES'
     path?: string
     message: string
 }
