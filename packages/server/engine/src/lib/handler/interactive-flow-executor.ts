@@ -1502,6 +1502,8 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
             )
             const missingExtractable = new Set<string>()
             let hasNonExtractableMissing = false
+            const isProducedByUnresolved = (fieldName: string): boolean =>
+                unresolvedNodes.some(p => isToolNode(p) && p.stateOutputs.includes(fieldName))
             for (const n of unresolvedNodes) {
                 if (!isToolNode(n)) continue
                 for (const fieldName of n.stateInputs) {
@@ -1509,6 +1511,13 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                     const fieldDef = fields.find(f => f.name === fieldName)
                     if (fieldDef && fieldDef.extractable !== false) {
                         missingExtractable.add(fieldName)
+                    }
+                    else if (isProducedByUnresolved(fieldName)) {
+                        // Campo non-extractable ma ancora producibile da un nodo
+                        // unresolved (es. customerMatches prodotto da search_customer).
+                        // Non è un deadlock: serve solo che l'utente fornisca i
+                        // campi extractable a monte.
+                        continue
                     }
                     else {
                         hasNonExtractableMissing = true
@@ -1563,7 +1572,15 @@ export const interactiveFlowExecutor: BaseExecutor<InteractiveFlowAction> = {
                 }
                 const missingList = primaryMissing.length > 0 ? primaryMissing : missingListRaw
                 let prompt: string | undefined
-                if (!isNil(settings.questionGenerator)) {
+                // Priorità 1: messaggio del LLM se già emesso dal command layer
+                // (ANSWER_META/INFO/REPROMPT/ASK_FIELD/cancel-*). Evita una
+                // seconda chiamata LLM via questionGenerator e mostra la risposta
+                // naturale del modello.
+                if (!isNil(commandLayerPreDagAck) && commandLayerPreDagAck.trim().length > 0) {
+                    prompt = commandLayerPreDagAck
+                }
+                // Priorità 2: questionGenerator (extraction-only flows)
+                else if (!isNil(settings.questionGenerator)) {
                     const generated = await questionGenerator.generate({
                         constants,
                         config: settings.questionGenerator,
