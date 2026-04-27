@@ -8,12 +8,17 @@
 # Avvia (se richiesto) bridge LLM + AEP backend, poi `npm run dev` (turbo:
 # web + api + engine + worker).
 #
-# Variabili d'ambiente opzionali (default = TRUE, avvia tutto):
+# Variabili d'ambiente opzionali (default sicuri, no Docker):
 #   START_CLAUDE_BRIDGE=false  — NON avvia claude-code-openai-bridge
-#   START_AEP=false            — NON avvia AEP backend (FastAPI)
+#                                (default true)
 #   AP_LLM_VIA_BRIDGE=false    — usa MockProviderAdapter invece del bridge
+#                                (default true)
+#   START_AEP=true             — avvia AEP backend (richiede Docker per
+#                                Postgres + Keycloak — default false).
+#                                Per usare AEP reale: `START_AEP=true ./dev-start.sh`
+#                                (Docker deve essere già avviato).
 #
-# RUN (di default avvia tutto: bridge + AEP + dev-stack con bridge LLM)
+# RUN (default = bridge + dev-stack via npm run dev, NO AEP/Docker)
 #   ./dev-start.sh
 #
 # Stop: Ctrl+C — la trap pulisce i processi figli (bridge, AEP, turbo).
@@ -112,14 +117,24 @@ if [ "${START_CLAUDE_BRIDGE:-true}" = "true" ]; then
 fi
 
 # ── AEP backend (banking MCP tools + FastAPI) ───────────────────────────────
-if [ "${START_AEP:-true}" = "true" ]; then
+# Richiede Postgres + Keycloak via Docker. Lo script AEP `./start.sh be`
+# avvia SOLO il backend FastAPI che SI ASPETTA Postgres su :5432 già up,
+# quindi lanciamo prima `./start.sh infra` (idempotente), poi `be`.
+if [ "${START_AEP:-false}" = "true" ]; then
     if curl -sf "$AEP_URL/mcp/health" > /dev/null 2>&1; then
         echo "  ✓ AEP backend already running on $AEP_URL"
     elif [ -d "$AEP_DIR" ] && [ -x "$AEP_DIR/start.sh" ]; then
-        echo "  Starting AEP backend: $AEP_URL  (agentic-engine-platform + MCP /mcp)"
-        ( cd "$AEP_DIR" && ./start.sh be 2>&1 ) &
-        PIDS+=($!)
-        wait_for_url "$AEP_URL/mcp/health" "AEP" 60
+        echo "  Starting AEP infra (Docker: Postgres + Keycloak)"
+        ( cd "$AEP_DIR" && ./start.sh infra 2>&1 ) || {
+            echo "  ⚠ AEP infra start failed (Docker not running?) — skipping AEP backend"
+            START_AEP=false
+        }
+        if [ "${START_AEP:-false}" = "true" ]; then
+            echo "  Starting AEP backend: $AEP_URL  (agentic-engine-platform + MCP /mcp)"
+            ( cd "$AEP_DIR" && ./start.sh be 2>&1 ) &
+            PIDS+=($!)
+            wait_for_url "$AEP_URL/mcp/health" "AEP" 90
+        fi
     else
         echo "  ⚠ START_AEP=true but $AEP_DIR/start.sh not found — skipping"
     fi
