@@ -1,6 +1,10 @@
 #!/bin/bash
 # dev-start.sh — orchestratore del dev-stack INTERACTIVE_FLOW.
 #
+# Pre-flight: killa qualsiasi processo già listening sulle porte dev
+# (3000 API, 4200 frontend, 8787 bridge, 8000 AEP) + processi orfani
+# noti (tsx watch, turbo, uvicorn).
+#
 # Avvia (se richiesto) bridge LLM + AEP backend, poi `npm run dev` (turbo:
 # web + api + engine + worker).
 #
@@ -40,6 +44,42 @@ cleanup() {
     wait 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
+
+# ── Kill anything already listening on the ports we need ────────────────────
+# Risolve il problema "address already in use" e processi orfani da run
+# precedenti (es. tsx watch zombie, AEP/bridge da sessioni passate).
+kill_port() {
+    local port="$1"
+    local label="$2"
+    local pids
+    pids=$(lsof -ti:"$port" 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+        echo "  ⚠ Port $port ($label) busy by PID(s): $pids — killing"
+        echo "$pids" | xargs -I{} kill -TERM {} 2>/dev/null || true
+        sleep 1
+        # Force-kill any survivor
+        pids=$(lsof -ti:"$port" 2>/dev/null || true)
+        if [ -n "$pids" ]; then
+            echo "$pids" | xargs -I{} kill -9 {} 2>/dev/null || true
+        fi
+    fi
+}
+
+echo "  ──────────────────────────────────────────"
+echo "  Pre-flight: killing any stale processes on dev ports"
+echo "  ──────────────────────────────────────────"
+kill_port 3000 "API"
+kill_port 4200 "frontend"
+kill_port 8787 "bridge"
+kill_port 8000 "AEP"
+# Kill known orphan node/python processes by command pattern (turbo, tsx
+# watch, uvicorn, etc.). Idempotent — silently no-op if not running.
+pkill -f "tsx.*packages/server/api/src/bootstrap" 2>/dev/null || true
+pkill -f "tsx.*packages/server/worker/src/bootstrap" 2>/dev/null || true
+pkill -f "turbo run serve" 2>/dev/null || true
+pkill -f "uvicorn.*app.main:app" 2>/dev/null || true
+pkill -f "claude-code-openai-bridge" 2>/dev/null || true
+sleep 2
 
 wait_for_url() {
     local url="$1"
