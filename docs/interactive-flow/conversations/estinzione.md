@@ -1,6 +1,6 @@
 # Estinzione rapporto bancario — conversazione E2E
 
-**Run ID:** `ZWbQ7mhOwhPQQHMRdjxlZ` · **Data:** 2026-04-23T18:29:05.757Z · **Durata:** 75.1s · **Esito finale:** SUCCEEDED (caseId `ES-2026-9014`)
+**Run ID:** `3iCBm9QqwWYKWdgb0Bwtf` · **Data:** 2026-04-26T07:01:32.000Z · **Durata:** 55.7s · **Esito finale:** SUCCEEDED (caseId `ES-2026-6943`)
 
 Provider AI: Claude CLI via `claude-code-openai-bridge` (8787) · MCP Gateway: `agentic-engine-platform` (8000) · Core Banking: `ced-poc-evento-marzo-2026.azurewebsites.net`
 
@@ -16,11 +16,11 @@ Provider AI: Claude CLI via `claude-code-openai-bridge` (8787) · MCP Gateway: `
 
 ### 🤖 Bot
 
-> Buongiorno. Per il cognome **Bellafronte** ho trovato **1 cliente**:
+> Buongiorno! Ho trovato **1 cliente** corrispondente al nominativo ricercato:
 > 
-> - **BELLAFRONTE GIANLUCA** — NDG **11255521**, Privato, Agenzia 745, residente a Lecce.
+> - **BELLAFRONTE GIANLUCA** — NDG: `11255521`
 > 
-> La prego di confermare l'NDG **11255521** per procedere con l'operazione.
+> Desidera procedere con questo cliente?
 
 *🧩 UI component renderizzata sotto il messaggio:* `DataTable` — props: `{"sourceField":"customerMatches"}`
 
@@ -49,7 +49,7 @@ Provider AI: Claude CLI via `claude-code-openai-bridge` (8787) · MCP Gateway: `
 
 ### 🤖 Bot
 
-> Gentile cliente Bellafronte Gianluca (NDG 11255521), la confermo come cliente selezionato. Sono disponibili **17 rapporti** a lei intestati: quale desidera estinguere? La prego di indicare il codice rapporto nel formato NN-NNN-NNNNNNNN (ad esempio 01-034-00392400).
+> Gentile **Bellafronte Gianluca** (NDG: **11255521**), ho trovato **17 rapporti** attivi a Lei intestati. Quale desidera estinguere? Può indicarmelo nel formato **NN-NNN-NNNNNNNN** (ad esempio, `01-034-00392400`).
 
 *🧩 UI component renderizzata sotto il messaggio:* `DataTable` — props: `{"sourceField":"accounts"}`
 
@@ -82,13 +82,7 @@ Provider AI: Claude CLI via `claude-code-openai-bridge` (8787) · MCP Gateway: `
 
 ### 🤖 Bot
 
-> Perfetto, confermo la selezione del rapporto **01-034-00392400** – Conto Corrente "Conto Zero Base". Per procedere con l'estinzione, La prego di indicarmi la **motivazione di chiusura** (codice a 2 cifre) e la **data di efficacia** in formato YYYY-MM-DD. A titolo esemplificativo, le motivazioni più ricorrenti sono:
-> 
-> - **01** – Trasferimento estero o zona non servita
-> - **02** – Scomodità rispetto ad altri sportelli
-> - **03** – Passaggio ad altro istituto di credito
-> 
-> Quale motivazione e data desidera indicare?
+> Perfetto, sig. Bellafronte: ho selezionato il rapporto **Conto Corrente - Conto Zero Base** (01-034-00392400) per la procedura di estinzione. Può indicarmi il **codice motivazione** (2 cifre) e la **data di efficacia** nel formato YYYY-MM-DD? Le motivazioni più frequenti sono: `01` – Trasferimento estero o zona non servita, `02` – Scomodità rispetto ad altri sportelli, `05` – Passaggio a concorrente.
 
 *🧩 UI component renderizzata sotto il messaggio:* `ClosureForm` — props: `{"sourceField":"closureReasons"}`
 
@@ -117,7 +111,7 @@ Provider AI: Claude CLI via `claude-code-openai-bridge` (8787) · MCP Gateway: `
 
 ### 🤖 Bot
 
-> Gentile cliente, riepilogo la sua richiesta di chiusura: **NDG 11255521** (Bellafronte Gianluca), rapporto **01-034-00392400** (Conto Corrente - Conto Zero Base), motivazione **01 – Trasferimento estero o zona non servita**, con data di efficacia **15/04/2029**. Il modulo PDF di chiusura è stato generato ed è pronto per il download. Conferma l'invio della pratica al Core Banking?
+> Ho riepilogato la sua richiesta di chiusura: **NDG 11255521 – BELLAFRONTE GIANLUCA**, rapporto **01-034-00392400** (Conto Corrente - Conto Zero Base), motivazione **codice 01 – "Trasferimento estero o zona non servita"**, con data di efficacia **15 aprile 2029**. Il modulo PDF è stato generato ed è pronto per la firma. Conferma l'invio della pratica al Core Banking?
 
 *🧩 UI component renderizzata sotto il messaggio:* `ConfirmCard` — props: `{"sourceField":"moduleBase64"}`
 
@@ -128,7 +122,7 @@ Provider AI: Claude CLI via `claude-code-openai-bridge` (8787) · MCP Gateway: `
 
 **🔧 MCP Tool:** `banking-operations/generate_module`
 - richiesta: `{"ndg":"11255521","rapportoId":"01-034-00392400","closureReasonCode":"01","closureDate":"2029-04-15"}`
-- risposta: PDF base64 (61644 bytes, anteprima: `JVBERi0xLjcKJcOkw7zDtsOfCjIgMCBvYmoKPDwv…`)
+- risposta: PDF base64 (61424 bytes, anteprima: `JVBERi0xLjcKJcOkw7zDtsOfCjIgMCBvYmoKPDwv…`)
 
 **📦 State delta:** +`closureDate`, +`closureReasonCode`, +`moduleBase64`
 
@@ -146,7 +140,7 @@ Provider AI: Claude CLI via `claude-code-openai-bridge` (8787) · MCP Gateway: `
 
 ### 🤖 Bot
 
-> Pratica di estinzione inviata con successo. ID pratica: ES-2026-9014.
+> Pratica di estinzione inviata con successo. ID pratica: ES-2026-6943.
 
 <details>
 <summary>🔬 Dettagli tecnici del turno</summary>
@@ -155,7 +149,7 @@ Provider AI: Claude CLI via `claude-code-openai-bridge` (8787) · MCP Gateway: `
 
 **🔧 MCP Tool:** `banking-operations/submit_closure`
 - richiesta: `{"ndg":"11255521","rapportoId":"01-034-00392400","closureReasonCode":"01","closureDate":"2029-04-15"}`
-- risposta: `{"caseId":"ES-2026-9014","stato":"inviata"}`
+- risposta: `{"caseId":"ES-2026-6943","stato":"inviata"}`
 
 **📦 State delta:** +`confirmed`, +`caseId`
 
@@ -171,5 +165,5 @@ Provider AI: Claude CLI via `claude-code-openai-bridge` (8787) · MCP Gateway: `
 - Chiamate tool MCP: **6**
 - Messaggi bot generati dall'LLM: **4**
 - Stato finale: **SUCCEEDED**
-- `caseId` generato: **ES-2026-9014**
-- Wall-clock totale: **75.1s**
+- `caseId` generato: **ES-2026-6943**
+- Wall-clock totale: **55.7s**
