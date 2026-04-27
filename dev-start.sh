@@ -8,15 +8,13 @@
 # Avvia (se richiesto) bridge LLM + AEP backend, poi `npm run dev` (turbo:
 # web + api + engine + worker).
 #
-# Variabili d'ambiente opzionali:
-#   START_CLAUDE_BRIDGE=true   — avvia claude-code-openai-bridge su :8787
-#   START_AEP=true             — avvia AEP backend (FastAPI) su :8000
-#   AP_LLM_VIA_BRIDGE=true     — propagato a turbo: il command layer usa
-#                                VercelAIAdapter via bridge (default off →
-#                                MockProviderAdapter).
+# Variabili d'ambiente opzionali (default = TRUE, avvia tutto):
+#   START_CLAUDE_BRIDGE=false  — NON avvia claude-code-openai-bridge
+#   START_AEP=false            — NON avvia AEP backend (FastAPI)
+#   AP_LLM_VIA_BRIDGE=false    — usa MockProviderAdapter invece del bridge
 #
-# RUN
-#   START_CLAUDE_BRIDGE=true START_AEP=true AP_LLM_VIA_BRIDGE=true ./dev-start.sh
+# RUN (di default avvia tutto: bridge + AEP + dev-stack con bridge LLM)
+#   ./dev-start.sh
 #
 # Stop: Ctrl+C — la trap pulisce i processi figli (bridge, AEP, turbo).
 
@@ -100,7 +98,7 @@ wait_for_url() {
 }
 
 # ── Bridge (claude-code-openai-bridge) ──────────────────────────────────────
-if [ "${START_CLAUDE_BRIDGE:-false}" = "true" ]; then
+if [ "${START_CLAUDE_BRIDGE:-true}" = "true" ]; then
     if curl -sf "$BRIDGE_URL/health" > /dev/null 2>&1; then
         echo "  ✓ Bridge already running on $BRIDGE_URL"
     elif [ -d "$BRIDGE_DIR" ]; then
@@ -114,7 +112,7 @@ if [ "${START_CLAUDE_BRIDGE:-false}" = "true" ]; then
 fi
 
 # ── AEP backend (banking MCP tools + FastAPI) ───────────────────────────────
-if [ "${START_AEP:-false}" = "true" ]; then
+if [ "${START_AEP:-true}" = "true" ]; then
     if curl -sf "$AEP_URL/mcp/health" > /dev/null 2>&1; then
         echo "  ✓ AEP backend already running on $AEP_URL"
     elif [ -d "$AEP_DIR" ] && [ -x "$AEP_DIR/start.sh" ]; then
@@ -131,11 +129,12 @@ fi
 echo ""
 echo "  ──────────────────────────────────────────"
 echo "  Starting Activepieces dev-stack via turbo"
-if [ "${AP_LLM_VIA_BRIDGE:-false}" = "true" ]; then
+export AP_LLM_VIA_BRIDGE="${AP_LLM_VIA_BRIDGE:-true}"
+if [ "$AP_LLM_VIA_BRIDGE" = "true" ]; then
     echo "  AP_LLM_VIA_BRIDGE=true → command layer uses VercelAIAdapter (bridge)"
 else
-    echo "  AP_LLM_VIA_BRIDGE not set → command layer uses MockProviderAdapter"
-    echo "    Set 'export AP_LLM_VIA_BRIDGE=true' to use real LLM via bridge."
+    echo "  AP_LLM_VIA_BRIDGE=false → command layer uses MockProviderAdapter"
+    echo "    To re-enable real LLM: unset AP_LLM_VIA_BRIDGE or set to 'true'."
     echo "    Then in any INTERACTIVE_FLOW action select provider"
     echo "    'custom' + model 'claude-cli' for fieldExtractor and/or"
     echo "    questionGenerator."
@@ -144,4 +143,9 @@ echo "  ────────────────────────
 echo ""
 
 cd "$REPO_DIR"
-exec npm run dev
+# Subprocess + wait (non `exec`) così la trap EXIT cleanup-a anche
+# bridge e AEP quando l'utente fa Ctrl+C.
+npm run dev &
+DEV_STACK_PID=$!
+PIDS+=($DEV_STACK_PID)
+wait $DEV_STACK_PID
