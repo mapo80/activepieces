@@ -8,17 +8,17 @@
 # Avvia (se richiesto) bridge LLM + AEP backend, poi `npm run dev` (turbo:
 # web + api + engine + worker).
 #
-# Variabili d'ambiente opzionali (default sicuri, no Docker):
+# Variabili d'ambiente opzionali (default = TRUE, avvia tutto):
 #   START_CLAUDE_BRIDGE=false  — NON avvia claude-code-openai-bridge
-#                                (default true)
+#   START_AEP=false            — NON avvia AEP backend (richiede Docker)
 #   AP_LLM_VIA_BRIDGE=false    — usa MockProviderAdapter invece del bridge
-#                                (default true)
-#   START_AEP=true             — avvia AEP backend (richiede Docker per
-#                                Postgres + Keycloak — default false).
-#                                Per usare AEP reale: `START_AEP=true ./dev-start.sh`
-#                                (Docker deve essere già avviato).
 #
-# RUN (default = bridge + dev-stack via npm run dev, NO AEP/Docker)
+# Pre-requisiti per AEP:
+#   - Docker daemon UP (Postgres + Keycloak girano in container)
+#   - Lo script gestisce kill+start di Postgres :5432, Keycloak :8081,
+#     backend FastAPI :8000.
+#
+# RUN (default = avvia bridge + AEP-infra-Docker + AEP-backend + dev-stack)
 #   ./dev-start.sh
 #
 # Stop: Ctrl+C — la trap pulisce i processi figli (bridge, AEP, turbo).
@@ -74,7 +74,7 @@ echo "  ────────────────────────
 kill_port 3000 "API"
 kill_port 4200 "frontend"
 kill_port 8787 "bridge"
-kill_port 8000 "AEP"
+kill_port 8000 "AEP backend"
 # Kill known orphan node/python processes by command pattern (turbo, tsx
 # watch, uvicorn, etc.). Idempotent — silently no-op if not running.
 pkill -f "tsx.*packages/server/api/src/bootstrap" 2>/dev/null || true
@@ -82,6 +82,9 @@ pkill -f "tsx.*packages/server/worker/src/bootstrap" 2>/dev/null || true
 pkill -f "turbo run serve" 2>/dev/null || true
 pkill -f "uvicorn.*app.main:app" 2>/dev/null || true
 pkill -f "claude-code-openai-bridge" 2>/dev/null || true
+# Kill AEP backend processes by command pattern (FastAPI uvicorn,
+# eventuali zombie del precedente start.sh be).
+pkill -f "agentic-engine-platform/backend" 2>/dev/null || true
 sleep 2
 
 wait_for_url() {
@@ -117,26 +120,43 @@ if [ "${START_CLAUDE_BRIDGE:-true}" = "true" ]; then
 fi
 
 # ── AEP backend (banking MCP tools + FastAPI) ───────────────────────────────
-# Richiede Postgres + Keycloak via Docker. Lo script AEP `./start.sh be`
-# avvia SOLO il backend FastAPI che SI ASPETTA Postgres su :5432 già up,
-# quindi lanciamo prima `./start.sh infra` (idempotente), poi `be`.
-if [ "${START_AEP:-false}" = "true" ]; then
+# Richiede Docker daemon UP per Postgres + Keycloak. Lo script AEP
+# `./start.sh be` avvia SOLO il backend FastAPI; `./start.sh infra`
+# avvia Docker. Eseguiamo entrambi in sequenza.
+if [ "${START_AEP:-true}" = "true" ]; then
     if curl -sf "$AEP_URL/mcp/health" > /dev/null 2>&1; then
         echo "  ✓ AEP backend already running on $AEP_URL"
-    elif [ -d "$AEP_DIR" ] && [ -x "$AEP_DIR/start.sh" ]; then
-        echo "  Starting AEP infra (Docker: Postgres + Keycloak)"
-        ( cd "$AEP_DIR" && ./start.sh infra 2>&1 ) || {
-            echo "  ⚠ AEP infra start failed (Docker not running?) — skipping AEP backend"
-            START_AEP=false
-        }
-        if [ "${START_AEP:-false}" = "true" ]; then
-            echo "  Starting AEP backend: $AEP_URL  (agentic-engine-platform + MCP /mcp)"
-            ( cd "$AEP_DIR" && ./start.sh be 2>&1 ) &
-            PIDS+=($!)
-            wait_for_url "$AEP_URL/mcp/health" "AEP" 90
-        fi
+    elif [ ! -d "$AEP_DIR" ] || [ ! -x "$AEP_DIR/start.sh" ]; then
+        echo "  ✗ START_AEP=true but $AEP_DIR/start.sh not found — ABORT"
+        exit 1
     else
-        echo "  ⚠ START_AEP=true but $AEP_DIR/start.sh not found — skipping"
+        # 1. Verifica che Docker daemon sia UP
+        if ! docker info > /dev/null 2>&1; then
+            echo "  ✗ Docker daemon non in esecuzione — necessario per AEP infra (Postgres + Keycloak)"
+            echo "    Avvia Docker Desktop e rilancia ./dev-start.sh"
+            echo "    Oppure: START_AEP=false ./dev-start.sh per skip AEP."
+            exit 1
+        fi
+
+        # 2. Avvia infra Docker (idempotente)
+        echo "  Starting AEP infra (Docker: Postgres + Keycloak)"
+        ( cd "$AEP_DIR" && ./start.sh infra ) || {
+            echo "  ✗ AEP infra start failed — ABORT"
+            exit 1
+        }
+
+        # 3. Avvia backend FastAPI in foreground subprocess (per cleanup trap)
+        echo "  Starting AEP backend: $AEP_URL  (agentic-engine-platform + MCP /mcp)"
+        ( cd "$AEP_DIR" && ./start.sh be ) &
+        PIDS+=($!)
+
+        # 4. Wait su /mcp/health con timeout esteso (Postgres+Keycloak warm-up
+        #    + FastAPI startup possono richiedere 60-90s al primo avvio)
+        wait_for_url "$AEP_URL/mcp/health" "AEP backend" 120
+        if ! curl -sf "$AEP_URL/mcp/health" > /dev/null 2>&1; then
+            echo "  ✗ AEP backend non risponde su /mcp/health entro 120s — ABORT"
+            exit 1
+        fi
     fi
 fi
 
