@@ -44,6 +44,7 @@ import { McpServerEntity } from '../mcp/mcp-entity'
 import { McpOAuthClientEntity } from '../mcp/oauth/client/mcp-oauth-client.entity'
 import { McpOAuthAuthorizationCodeEntity } from '../mcp/oauth/code/mcp-oauth-code.entity'
 import { McpOAuthTokenEntity } from '../mcp/oauth/token/mcp-oauth-token.entity'
+import { McpGatewayEntity } from '../mcp-gateway/mcp-gateway.entity'
 import { PieceMetadataEntity } from '../pieces/metadata/piece-metadata-entity'
 import { PieceTagEntity } from '../pieces/tags/pieces/piece-tag.entity'
 import { TagEntity } from '../pieces/tags/tag-entity'
@@ -101,6 +102,7 @@ function getEntities(): EntitySchema<unknown>[] {
         McpOAuthClientEntity,
         McpOAuthAuthorizationCodeEntity,
         McpOAuthTokenEntity,
+        McpGatewayEntity,
         KnowledgeBaseFileEntity,
         KnowledgeBaseChunkEntity,
         ChatConversationEntity,
