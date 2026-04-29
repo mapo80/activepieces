@@ -59,6 +59,11 @@ export function PlatformSidebar() {
       icon: BotIcon,
     },
     {
+      to: '/platform/setup/mcp-gateways',
+      label: t('MCP Gateways'),
+      icon: ServerIcon,
+    },
+    {
       to: '/platform/setup/branding',
       label: t('Branding'),
       icon: PaletteIcon,

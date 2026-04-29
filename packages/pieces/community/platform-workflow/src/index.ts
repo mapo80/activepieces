@@ -3,6 +3,7 @@ import { PieceCategory } from '@activepieces/shared';
 import { checkpointAction } from './lib/actions/checkpoint';
 import { waitEventAction } from './lib/actions/wait-event';
 import { sagaAction } from './lib/actions/saga';
+import { callWorkflowAction } from './lib/actions/call-workflow';
 
 export const platformWorkflowAuth = PieceAuth.None();
 
@@ -15,6 +16,6 @@ export const platformWorkflow = createPiece({
   logoUrl: 'https://cdn.activepieces.com/pieces/workflow.png',
   authors: ['agentic-workflow-platform'],
   categories: [PieceCategory.PRODUCTIVITY],
-  actions: [checkpointAction, waitEventAction, sagaAction],
+  actions: [checkpointAction, waitEventAction, sagaAction, callWorkflowAction],
   triggers: [],
 });

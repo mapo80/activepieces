@@ -76,6 +76,7 @@ import { mcpServerModule } from './mcp/mcp-module'
 import { mcpOAuthApproveController } from './mcp/oauth/code/mcp-oauth-approve.controller'
 import { mcpGatewayModule } from './mcp-gateway/mcp-gateway.module'
 import { mcpGatewayWorkerController } from './mcp-gateway/mcp-gateway-worker.controller'
+import { agenticModule } from './agentic/agentic.module'
 import { communityPiecesModule } from './pieces/community-piece-module'
 import { startDevPieceWatcher } from './pieces/dev-piece-watcher'
 import { pieceModule } from './pieces/metadata/piece-metadata-controller'
@@ -222,6 +223,7 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
     await app.register(mcpOAuthApproveController)
     await app.register(mcpGatewayModule)
     await app.register(mcpGatewayWorkerController, { prefix: '/v1/engine/mcp-gateways' })
+    await app.register(agenticModule)
     await app.register(agentsModule)
     await app.register(platformUserModule)
     await app.register(alertsModule)
