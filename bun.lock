@@ -5381,6 +5381,36 @@
         "tslib": "2.6.2",
       },
     },
+    "packages/pieces/community/platform-chat": {
+      "name": "@activepieces/piece-platform-chat",
+      "version": "0.1.0",
+      "dependencies": {
+        "@activepieces/pieces-common": "workspace:*",
+        "@activepieces/pieces-framework": "workspace:*",
+        "@activepieces/shared": "workspace:*",
+        "tslib": "2.6.2",
+      },
+    },
+    "packages/pieces/community/platform-tool-gateway": {
+      "name": "@activepieces/piece-platform-tool-gateway",
+      "version": "0.1.0",
+      "dependencies": {
+        "@activepieces/pieces-common": "workspace:*",
+        "@activepieces/pieces-framework": "workspace:*",
+        "@activepieces/shared": "workspace:*",
+        "tslib": "2.6.2",
+      },
+    },
+    "packages/pieces/community/platform-workflow": {
+      "name": "@activepieces/piece-platform-workflow",
+      "version": "0.1.0",
+      "dependencies": {
+        "@activepieces/pieces-common": "workspace:*",
+        "@activepieces/pieces-framework": "workspace:*",
+        "@activepieces/shared": "workspace:*",
+        "tslib": "2.6.2",
+      },
+    },
     "packages/pieces/community/plausible": {
       "name": "@activepieces/piece-plausible",
       "version": "0.0.5",
@@ -9312,6 +9342,12 @@
     "@activepieces/piece-pipedrive": ["@activepieces/piece-pipedrive@workspace:packages/pieces/community/pipedrive"],
 
     "@activepieces/piece-placid": ["@activepieces/piece-placid@workspace:packages/pieces/community/placid"],
+
+    "@activepieces/piece-platform-chat": ["@activepieces/piece-platform-chat@workspace:packages/pieces/community/platform-chat"],
+
+    "@activepieces/piece-platform-tool-gateway": ["@activepieces/piece-platform-tool-gateway@workspace:packages/pieces/community/platform-tool-gateway"],
+
+    "@activepieces/piece-platform-workflow": ["@activepieces/piece-platform-workflow@workspace:packages/pieces/community/platform-workflow"],
 
     "@activepieces/piece-plausible": ["@activepieces/piece-plausible@workspace:packages/pieces/community/plausible"],
 
