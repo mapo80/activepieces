@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { safeHttp } from '@activepieces/server-utils'
 import { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { StatusCodes } from 'http-status-codes'
@@ -8,18 +9,27 @@ export const toolsInvokeController: FastifyPluginAsyncZod = async (app) => {
     app.post('/tools/invoke', InvokeRoute, async (request, reply) => {
         const javaUrl = process.env['AP_AGENTIC_PROVIDER_URL'] ?? DEFAULT_PROVIDER_URL
         const javaApiKey = process.env['AP_AGENTIC_PROVIDER_API_KEY'] ?? ''
+        const webhookSecret = process.env['AP_AGENTIC_WEBHOOK_SECRET'] ?? ''
+
         const headers: Record<string, string> = { 'Content-Type': 'application/json' }
         if (javaApiKey) {
             headers['Authorization'] = `Bearer ${javaApiKey}`
         }
+
+        const rawBody = JSON.stringify(request.body)
+        if (webhookSecret.length > 0) {
+            headers[SIGNATURE_HEADER] = signHmac(rawBody, webhookSecret)
+        }
+
         try {
             const response = await safeHttp.axios.post(
                 `${javaUrl}/agentic/v1/tools/invoke`,
-                request.body,
+                rawBody,
                 {
                     timeout: PROXY_TIMEOUT_MS,
                     headers,
                     validateStatus: () => true,
+                    transformRequest: [(data) => data],
                 },
             )
             await reply.status(response.status).send(response.data)
@@ -34,8 +44,24 @@ export const toolsInvokeController: FastifyPluginAsyncZod = async (app) => {
     })
 }
 
+function signHmac(payload: string, secret: string): string {
+    const mac = createHmac('sha256', secret)
+    mac.update(payload, 'utf8')
+    return `sha256=${mac.digest('hex')}`
+}
+
+export function verifyHmac(payload: string, secret: string, header: string | undefined): boolean {
+    if (!header || !header.startsWith('sha256=')) return false
+    const expected = signHmac(payload, secret)
+    const a = Buffer.from(expected, 'utf8')
+    const b = Buffer.from(header, 'utf8')
+    if (a.length !== b.length) return false
+    return timingSafeEqual(a, b)
+}
+
 const DEFAULT_PROVIDER_URL = 'http://localhost:8090'
 const PROXY_TIMEOUT_MS = 60_000
+const SIGNATURE_HEADER = 'X-AP-Signature'
 
 const InvokeRequestSchema = z.object({
     mcpGatewayId: z.string().min(1),
