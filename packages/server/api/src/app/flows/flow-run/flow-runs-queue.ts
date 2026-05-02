@@ -128,6 +128,9 @@ export const runsMetadataQueue = (log: FastifyBaseLogger) => ({
                                         resumePayload: latestWaitpoint.resumePayload,
                                     })
                                 }
+                                else {
+                                    await flowRunSideEffects(log).onPause(savedFlowRun)
+                                }
                             }
                         }
                         catch (error) {
