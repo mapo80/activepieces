@@ -120,9 +120,71 @@ function deterministicBankingOutput(toolRef: string, payload: Record<string, unk
         praticaId: 'ES-2026-0001',
         request: payload.request ?? payload,
       };
+    case 'banking-mortgages/simulate_rate': {
+      const loanAmount = numericValue(payload, 'loanAmount', 150000);
+      const propertyValue = numericValue(payload, 'propertyValue', 200000);
+      const duration = numericValue(payload, 'loanDurationMonths', 240);
+      const estimatedRate = 0.029;
+      const monthlyRate = estimatedRate / 12;
+      const monthlyPayment = (loanAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -duration));
+      const ltv = propertyValue === 0 ? 0 : loanAmount / propertyValue;
+      return {
+        estimatedRate,
+        monthlyPayment: Math.round(monthlyPayment * 100) / 100,
+        loanDurationMonths: duration,
+        loanAmount,
+        propertyValue,
+        ltv: Math.round(ltv * 10000) / 10000,
+      };
+    }
+    case 'banking-mortgages/validate_ltv': {
+      const loanAmount = numericValue(payload, 'loanAmount', 150000);
+      const propertyValue = numericValue(payload, 'propertyValue', 200000);
+      const ltv = propertyValue === 0 ? 0 : loanAmount / propertyValue;
+      const ltvValid = ltv <= 0.8;
+      return {
+        ltv: Math.round(ltv * 10000) / 10000,
+        ltvValid,
+        incomeOk: true,
+        denyReason: ltvValid ? '' : 'ltv-exceeded-0.80',
+      };
+    }
+    case 'banking-mortgages/submit_application':
+      return {
+        applicationId: 'MM-2026-0001',
+        submissionStatus: 'INVIATA',
+        submittedAt: '2026-05-02T10:00:00Z',
+        request: payload.request ?? payload,
+      };
+    case 'banking-properties/search_property':
+      return {
+        items: [
+          {
+            propertyId: 'P-100',
+            address: String(payload.query ?? payload.propertyAddress ?? ''),
+            city: 'Milano',
+            type: 'residential',
+          },
+        ],
+      };
+    case 'banking-properties/get_valuation':
+      return {
+        propertyId: String(payload.propertyId ?? 'P-100'),
+        estimatedValue: 200000,
+        currency: 'EUR',
+        valuationDate: '2026-05-01',
+      };
     default:
       return {
         result: 'ok',
       };
   }
+}
+
+function numericValue(payload: Record<string, unknown>, key: string, dflt: number): number {
+  const v = payload[key];
+  if (v === undefined || v === null) return dflt;
+  if (typeof v === 'number') return v;
+  const parsed = Number(v);
+  return Number.isNaN(parsed) ? dflt : parsed;
 }
