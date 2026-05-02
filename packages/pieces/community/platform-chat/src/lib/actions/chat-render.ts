@@ -17,6 +17,7 @@ export const chatRenderAction = createAction({
           { label: 'Information answer', value: 'answerInfo' },
           { label: 'Verification result', value: 'verifyRelationship' },
           { label: 'Account list', value: 'accountList' },
+          { label: 'Reason catalog', value: 'reasonCatalog' },
           { label: 'Final receipt', value: 'finalReceipt' },
           { label: 'Generic markdown', value: 'markdown' },
         ],

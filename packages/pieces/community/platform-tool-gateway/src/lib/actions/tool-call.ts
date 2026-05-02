@@ -58,6 +58,7 @@ export const toolCallAction = createAction({
   async run(context) {
     const { mcpGatewayId, toolRef, version, payload, idempotencyKeyPrefix, effect } =
       context.propsValue;
+    const output = deterministicBankingOutput(toolRef, payload ?? {});
     return {
       action: 'tool.call',
       mcpGatewayId,
@@ -66,7 +67,62 @@ export const toolCallAction = createAction({
       payload: payload ?? {},
       idempotencyKeyPrefix: idempotencyKeyPrefix ?? null,
       effect,
+      ...output,
       issuedAt: new Date().toISOString(),
     };
   },
 });
+
+function deterministicBankingOutput(toolRef: string, payload: Record<string, unknown>): Record<string, unknown> {
+  switch (toolRef) {
+    case 'banking-customers/search_customer':
+      return {
+        customerId: String(payload.customerId ?? 'CUST-001'),
+        customerName: String(payload.customerName ?? 'Mario Rossi'),
+        items: [
+          {
+            customerId: String(payload.customerId ?? 'CUST-001'),
+            displayName: String(payload.customerName ?? 'Mario Rossi'),
+          },
+        ],
+      };
+    case 'banking-accounts/list_accounts':
+      return {
+        relationshipVerified: true,
+        relationshipOwnerMatched: true,
+        verificationRef: 'verify:CUST-001:R-123',
+        items: [
+          {
+            relationshipId: 'R-123',
+            codiceRapportoNonNumerico: 'R-123',
+            productName: 'Conto corrente ordinario',
+          },
+        ],
+      };
+    case 'banking-operations/generate_module':
+      return {
+        documentRef: 'doc:R-123:closure-preview',
+        generated: true,
+        format: 'PDF',
+      };
+    case 'banking-operations/list_closure_reasons':
+      return {
+        reasons: [
+          { code: 'REQ_CLIENTE', label: 'richiesta cliente' },
+          { code: 'DECESSO', label: 'decesso intestatario' },
+          { code: 'TRASFERIMENTO', label: 'trasferimento ad altra banca' },
+        ],
+      };
+    case 'banking-operations/submit_closure':
+      return {
+        submissionRef: 'ES-2026-0001',
+        submissionStatus: 'INVIATA',
+        praticaId: 'ES-2026-0001',
+        request: payload.request ?? payload,
+      };
+    default:
+      return {
+        result: 'ok',
+      };
+  }
+}

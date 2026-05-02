@@ -1,4 +1,5 @@
 import { createAction, Property } from '@activepieces/pieces-framework';
+import { ExecutionType } from '@activepieces/shared';
 import { platformChatAuth } from '../../index';
 
 export const chatAskAction = createAction({
@@ -48,8 +49,35 @@ export const chatAskAction = createAction({
   },
   async run(context) {
     const { promptText, fieldName, component, allowedValues, timeoutSeconds } = context.propsValue;
+    if (context.executionType === ExecutionType.RESUME) {
+      const value = readResumeValue(context.resumePayload, fieldName);
+      return {
+        action: 'chat.ask.completed',
+        outputField: fieldName,
+        value,
+        [fieldName]: value,
+        resumedAt: new Date().toISOString(),
+      };
+    }
+
+    const waitpoint = await context.run.createWaitpoint({
+      type: 'WEBHOOK',
+      responseToSend: {
+        status: 200,
+        body: {
+          action: 'chat.ask',
+          promptText,
+          outputField: fieldName,
+          component: component ?? 'text-input',
+          allowedValues: allowedValues ?? [],
+        },
+      },
+    });
+    context.run.waitForWaitpoint(waitpoint.id);
     return {
       action: 'chat.ask',
+      waitpointId: waitpoint.id,
+      resumeUrl: waitpoint.resumeUrl,
       promptText,
       outputField: fieldName,
       component: component ?? 'text-input',
@@ -59,3 +87,29 @@ export const chatAskAction = createAction({
     };
   },
 });
+
+function readResumeValue(resumePayload: unknown, fieldName: string): unknown {
+  const payload = asRecord(resumePayload);
+  const body = asRecord(payload.body);
+  const nestedPayload = asRecord(body.payload);
+  const queryParams = asRecord(payload.queryParams);
+  return firstDefined(
+    body[fieldName],
+    nestedPayload[fieldName],
+    body.value,
+    body.answer,
+    queryParams[fieldName],
+    queryParams.value,
+    queryParams.answer,
+  );
+}
+
+function firstDefined(...values: unknown[]): unknown {
+  return values.find((value) => value !== undefined);
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : {};
+}

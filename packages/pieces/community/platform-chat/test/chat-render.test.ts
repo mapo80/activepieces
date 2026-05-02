@@ -38,4 +38,18 @@ describe('@platform/chat · chat-render action', () => {
     expect(result.title).toBeNull();
     expect(result.sourceFields).toEqual([]);
   });
+
+  it('emits reasonCatalog render type for ambiguous closure reasons', async () => {
+    const result = await chatRenderAction.run({
+      auth: undefined,
+      propsValue: {
+        renderType: 'reasonCatalog',
+        title: 'Motivazione non identificata',
+        body: 'Seleziona o scrivi una motivazione tra quelle disponibili.',
+      },
+    } as Parameters<typeof chatRenderAction.run>[0]);
+
+    expect(result.renderType).toBe('reasonCatalog');
+    expect(result.title).toBe('Motivazione non identificata');
+  });
 });

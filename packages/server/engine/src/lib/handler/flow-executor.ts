@@ -1,5 +1,5 @@
 import { performance } from 'node:perf_hooks'
-import { EngineGenericError, ExecuteFlowOperation, ExecutionType, FlowAction, FlowActionType, FlowRunStatus, FlowTrigger, GenericStepOutput, isNil, StepOutputStatus } from '@activepieces/shared'
+import { EngineGenericError, ExecuteFlowOperation, ExecutionType, FlowAction, FlowActionType, FlowRunStatus, FlowTrigger, FlowTriggerType, GenericStepOutput, isNil, StepOutputStatus } from '@activepieces/shared'
 import dayjs from 'dayjs'
 import { loggingUtils } from '../helper/logging-utils'
 import { triggerHelper } from '../helper/trigger-helper'
@@ -45,7 +45,9 @@ export const flowExecutor = {
             }).catch((err) => {
                 console.error('[Progress] Initial payload upload failed', err)
             })
-            await triggerHelper.executeOnStart(trigger, constants, input.triggerPayload)
+            if (trigger.type === FlowTriggerType.PIECE) {
+                await triggerHelper.executeOnStart(trigger, constants, input.triggerPayload)
+            }
             await runProgressService.sendUpdate({
                 engineConstants: constants,
                 flowExecutorContext: executionState,
