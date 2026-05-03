@@ -69,6 +69,7 @@ describe('flowRunSideEffects agentic emission', () => {
         const call = emitMock.mock.calls[0][0]
         expect(call.runState).toBe('SUCCEEDED')
         expect(call.platformRunId).toBe('ap-run-1')
+        expect(call.externalRunId).toBe('ap-run-1')
         expect(call.projectId).toBe('proj-1')
     })
 
@@ -138,6 +139,39 @@ describe('flowRunSideEffects agentic emission', () => {
 
         const call = emitMock.mock.calls[0][0]
         expect(call.eventEpoch).toBe(new Date('2026-05-02T10:00:01.000Z').getTime())
+        expect(call.runVersion).toBe(call.eventEpoch)
+    })
+
+    it('uses a canonical platformRunId when the flowRun carries agentic metadata', async () => {
+        const log = buildLogger()
+        await flowRunSideEffects(log as never).onFinish(buildFlowRun({
+            status: FlowRunStatus.SUCCEEDED,
+            metadata: { platformRunId: 'plat-r-9', providerEpoch: 7 },
+        } as Partial<FlowRun>))
+
+        const call = emitMock.mock.calls[0][0]
+        expect(call.platformRunId).toBe('plat-r-9')
+        expect(call.externalRunId).toBe('ap-run-1')
+        expect(call.providerEpoch).toBe(7)
+        expect(call.runVersion).toBe(7)
+    })
+
+    it('emits increasing versions for pause and terminal callbacks of the same AP run', async () => {
+        const log = buildLogger()
+        await flowRunSideEffects(log as never).onPause(buildFlowRun({
+            status: FlowRunStatus.PAUSED,
+            updated: '2026-05-02T10:00:01.000Z',
+        }))
+        await flowRunSideEffects(log as never).onFinish(buildFlowRun({
+            status: FlowRunStatus.SUCCEEDED,
+            updated: '2026-05-02T10:00:02.000Z',
+        }))
+
+        const paused = emitMock.mock.calls[0][0]
+        const succeeded = emitMock.mock.calls[1][0]
+        expect(paused.platformRunId).toBe(succeeded.platformRunId)
+        expect(paused.externalRunId).toBe(succeeded.externalRunId)
+        expect(succeeded.runVersion).toBeGreaterThan(paused.runVersion)
     })
 
     it('payload includes data with failedStepName when run failed with step info', async () => {

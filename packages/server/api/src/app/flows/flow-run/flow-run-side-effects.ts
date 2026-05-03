@@ -67,11 +67,15 @@ async function emitAgenticRunState({ log, flowRun }: { log: FastifyBaseLogger, f
         return
     }
     const emitter = getAgenticEmitter(log)
+    const eventEpoch = deriveEventEpoch(flowRun)
+    const providerEpoch = deriveProviderEpoch(flowRun)
     const result = await tryCatch(() => emitter.emit({
-        platformRunId: flowRun.id,
-        runVersion: deriveRunVersion(flowRun),
+        platformRunId: derivePlatformRunId(flowRun),
+        externalRunId: flowRun.id,
+        runVersion: deriveRunVersion(eventEpoch, providerEpoch),
         runState,
-        eventEpoch: deriveEventEpoch(flowRun),
+        eventEpoch,
+        ...(providerEpoch !== undefined ? { providerEpoch } : {}),
         tenantId: flowRun.environment,
         projectId: flowRun.projectId,
         timestamp: new Date().toISOString(),
@@ -102,13 +106,54 @@ function mapFlowRunStateForAgentic(status: FlowRunStatus): RunState | undefined 
     }
 }
 
-function deriveRunVersion(flowRun: FlowRun): number {
-    return Number(flowRun.flowVersionId.replace(/[^0-9]/g, '').slice(-9)) || 1
+function deriveRunVersion(eventEpoch: number, providerEpoch?: number): number {
+    return providerEpoch ?? eventEpoch
 }
 
 function deriveEventEpoch(flowRun: FlowRun): number {
     const updated = flowRun.updated ?? new Date().toISOString()
-    return new Date(updated).getTime()
+    const epoch = new Date(updated).getTime()
+    return Number.isFinite(epoch) ? epoch : Date.now()
+}
+
+function derivePlatformRunId(flowRun: FlowRun): string {
+    return readNestedString(flowRun, ['metadata', 'platformRunId'])
+        ?? readNestedString(flowRun, ['agentic', 'platformRunId'])
+        ?? readNestedString(flowRun, ['input', 'platformRunId'])
+        ?? readNestedString(flowRun, ['payload', 'platformRunId'])
+        ?? flowRun.id
+}
+
+function deriveProviderEpoch(flowRun: FlowRun): number | undefined {
+    const value = readNestedNumber(flowRun, ['metadata', 'providerEpoch'])
+        ?? readNestedNumber(flowRun, ['agentic', 'providerEpoch'])
+        ?? readNestedNumber(flowRun, ['input', 'providerEpoch'])
+        ?? readNestedNumber(flowRun, ['payload', 'providerEpoch'])
+    return value !== undefined && Number.isFinite(value) ? value : undefined
+}
+
+function readNestedString(source: unknown, path: string[]): string | undefined {
+    const value = readNestedValue(source, path)
+    return typeof value === 'string' && value.trim() !== '' ? value : undefined
+}
+
+function readNestedNumber(source: unknown, path: string[]): number | undefined {
+    const value = readNestedValue(source, path)
+    if (typeof value === 'number') return value
+    if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value)
+        return Number.isFinite(parsed) ? parsed : undefined
+    }
+    return undefined
+}
+
+function readNestedValue(source: unknown, path: string[]): unknown {
+    let cursor: unknown = source
+    for (const key of path) {
+        if (cursor === null || typeof cursor !== 'object') return undefined
+        cursor = (cursor as Record<string, unknown>)[key]
+    }
+    return cursor
 }
 
 function extractAgenticData(flowRun: FlowRun): Record<string, unknown> | undefined {

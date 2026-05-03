@@ -138,9 +138,11 @@ export type RunState = 'PAUSED' | 'SUCCEEDED' | 'FAILED' | 'CANCELED'
 
 export type RunStatePayload = {
     platformRunId: string
+    externalRunId?: string
     runVersion: number
     runState: RunState
     eventEpoch: number
+    providerEpoch?: number
     tenantId?: string
     projectId?: string
     data?: Record<string, unknown>
