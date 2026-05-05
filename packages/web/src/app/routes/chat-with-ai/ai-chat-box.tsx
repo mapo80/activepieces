@@ -1,9 +1,8 @@
 import { AIProviderName } from '@activepieces/shared';
-import { useQuery } from '@tanstack/react-query';
 import { t } from 'i18next';
 import { AlertTriangle, RefreshCw, Square } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   ChatContainerContent,
@@ -12,22 +11,27 @@ import {
 } from '@/components/prompt-kit/chat-container';
 import { ScrollButton } from '@/components/prompt-kit/scroll-button';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { chatApi } from '@/features/chat/lib/chat-api';
 import { useAgentChat } from '@/features/chat/lib/use-chat';
 import { aiProviderQueries } from '@/features/platform-admin';
+import { projectCollectionUtils } from '@/features/projects';
 
 import {
   EmptyState,
   MessageSkeletons,
-  SandboxNotConfiguredState,
   SetupRequiredState,
   SuggestionCards,
 } from './components/chat-empty-state';
 import { ChatInput } from './components/chat-input';
 import { ChatMessage } from './components/chat-message';
+import { ChatModelSelector } from './components/chat-model-selector';
+import { ChatProjectSelector } from './components/chat-project-selector';
 import { QuickReplies } from './components/message-content';
-import { getTextFromParts, parseQuickReplies } from './lib/message-parsers';
+import { MultiQuestionForm } from './components/multi-question-form';
+import {
+  getTextFromParts,
+  parseMultiQuestion,
+  parseQuickReplies,
+} from './lib/message-parsers';
 
 export function AIChatBox({
   incognito,
@@ -38,33 +42,11 @@ export function AIChatBox({
   const { data: providers, isLoading: isLoadingProviders } =
     aiProviderQueries.useAiProviders();
 
-  const hasChatProvider = providers?.some(
-    (p) =>
-      p.provider === AIProviderName.ACTIVEPIECES ||
-      p.provider === AIProviderName.ANTHROPIC,
-  );
+  const chatProvider = providers?.find((p) => p.enabledForChat);
+  const hasChatProvider = Boolean(chatProvider);
 
-  const { data: warmResult, isLoading: isLoadingWarm } = useQuery({
-    queryKey: ['chat-warm'],
-    queryFn: () => chatApi.warm(),
-    enabled: Boolean(hasChatProvider),
-    staleTime: Infinity,
-  });
-
-  if (isLoadingProviders || (hasChatProvider && isLoadingWarm)) {
-    return (
-      <div className="flex items-center justify-center h-full flex-1 min-w-0">
-        <Skeleton className="h-8 w-48" />
-      </div>
-    );
-  }
-
-  if (!hasChatProvider) {
+  if (!isLoadingProviders && !hasChatProvider) {
     return <SetupRequiredState />;
-  }
-
-  if (!warmResult?.configured) {
-    return <SandboxNotConfiguredState />;
   }
 
   return (
@@ -73,6 +55,7 @@ export function AIChatBox({
       conversationId={conversationId}
       onTitleUpdate={onTitleUpdate}
       onConversationCreated={onConversationCreated}
+      chatProviderName={chatProvider?.provider}
     />
   );
 }
@@ -82,9 +65,12 @@ function ChatBoxContent({
   conversationId: initialConversationId,
   onTitleUpdate,
   onConversationCreated,
+  chatProviderName,
 }: AIChatBoxProps) {
   const {
     messages,
+    modelName,
+    selectedProjectId,
     isStreaming,
     wasCancelled,
     isLoadingHistory,
@@ -92,13 +78,22 @@ function ChatBoxContent({
     sendMessage,
     cancelStream,
     setConversationId,
+    setModelName,
+    setProjectContext,
   } = useAgentChat({ onTitleUpdate, onConversationCreated });
-  const [connectedPieces, setConnectedPieces] = useState<Set<string>>(
+  const { data: allProjects } = projectCollectionUtils.useAll();
+  const projects = allProjects ?? [];
+
+  const handleProjectChange = useCallback(
+    (projectId: string | null) => {
+      void setProjectContext(projectId);
+    },
+    [setProjectContext],
+  );
+
+  const [dismissedFormIds, setDismissedFormIds] = useState<Set<string>>(
     new Set(),
   );
-  const markPieceConnected = useCallback((piece: string) => {
-    setConnectedPieces((prev) => new Set(prev).add(piece));
-  }, []);
 
   useEffect(() => {
     if (initialConversationId) {
@@ -119,6 +114,22 @@ function ChatBoxContent({
     if (lastUser) void sendMessage(getTextFromParts(lastUser.parts));
   }, [messages, sendMessage]);
 
+  const lastMessage = messages[messages.length - 1];
+  const lastMessageText = useMemo(
+    () =>
+      lastMessage?.role === 'assistant'
+        ? getTextFromParts(lastMessage.parts)
+        : '',
+    [lastMessage],
+  );
+  const activeQuestions = useMemo(
+    () => parseMultiQuestion(lastMessageText).questions,
+    [lastMessageText],
+  );
+  const hasActiveForm =
+    activeQuestions.length > 0 &&
+    !!lastMessage &&
+    !dismissedFormIds.has(lastMessage.id);
   const isEmpty = messages.length === 0 && !isLoadingHistory && !isStreaming;
 
   if (isEmpty) {
@@ -133,6 +144,20 @@ function ChatBoxContent({
               isStreaming={isStreaming}
               onSend={handleSend}
               onStop={cancelStream}
+              leftActions={
+                <>
+                  <ChatProjectSelector
+                    projects={projects}
+                    selectedProjectId={selectedProjectId}
+                    onProjectChange={handleProjectChange}
+                  />
+                  <ChatModelSelector
+                    chatProviderName={chatProviderName}
+                    selectedModel={modelName}
+                    onModelChange={setModelName}
+                  />
+                </>
+              }
             />
           </div>
         </div>
@@ -152,7 +177,7 @@ function ChatBoxContent({
             'linear-gradient(to bottom, black 0%, black calc(100% - 40px), transparent 100%)',
         }}
       >
-        <ChatContainerContent className="max-w-4xl mx-auto px-6 py-8 gap-0">
+        <ChatContainerContent className="max-w-3xl mx-auto px-6 pt-8 pb-16 gap-0">
           {isLoadingHistory && <MessageSkeletons />}
 
           {messages.map((msg, idx) => {
@@ -168,9 +193,10 @@ function ChatBoxContent({
                 isStreaming={isLastStreamingAssistant}
                 isLastMessage={idx === messages.length - 1}
                 onSend={handleSend}
-                connectedPieces={connectedPieces}
-                onPieceConnected={markPieceConnected}
                 onRetry={handleRetry}
+                selectedProjectId={selectedProjectId}
+                projects={projects}
+                onSelectProject={handleProjectChange}
               />
             );
           })}
@@ -182,18 +208,12 @@ function ChatBoxContent({
             </div>
           )}
 
-          {!wasCancelled &&
-            messages.length > 0 &&
-            messages[messages.length - 1]?.role === 'assistant' && (
-              <QuickReplies
-                replies={
-                  parseQuickReplies(
-                    getTextFromParts(messages[messages.length - 1].parts),
-                  ).replies
-                }
-                onSend={handleSend}
-              />
-            )}
+          {!wasCancelled && lastMessageText && (
+            <QuickReplies
+              replies={parseQuickReplies(lastMessageText).replies}
+              onSend={handleSend}
+            />
+          )}
 
           {error && (
             <motion.div
@@ -221,14 +241,55 @@ function ChatBoxContent({
         <ScrollButton className="absolute bottom-4 right-1/2 translate-x-1/2" />
       </ChatContainerRoot>
 
-      <div className="pb-4 px-6">
+      <div className="px-6">
         <div className="max-w-3xl mx-auto">
-          <ChatInput
-            isStreaming={isStreaming}
-            onSend={handleSend}
-            onStop={cancelStream}
-            placeholder={t('Reply...')}
-          />
+          {hasActiveForm ? (
+            <MultiQuestionForm
+              key={lastMessage?.id}
+              questions={activeQuestions}
+              onSubmit={(text) => {
+                if (lastMessage?.id) {
+                  setDismissedFormIds((prev) => {
+                    const next = new Set(prev);
+                    next.add(lastMessage.id);
+                    return next;
+                  });
+                }
+                void handleSend(text);
+              }}
+              onDismiss={() => {
+                if (lastMessage?.id) {
+                  setDismissedFormIds((prev) => {
+                    const next = new Set(prev);
+                    next.add(lastMessage.id);
+                    return next;
+                  });
+                }
+                void handleSend(t('Skip these questions'));
+              }}
+            />
+          ) : (
+            <ChatInput
+              isStreaming={isStreaming}
+              onSend={handleSend}
+              onStop={cancelStream}
+              placeholder={t('Reply...')}
+              leftActions={
+                <>
+                  <ChatProjectSelector
+                    projects={projects}
+                    selectedProjectId={selectedProjectId}
+                    onProjectChange={handleProjectChange}
+                  />
+                  <ChatModelSelector
+                    chatProviderName={chatProviderName}
+                    selectedModel={modelName}
+                    onModelChange={setModelName}
+                  />
+                </>
+              }
+            />
+          )}
         </div>
       </div>
     </div>
@@ -240,4 +301,5 @@ type AIChatBoxProps = {
   conversationId?: string | null;
   onConversationCreated?: (conversationId: string) => void;
   onTitleUpdate?: (title: string, conversationId?: string) => void;
+  chatProviderName?: AIProviderName;
 };

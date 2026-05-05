@@ -3,6 +3,7 @@ import { t } from 'i18next';
 import { ComponentType, useRef } from 'react';
 import { Link } from 'react-router-dom';
 
+import { McpSvg } from '@/assets/img/custom/mcp';
 import { BotIcon } from '@/components/icons/bot';
 import {
   ChevronLeftIcon,
@@ -62,6 +63,11 @@ export function PlatformSidebar() {
       to: '/platform/setup/mcp-gateways',
       label: t('MCP Gateways'),
       icon: ServerIcon,
+    },
+    {
+      to: '/platform/setup/mcp',
+      label: t('MCP Server'),
+      icon: McpSvg,
     },
     {
       to: '/platform/setup/branding',

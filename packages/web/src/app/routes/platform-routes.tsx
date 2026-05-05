@@ -45,6 +45,7 @@ const AIProvidersPage = React.lazy(() => import('./platform/setup/ai'));
 const McpGatewaysPage = React.lazy(
   () => import('./platform/setup/mcp-gateways'),
 );
+const PlatformMcpPage = React.lazy(() => import('./platform/setup/mcp'));
 const BrandingPage = React.lazy(() =>
   import('./platform/setup/branding').then((m) => ({
     default: m.BrandingPage,
@@ -135,6 +136,18 @@ export const platformRoutes = [
         <PageTitle title="MCP Gateways">
           <SuspenseWrapper>
             <McpGatewaysPage />
+          </SuspenseWrapper>
+        </PageTitle>
+      </PlatformLayout>
+    ),
+  },
+  {
+    path: '/platform/setup/mcp',
+    element: (
+      <PlatformLayout>
+        <PageTitle title="MCP Server">
+          <SuspenseWrapper>
+            <PlatformMcpPage />
           </SuspenseWrapper>
         </PageTitle>
       </PlatformLayout>

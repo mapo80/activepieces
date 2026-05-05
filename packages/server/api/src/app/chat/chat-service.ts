@@ -1,19 +1,22 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
+import { ServerResponse } from 'http'
 import {
     ActivepiecesError,
+    AIProviderModelType,
     AIProviderName,
+    ALLOWED_CHAT_MODELS_BY_PROVIDER,
     apId,
     ChatConversation,
     ChatHistoryMessage,
     CreateChatConversationRequest,
     ErrorCode,
+    GetProviderConfigResponse,
     isNil,
+    Project,
     SeekPage,
     spreadIfDefined,
-    tryCatch,
     UpdateChatConversationRequest,
 } from '@activepieces/shared'
+import { LanguageModel, ModelMessage, stepCountIs, streamText } from 'ai'
 import { FastifyBaseLogger } from 'fastify'
 import { aiProviderService } from '../ai/ai-provider-service'
 import { repoFactory } from '../core/db/repo-factory'
@@ -22,68 +25,36 @@ import { paginationHelper } from '../helper/pagination/pagination-utils'
 import { Order } from '../helper/pagination/paginator'
 import { system } from '../helper/system/system'
 import { AppSystemProp } from '../helper/system/system-props'
-import { mcpServerService } from '../mcp/mcp-service'
+import { mcpProjectSelection } from '../mcp/mcp-project-selection'
 import { projectService } from '../project/project-service'
+import { userService } from '../user/user-service'
+import { chatCompaction } from './chat-compaction'
 import { ChatConversationEntity } from './chat-conversation-entity'
-import { chatSessionCleanup } from './sandbox/postgres-persist-driver'
-import { ChatAiConfig, chatSandboxAgent, ChatSandboxConfig } from './sandbox/sandbox-agent'
-import { userSandboxService } from './user-sandbox-service'
+import { buildUserContentWithFiles } from './chat-file-utils'
+import { createChatModel } from './chat-model-factory'
+import { chatHistory } from './history/chat-history'
+import { chatMcp } from './mcp/chat-mcp'
+import { chatPrompt } from './prompt/chat-prompt'
+import { createChatTools } from './tools/chat-tools'
 
 const conversationRepo = repoFactory(ChatConversationEntity)
 
-const AI_CONFIG_TTL_MS = 5 * 60 * 1000
-const aiConfigCache = new Map<string, { config: ChatAiConfig, expiresAt: number }>()
+const MAX_STEPS = 30
 
 export const chatService = (log: FastifyBaseLogger) => ({
-    async createConversation({ projectId, userId, request }: CreateConversationParams): Promise<ChatConversation> {
+    async createConversation({ platformId, userId, request }: CreateConversationParams): Promise<ChatConversation> {
         return conversationRepo().save({
             id: apId(),
-            projectId,
+            platformId,
+            projectId: null,
             userId,
             title: request.title ?? null,
-            sandboxSessionId: null,
             modelName: request.modelName ?? null,
-            summary: null,
+            messages: [],
         })
     },
 
-    async ensureSession({ id, projectId, userId, platformId }: EnsureSessionParams): Promise<EnsureSessionResult> {
-        const conversation = await this.getConversationOrThrow({ id, projectId, userId })
-        if (conversation.sandboxSessionId) {
-            return { conversation }
-        }
-        const [aiConfig, mcpCredentials] = await Promise.all([
-            this.getChatAiConfig({ platformId, modelName: conversation.modelName }),
-            getMcpCredentials({ projectId, log }),
-        ])
-        const sandboxId = await userSandboxService.getOrCreate({ userId, platformId, aiConfig })
-        const { session, sdk } = await chatSandboxAgent.createSession({
-            aiConfig,
-            sandboxId,
-            mcpServerUrl: mcpCredentials.mcpServerUrl,
-            mcpToken: mcpCredentials.mcpToken,
-        })
-        const resolvedSandboxId = sdk.sandboxId ?? sandboxId
-        if (resolvedSandboxId !== sandboxId) {
-            void userSandboxService.updateSandboxId({ userId, sandboxId: resolvedSandboxId }).catch(() => undefined)
-        }
-        const result = await conversationRepo()
-            .createQueryBuilder()
-            .update()
-            .set({ sandboxSessionId: session.id })
-            .where('id = :id AND "sandboxSessionId" IS NULL', { id })
-            .execute()
-        if (result.affected === 0) {
-            await chatSandboxAgent.destroySession({ sessionId: session.id, sandboxId: resolvedSandboxId }).catch(() => undefined)
-            return { conversation: await this.getConversationOrThrow({ id, projectId, userId }) }
-        }
-        return {
-            conversation: { ...conversation, sandboxSessionId: session.id },
-            liveSession: { session, sandboxId: resolvedSandboxId },
-        }
-    },
-
-    async listConversations({ projectId, userId, cursor, limit }: ListConversationsParams): Promise<SeekPage<ChatConversation>> {
+    async listConversations({ platformId, userId, cursor, limit }: ListConversationsParams): Promise<SeekPage<ChatConversation>> {
         const decodedCursor = paginationHelper.decodeCursor(cursor)
         const paginator = buildPaginator({
             entity: ChatConversationEntity,
@@ -100,14 +71,14 @@ export const chatService = (log: FastifyBaseLogger) => ({
 
         const queryBuilder = conversationRepo()
             .createQueryBuilder('chat_conversation')
-            .where({ projectId, userId })
+            .where({ platformId, userId })
 
         const { data, cursor: paginationCursor } = await paginator.paginate(queryBuilder)
         return paginationHelper.createPage(data, paginationCursor)
     },
 
-    async getConversationOrThrow({ id, projectId, userId }: GetConversationParams): Promise<ChatConversation> {
-        const conversation = await conversationRepo().findOneBy({ id, projectId, userId })
+    async getConversationOrThrow({ id, platformId, userId }: ConversationIdentifier): Promise<ChatConversation> {
+        const conversation = await conversationRepo().findOneBy({ id, platformId, userId })
         if (isNil(conversation)) {
             throw new ActivepiecesError({
                 code: ErrorCode.ENTITY_NOT_FOUND,
@@ -117,8 +88,8 @@ export const chatService = (log: FastifyBaseLogger) => ({
         return conversation
     },
 
-    async updateConversation({ id, projectId, userId, request }: UpdateConversationParams): Promise<ChatConversation> {
-        const conversation = await this.getConversationOrThrow({ id, projectId, userId })
+    async updateConversation({ id, platformId, userId, request }: UpdateConversationParams): Promise<ChatConversation> {
+        const conversation = await this.getConversationOrThrow({ id, platformId, userId })
         const updates = {
             ...spreadIfDefined('title', request.title),
             ...spreadIfDefined('modelName', request.modelName),
@@ -130,206 +101,294 @@ export const chatService = (log: FastifyBaseLogger) => ({
         return { ...conversation, ...updates }
     },
 
-    async resetSession({ id, projectId }: { id: string, projectId: string }): Promise<void> {
-        await conversationRepo().update({ id, projectId }, { sandboxSessionId: null })
+    async deleteConversation({ id, platformId, userId }: ConversationIdentifier): Promise<void> {
+        const conversation = await this.getConversationOrThrow({ id, platformId, userId })
+        await conversationRepo().delete(conversation.id)
     },
 
-    async cancelSession({ id, projectId, userId }: DeleteConversationParams): Promise<void> {
-        const conversation = await this.getConversationOrThrow({ id, projectId, userId })
-        const sandboxSessionId = conversation.sandboxSessionId
-        if (!sandboxSessionId) return
-        await conversationRepo().update(id, { sandboxSessionId: null })
-        void destroySessionAndCleanup({ sessionId: sandboxSessionId, userId, log }).catch((err) => {
-            log.warn({ err, sessionId: sandboxSessionId }, 'Background session cleanup failed')
-        })
-    },
-
-    async deleteConversation({ id, projectId, userId }: DeleteConversationParams): Promise<void> {
-        const conversation = await this.getConversationOrThrow({ id, projectId, userId })
-        const sandboxSessionId = conversation.sandboxSessionId
-        await conversationRepo().delete({ id, projectId, userId })
-        if (sandboxSessionId) {
-            void destroySessionAndCleanup({ sessionId: sandboxSessionId, userId, log }).catch((err) => {
-                log.warn({ err, sessionId: sandboxSessionId }, 'Background session cleanup failed')
-            })
-        }
-    },
-
-    async getMessages({ id, projectId, userId }: GetMessagesParams): Promise<{ data: ChatHistoryMessage[] }> {
-        const conversation = await this.getConversationOrThrow({ id, projectId, userId })
-        const sessionId = conversation.sandboxSessionId
-        if (!sessionId) {
-            return { data: [] }
-        }
-        const { data: messages, error: historyError } = await tryCatch(
-            async () => chatSandboxAgent.getSessionHistory({ sessionId }),
-        )
-        if (historyError) {
-            log.warn({ err: historyError, conversationId: id }, 'Failed to load session history')
-            return { data: [] }
-        }
+    async getMessages({ id, platformId, userId }: ConversationIdentifier): Promise<{ data: ChatHistoryMessage[] }> {
+        const conversation = await this.getConversationOrThrow({ id, platformId, userId })
+        const messages = chatHistory.reconstruct(conversation.messages as ModelMessage[])
         return { data: messages }
     },
 
-    async getChatAiConfig({ platformId, modelName }: { platformId: string, modelName?: string | null }): Promise<ChatAiConfig> {
-        const cached = aiConfigCache.get(platformId)
-        if (cached && cached.expiresAt > Date.now()) {
-            return { ...cached.config, model: modelName ?? ChatSandboxConfig.model.DEFAULT }
+    async setProjectContext({ id, platformId, userId, projectId }: SetProjectContextParams): Promise<ChatConversation> {
+        const conversation = await this.getConversationOrThrow({ id, platformId, userId })
+        if (projectId !== null) {
+            await assertUserHasProjectAccess({ platformId, userId, projectId, log })
         }
-        const config = await resolveChatAiConfig({ platformId, modelName, log })
-        aiConfigCache.set(platformId, { config, expiresAt: Date.now() + AI_CONFIG_TTL_MS })
-        return config
+        await conversationRepo().update(conversation.id, { projectId })
+        return { ...conversation, projectId }
     },
 
-    isSandboxConfigured(): boolean {
-        return Boolean(system.get(AppSystemProp.E2B_API_KEY))
+    async sendMessage({ conversationId, userId, platformId, content, files }: SendMessageParams): Promise<SendMessageResult> {
+        const [conversation, providerConfig, userProjects, mcpCredentials, userContent] = await Promise.all([
+            this.getConversationOrThrow({ id: conversationId, platformId, userId }),
+            resolveChatProvider({ platformId, log }),
+            getUserProjects({ platformId, userId, log }),
+            chatMcp.getCredentials({ platformId, userId, log }),
+            buildUserContentWithFiles({ text: content, files }),
+        ])
+
+        const candidateProjectId = conversation.projectId ?? null
+        const selectedProjectId = candidateProjectId && userProjects.some((p) => p.id === candidateProjectId)
+            ? candidateProjectId
+            : null
+
+        const modelName = conversation.modelName
+            ?? await resolveDefaultChatModel({ platformId, provider: providerConfig.provider, log })
+
+        const { mcpClient, mcpToolSet } = await chatMcp.connectClient({ mcpCredentials, log })
+
+        if (selectedProjectId) {
+            mcpProjectSelection.set({ platformId, userId, projectId: selectedProjectId })
+        }
+        else {
+            mcpProjectSelection.clear({ platformId, userId })
+        }
+
+        const model = createChatModel({
+            provider: providerConfig.provider,
+            auth: providerConfig.auth,
+            config: providerConfig.config,
+            modelId: modelName,
+        })
+
+        const frontendUrl = system.getOrThrow(AppSystemProp.FRONTEND_URL)
+        const systemPrompt = chatPrompt.buildSystemPrompt({
+            projects: userProjects,
+            currentProjectId: selectedProjectId,
+            frontendUrl,
+        })
+        const previousMessages = conversation.messages as ModelMessage[]
+        const newUserMessage: ModelMessage = { role: 'user' as const, content: userContent }
+        const allMessages = [...previousMessages, newUserMessage]
+
+        const compactionState = await resolveCompactionState({
+            conversation,
+            allMessages,
+            systemPromptLength: systemPrompt.length,
+            provider: providerConfig.provider,
+            model,
+            conversationId,
+            log,
+        })
+
+        const messagesForLlm = chatCompaction.buildCompactedPayload({
+            messages: allMessages,
+            summary: compactionState.summary,
+            summarizedUpToIndex: compactionState.summarizedUpToIndex,
+            provider: providerConfig.provider,
+        })
+
+        let pendingTitle = ''
+        const localTools = createChatTools({
+            onSessionTitle: (title) => {
+                pendingTitle = title
+            },
+            onSetProjectContext: async (projectId) => {
+                await conversationRepo().update(conversationId, { projectId })
+                if (projectId) {
+                    mcpProjectSelection.set({ platformId, userId, projectId })
+                }
+                else {
+                    mcpProjectSelection.clear({ platformId, userId })
+                }
+            },
+            availableProjectIds: userProjects.map((p) => p.id),
+        })
+        const tools = { ...localTools, ...mcpToolSet }
+
+        const closeMcpClient = async (): Promise<void> => {
+            if (mcpClient) {
+                await mcpClient.close().catch((err: unknown) => {
+                    log.warn({ err }, 'Failed to close MCP client')
+                })
+            }
+        }
+
+        try {
+            const result = streamText({
+                model,
+                system: systemPrompt,
+                messages: messagesForLlm,
+                tools,
+                stopWhen: stepCountIs(MAX_STEPS),
+                onStepFinish: ({ finishReason, usage }) => {
+                    log.debug({ conversationId, finishReason, usage }, 'Chat step finished')
+                },
+                onFinish: async ({ response, usage }) => {
+                    const updatedMessages = [...allMessages, ...response.messages]
+                    try {
+                        await conversationRepo().update(conversationId, {
+                            messages: updatedMessages,
+                            ...(pendingTitle ? { title: pendingTitle } : {}),
+                            ...(isNil(conversation.modelName) ? { modelName } : {}),
+                        })
+                    }
+                    catch (saveErr) {
+                        log.error({ err: saveErr, conversationId }, 'Failed to persist conversation messages')
+                    }
+
+                    log.info({
+                        conversationId,
+                        inputTokens: usage.inputTokens,
+                        outputTokens: usage.outputTokens,
+                        provider: providerConfig.provider,
+                    }, 'Chat message completed')
+                },
+                onError: ({ error }) => {
+                    log.error({ err: error, conversationId }, 'Chat streamText error')
+                },
+            })
+
+            return { result, closeMcpClient }
+        }
+        catch (err) {
+            await closeMcpClient()
+            throw err
+        }
     },
 
-    async buildSystemPrompt({ projectId }: { projectId: string }): Promise<string> {
-        const project = await projectService(log).getOneOrThrow(projectId)
-        return buildAgentSystemPrompt(project.displayName)
-    },
 })
 
-const OPENROUTER_BASE_URL = 'https://openrouter.ai/api'
-
-async function resolveChatAiConfig({ platformId, modelName, log }: { platformId: string, modelName?: string | null, log: FastifyBaseLogger }): Promise<ChatAiConfig> {
-    const model = modelName ?? ChatSandboxConfig.model.DEFAULT
-
-    const openRouterConfig = await resolveProviderApiKey({ platformId, provider: AIProviderName.ACTIVEPIECES, log })
-    if (openRouterConfig) {
-        return {
-            agent: ChatSandboxConfig.agent.CLAUDE,
-            model,
-            envs: {
-                [ChatSandboxConfig.envVar.ANTHROPIC_API_KEY]: openRouterConfig,
-                [ChatSandboxConfig.envVar.ANTHROPIC_BASE_URL]: OPENROUTER_BASE_URL,
-            },
-        }
-    }
-
-    const anthropicApiKey = await resolveProviderApiKey({ platformId, provider: AIProviderName.ANTHROPIC, log })
-    if (anthropicApiKey) {
-        return {
-            agent: ChatSandboxConfig.agent.CLAUDE,
-            model,
-            envs: {
-                [ChatSandboxConfig.envVar.ANTHROPIC_API_KEY]: anthropicApiKey,
-            },
-        }
-    }
-
-    throw new ActivepiecesError({
-        code: ErrorCode.ENTITY_NOT_FOUND,
-        params: { entityId: platformId, entityType: 'ChatAiProvider' },
-    })
-}
-
-async function destroySessionAndCleanup({ sessionId, userId, log }: {
-    sessionId: string
+async function getUserProjects({ platformId, userId, log }: {
+    platformId: string
     userId: string
     log: FastifyBaseLogger
-}): Promise<void> {
-    const sandboxId = await userSandboxService.getSandboxId({ userId })
-    if (sandboxId) {
-        await chatSandboxAgent.destroySession({ sessionId, sandboxId }).catch((err) => {
-            log.warn({ err, sessionId }, 'Failed to destroy E2B session')
-        })
-    }
-    await chatSessionCleanup.deleteSessionData({ sessionId }).catch((err) => {
-        log.warn({ err, sessionId }, 'Failed to clean up session data')
+}): Promise<Project[]> {
+    const user = await userService(log).getOneOrFail({ id: userId })
+    return projectService(log).getAllForUser({
+        platformId,
+        userId,
+        isPrivileged: userService(log).isUserPrivileged(user),
     })
 }
 
-async function resolveProviderApiKey({ platformId, provider, log }: { platformId: string, provider: AIProviderName, log: FastifyBaseLogger }): Promise<string | null> {
-    const { data: config } = await tryCatch(
-        async () => aiProviderService(log).getConfigOrThrow({ platformId, provider }),
-    )
-    if (config && 'apiKey' in config.auth && config.auth.apiKey) {
-        return config.auth.apiKey
-    }
-    return null
-}
-
-async function getMcpCredentials({ projectId, log }: { projectId: string, log: FastifyBaseLogger }): Promise<{ mcpServerUrl: string | null, mcpToken: string | null }> {
-    const { data: mcpServer, error } = await tryCatch(async () => mcpServerService(log).getByProjectId(projectId))
-    if (error) {
-        return { mcpServerUrl: null, mcpToken: null }
-    }
-    const frontendUrl = system.getOrThrow(AppSystemProp.FRONTEND_URL)
-    const mcpServerUrl = `${frontendUrl}/mcp`
-    if (frontendUrl.includes('localhost') || frontendUrl.includes('127.0.0.1')) {
-        log.warn({ mcpServerUrl }, 'MCP server URL points to localhost — the sandbox agent (E2B) cannot reach it. Set AP_FRONTEND_URL to a public URL (e.g. ngrok tunnel) for MCP tools to work.')
-    }
-    return {
-        mcpServerUrl,
-        mcpToken: mcpServer.token,
+async function assertUserHasProjectAccess({ platformId, userId, projectId, log }: {
+    platformId: string
+    userId: string
+    projectId: string
+    log: FastifyBaseLogger
+}): Promise<void> {
+    const userProjects = await getUserProjects({ platformId, userId, log })
+    if (!userProjects.some((p) => p.id === projectId)) {
+        throw new ActivepiecesError({
+            code: ErrorCode.ENTITY_NOT_FOUND,
+            params: { entityId: projectId, entityType: 'Project' },
+        })
     }
 }
 
-function sanitizeProjectName(name: string): string {
-    return name.replace(/["`<>\\\r\n]/g, '').slice(0, 64)
+async function resolveChatProvider({ platformId, log }: { platformId: string, log: FastifyBaseLogger }): Promise<GetProviderConfigResponse> {
+    const chatProvider = await aiProviderService(log).getChatProvider({ platformId })
+    if (isNil(chatProvider)) {
+        throw new ActivepiecesError({
+            code: ErrorCode.ENTITY_NOT_FOUND,
+            params: { entityId: platformId, entityType: 'ChatAiProvider' },
+        })
+    }
+    return chatProvider
 }
 
-const SYSTEM_PROMPT_TEMPLATE = readFileSync(
-    path.resolve('packages/server/api/src/assets/prompts/chat-system-prompt.md'),
-    'utf8',
-)
+async function resolveDefaultChatModel({ platformId, provider, log }: {
+    platformId: string
+    provider: AIProviderName
+    log: FastifyBaseLogger
+}): Promise<string> {
+    const allModels = await aiProviderService(log).listModels(platformId, provider)
+    const textModels = allModels.filter((m) => m.type === AIProviderModelType.TEXT)
+    const allowedIds = ALLOWED_CHAT_MODELS_BY_PROVIDER[provider]
+    if (allowedIds) {
+        const firstAllowed = textModels.find((m) => allowedIds.includes(m.id))
+        if (firstAllowed) return firstAllowed.id
+    }
+    const firstText = textModels[0]
+    if (firstText) return firstText.id
+    throw new ActivepiecesError({
+        code: ErrorCode.ENTITY_NOT_FOUND,
+        params: { entityId: provider, entityType: 'AIProviderTextModel' },
+    })
+}
 
-function buildAgentSystemPrompt(projectName: string): string {
-    return SYSTEM_PROMPT_TEMPLATE.replace('{{PROJECT_NAME}}', sanitizeProjectName(projectName))
+async function resolveCompactionState({ conversation, allMessages, systemPromptLength, provider, model, conversationId, log }: {
+    conversation: ChatConversation
+    allMessages: ModelMessage[]
+    systemPromptLength: number
+    provider: AIProviderName
+    model: LanguageModel
+    conversationId: string
+    log: FastifyBaseLogger
+}): Promise<{ summary: string | null, summarizedUpToIndex: number | null }> {
+    const summary = conversation.summary ?? null
+    const summarizedUpToIndex = conversation.summarizedUpToIndex ?? null
+
+    const estimatedTokens = chatCompaction.estimateTokenCount({
+        messages: allMessages,
+        systemPromptLength,
+    })
+
+    if (!chatCompaction.shouldCompact({ estimatedTokens, provider, messageCount: allMessages.length })) {
+        return { summary, summarizedUpToIndex }
+    }
+
+    const result = await chatCompaction.compactMessages({
+        messages: allMessages,
+        existingSummary: summary,
+        summarizedUpToIndex,
+        provider,
+        model,
+        log,
+    })
+
+    await conversationRepo().update(conversationId, {
+        summary: result.summary,
+        summarizedUpToIndex: result.summarizedUpToIndex,
+    })
+    log.info({ conversationId, summarizedUpToIndex: result.summarizedUpToIndex }, 'Chat compaction completed')
+
+    return result
 }
 
 type CreateConversationParams = {
-    projectId: string
+    platformId: string
     userId: string
     request: CreateChatConversationRequest
 }
 
 type ListConversationsParams = {
-    projectId: string
+    platformId: string
     userId: string
     cursor?: string
     limit: number
 }
 
-type GetConversationParams = {
+type ConversationIdentifier = {
     id: string
-    projectId: string
+    platformId: string
     userId: string
 }
 
-type UpdateConversationParams = {
-    id: string
-    projectId: string
-    userId: string
+type UpdateConversationParams = ConversationIdentifier & {
     request: UpdateChatConversationRequest
 }
 
-type EnsureSessionParams = {
-    id: string
-    projectId: string
-    userId: string
-    platformId: string
+type SetProjectContextParams = ConversationIdentifier & {
+    projectId: string | null
 }
 
-type EnsureSessionResult = {
-    conversation: ChatConversation
-    liveSession?: {
-        session: import('sandbox-agent').Session
-        sandboxId: string
+type SendMessageParams = {
+    conversationId: string
+    userId: string
+    platformId: string
+    content: string
+    files?: Array<{ name: string, mimeType: string, data: string }>
+}
+
+type SendMessageResult = {
+    result: {
+        pipeUIMessageStreamToResponse(response: ServerResponse, options?: Record<string, unknown>): void
+        consumeStream(): PromiseLike<void>
     }
-}
-
-type DeleteConversationParams = {
-    id: string
-    projectId: string
-    userId: string
-    platformId: string
-}
-
-type GetMessagesParams = {
-    id: string
-    projectId: string
-    userId: string
+    closeMcpClient: () => Promise<void>
 }
