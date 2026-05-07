@@ -159,9 +159,24 @@ function readNestedValue(source: unknown, path: string[]): unknown {
 function extractAgenticData(flowRun: FlowRun): Record<string, unknown> | undefined {
     const data: Record<string, unknown> = {}
     if (flowRun.failedStep?.name !== undefined) data.failedStepName = flowRun.failedStep.name
-    if (flowRun.duration !== undefined) data.durationMs = flowRun.duration
-    if (flowRun.tasks !== undefined) data.tasksExecuted = flowRun.tasks
+    const durationMs = calculateDurationMs(flowRun)
+    if (durationMs !== undefined) data.durationMs = durationMs
+    if (flowRun.stepsCount !== undefined) data.tasksExecuted = flowRun.stepsCount
     return Object.keys(data).length === 0 ? undefined : data
+}
+
+function calculateDurationMs(flowRun: FlowRun): number | undefined {
+    if (flowRun.startTime === undefined || flowRun.startTime === null
+        || flowRun.finishTime === undefined || flowRun.finishTime === null) {
+        return undefined
+    }
+    const start = new Date(flowRun.startTime).getTime()
+    const finish = new Date(flowRun.finishTime).getTime()
+    if (!Number.isFinite(start) || !Number.isFinite(finish)) {
+        return undefined
+    }
+    const duration = finish - start
+    return duration >= 0 ? duration : undefined
 }
 
 function getAgenticEmitter(log: FastifyBaseLogger): ReturnType<typeof agenticRunStateEmitter> {

@@ -1,0 +1,856 @@
+{
+  "actions": [
+    {
+      "checkpointId": "cp-collect",
+      "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+      "displayName": "Indica il cliente intestatario.",
+      "effect": "PURE",
+      "inputFields": [],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "ask-customer",
+        "completionCriteria": "La verifica anagrafica del cliente e' stata completata.",
+        "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+        "diagnosticOnly": false,
+        "phaseId": "identify-customer",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "ask-customer",
+      "outputFields": [
+        "customerName"
+      ],
+      "settings": {
+        "actionName": "chat-ask",
+        "input": {
+          "component": "banking.customer.disambiguation",
+          "fieldName": "customerName",
+          "promptHint": "Indica il cliente intestatario.",
+          "promptText": "Indica il cliente intestatario."
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "ask-customer",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-verify",
+      "description": "Esegue il servizio Ricerca cliente tramite ToolGateway.",
+      "displayName": "Ricerca cliente",
+      "effect": "READ",
+      "inputFields": [
+        "customerName"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "resolve-customer",
+        "completionCriteria": "La verifica anagrafica del cliente e' stata completata.",
+        "description": "Esegue il servizio Ricerca cliente tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "identify-customer",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "resolve-customer",
+      "outputFields": [
+        "customerId"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "READ",
+          "mcpGatewayId": "banking-core-mcp",
+          "payload": {},
+          "toolRef": "banking-customers/search_customer",
+          "version": "2026.04"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "resolve-customer",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-verify",
+      "description": "Esegue il servizio Lista rapporti tramite ToolGateway.",
+      "displayName": "Lista rapporti",
+      "effect": "READ",
+      "inputFields": [
+        "customerId"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "list-relationships",
+        "completionCriteria": "Il rapporto e' presente tra quelli del cliente.",
+        "description": "Esegue il servizio Lista rapporti tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "select-relationship",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "list-relationships",
+      "outputFields": [
+        "relationships",
+        "relationshipsUiRows"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "READ",
+          "mcpGatewayId": "banking-core-mcp",
+          "payload": {},
+          "toolRef": "banking-accounts/list_accounts",
+          "version": "2026.04"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "list-relationships",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-collect",
+      "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+      "displayName": "Seleziona o indica il rapporto da estinguere.",
+      "effect": "PURE",
+      "inputFields": [
+        "customerId"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "ask-relationship",
+        "completionCriteria": "Il rapporto e' presente tra quelli del cliente.",
+        "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+        "diagnosticOnly": false,
+        "phaseId": "select-relationship",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "ask-relationship",
+      "outputFields": [
+        "relationshipId"
+      ],
+      "settings": {
+        "actionName": "chat-ask",
+        "input": {
+          "component": "banking.relationships.table",
+          "fieldName": "relationshipId",
+          "promptHint": "Seleziona o indica il rapporto da estinguere.",
+          "promptText": "Seleziona o indica il rapporto da estinguere."
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "ask-relationship",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-verify",
+      "description": "Esegue il servizio Lista rapporti tramite ToolGateway.",
+      "displayName": "Lista rapporti",
+      "effect": "READ",
+      "inputFields": [
+        "customerId",
+        "relationshipId"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "verify-relationship",
+        "completionCriteria": "Il rapporto e' presente tra quelli del cliente.",
+        "description": "Esegue il servizio Lista rapporti tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "select-relationship",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "verify-relationship",
+      "outputFields": [
+        "relationshipVerified",
+        "relationshipOwnerMatched",
+        "verificationRef"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "READ",
+          "mcpGatewayId": "banking-core-mcp",
+          "payload": {},
+          "toolRef": "banking-accounts/list_accounts",
+          "version": "2026.04"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "verify-relationship",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-verify",
+      "description": "Valuta il prossimo ramo del workflow.",
+      "displayName": "Relationship guard",
+      "effect": "PURE",
+      "inputFields": [
+        "relationshipOwnerMatched"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "relationship-guard",
+        "completionCriteria": "Il rapporto e' presente tra quelli del cliente.",
+        "description": "Valuta il prossimo ramo del workflow.",
+        "diagnosticOnly": true,
+        "phaseId": "select-relationship",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": false
+      },
+      "name": "relationship-guard",
+      "outputFields": [],
+      "settings": {
+        "actionName": "checkpoint",
+        "input": {
+          "barriers": [],
+          "branches": [
+            {
+              "condition": "relationshipOwnerMatched == 'true'",
+              "next": "ask-date"
+            },
+            {
+              "default": true,
+              "next": "relationship-mismatch"
+            }
+          ],
+          "checkpointId": "relationship-guard",
+          "revisionable": false
+        },
+        "pieceName": "@activepieces/piece-platform-workflow",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "relationship-guard",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-collect",
+      "description": "Attende un evento esterno o una risposta prima di riprendere il workflow.",
+      "displayName": "Il rapporto indicato non appartiene al cliente. Seleziona un rapporto valido.",
+      "effect": "PURE",
+      "inputFields": [
+        "customerName",
+        "relationshipId"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "relationship-mismatch",
+        "completionCriteria": "Il rapporto e' presente tra quelli del cliente.",
+        "description": "Attende un evento esterno o una risposta prima di riprendere il workflow.",
+        "diagnosticOnly": false,
+        "phaseId": "select-relationship",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "relationship-mismatch",
+      "outputFields": [
+        "relationshipId"
+      ],
+      "settings": {
+        "actionName": "wait-event",
+        "input": {
+          "component": "banking.relationships.table",
+          "eventName": "relationship-mismatch",
+          "next": "ask-relationship",
+          "outputFields": [
+            "relationshipId"
+          ],
+          "promptHint": "Il rapporto indicato non appartiene al cliente. Seleziona un rapporto valido.",
+          "renderReason": "relationship_not_owned",
+          "timeoutSeconds": 600
+        },
+        "pieceName": "@activepieces/piece-platform-workflow",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "relationship-mismatch",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-collect",
+      "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+      "displayName": "Indica la data di estinzione.",
+      "effect": "PURE",
+      "inputFields": [
+        "relationshipId"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "ask-date",
+        "completionCriteria": "Data e motivazione sono state raccolte e la motivazione e' stata confrontata con il catalogo.",
+        "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+        "diagnosticOnly": false,
+        "phaseId": "closure-details",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "ask-date",
+      "outputFields": [
+        "closureDate"
+      ],
+      "settings": {
+        "actionName": "chat-ask",
+        "input": {
+          "component": "banking.datePicker",
+          "fieldName": "closureDate",
+          "promptHint": "Indica la data di estinzione.",
+          "promptText": "Indica la data di estinzione."
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "ask-date",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-collect",
+      "description": "Esegue il servizio Lista estinzione motivazioni tramite ToolGateway.",
+      "displayName": "Lista estinzione motivazioni",
+      "effect": "READ",
+      "inputFields": [
+        "closureReasonText"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "list-closure-reasons",
+        "completionCriteria": "Data e motivazione sono state raccolte e la motivazione e' stata confrontata con il catalogo.",
+        "description": "Esegue il servizio Lista estinzione motivazioni tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "closure-details",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "list-closure-reasons",
+      "outputFields": [
+        "closureReasonSuggestions"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "READ",
+          "mcpGatewayId": "banking-core-mcp",
+          "payload": {},
+          "toolRef": "banking-operations/list_closure_reasons",
+          "version": "2026.04"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "list-closure-reasons",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-collect",
+      "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+      "displayName": "Indica la motivazione dell'estinzione.",
+      "effect": "PURE",
+      "inputFields": [
+        "relationshipId",
+        "closureDate"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "ask-reason",
+        "completionCriteria": "Data e motivazione sono state raccolte e la motivazione e' stata confrontata con il catalogo.",
+        "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+        "diagnosticOnly": false,
+        "phaseId": "closure-details",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "ask-reason",
+      "outputFields": [
+        "closureReasonText"
+      ],
+      "settings": {
+        "actionName": "chat-ask",
+        "input": {
+          "component": "banking.reasonText",
+          "fieldName": "closureReasonText",
+          "maxLength": 500,
+          "promptHint": "Indica la motivazione dell'estinzione.",
+          "promptText": "Indica la motivazione dell'estinzione."
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "ask-reason",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-collect",
+      "description": "Esegue il servizio Lista estinzione motivazioni tramite ToolGateway.",
+      "displayName": "Lista estinzione motivazioni",
+      "effect": "READ",
+      "inputFields": [
+        "closureReasonText"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "validate-closure-reason",
+        "completionCriteria": "Data e motivazione sono state raccolte e la motivazione e' stata confrontata con il catalogo.",
+        "description": "Esegue il servizio Lista estinzione motivazioni tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "closure-details",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "validate-closure-reason",
+      "outputFields": [
+        "closureReasonCatalogStatus",
+        "closureReasonCatalogMessage",
+        "closureReasonSuggestions"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "READ",
+          "mcpGatewayId": "banking-core-mcp",
+          "payload": {},
+          "toolRef": "banking-operations/list_closure_reasons",
+          "version": "2026.04"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "validate-closure-reason",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-collect",
+      "description": "Valuta il prossimo ramo del workflow.",
+      "displayName": "Reason guard",
+      "effect": "PURE",
+      "inputFields": [
+        "closureReasonCatalogStatus"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "reason-guard",
+        "completionCriteria": "Data e motivazione sono state raccolte e la motivazione e' stata confrontata con il catalogo.",
+        "description": "Valuta il prossimo ramo del workflow.",
+        "diagnosticOnly": true,
+        "phaseId": "closure-details",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": false
+      },
+      "name": "reason-guard",
+      "outputFields": [],
+      "settings": {
+        "actionName": "checkpoint",
+        "input": {
+          "barriers": [],
+          "branches": [
+            {
+              "condition": "closureReasonCatalogStatus == 'MATCHED'",
+              "next": "preview-closure"
+            },
+            {
+              "default": true,
+              "next": "reason-mismatch"
+            }
+          ],
+          "checkpointId": "reason-guard",
+          "revisionable": false
+        },
+        "pieceName": "@activepieces/piece-platform-workflow",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "reason-guard",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-collect",
+      "description": "Attende un evento esterno o una risposta prima di riprendere il workflow.",
+      "displayName": "Non ho trovato una corrispondenza abbastanza chiara con il catalogo motivazioni. Puoi scegliere un suggerimento oppure scrivere una motivazione piu' precisa.",
+      "effect": "PURE",
+      "inputFields": [
+        "closureReasonText"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "reason-mismatch",
+        "completionCriteria": "Data e motivazione sono state raccolte e la motivazione e' stata confrontata con il catalogo.",
+        "description": "Attende un evento esterno o una risposta prima di riprendere il workflow.",
+        "diagnosticOnly": false,
+        "phaseId": "closure-details",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "reason-mismatch",
+      "outputFields": [
+        "closureReasonText"
+      ],
+      "settings": {
+        "actionName": "wait-event",
+        "input": {
+          "component": "banking.reasonText",
+          "eventName": "reason-mismatch",
+          "next": "validate-closure-reason",
+          "outputFields": [
+            "closureReasonText"
+          ],
+          "promptHint": "Non ho trovato una corrispondenza abbastanza chiara con il catalogo motivazioni. Puoi scegliere un suggerimento oppure scrivere una motivazione piu' precisa.",
+          "renderReason": "closure_reason_not_identified",
+          "timeoutSeconds": 600
+        },
+        "pieceName": "@activepieces/piece-platform-workflow",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "reason-mismatch",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-preview",
+      "description": "Esegue il servizio Generazione modulo tramite ToolGateway.",
+      "displayName": "Generazione modulo",
+      "effect": "IDEMPOTENT",
+      "inputFields": [
+        "customerId",
+        "relationshipId",
+        "closureDate",
+        "closureReasonText"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "preview-closure",
+        "completionCriteria": "L'utente ha verificato l'anteprima e confermato o annullato.",
+        "description": "Esegue il servizio Generazione modulo tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "preview-confirmation",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "preview-closure",
+      "outputFields": [
+        "documentRef"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "IDEMPOTENT",
+          "mcpGatewayId": "banking-core-mcp",
+          "payload": {},
+          "toolRef": "banking-operations/generate_module",
+          "version": "2026.04"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "preview-closure",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-confirm",
+      "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+      "displayName": "Confermi l'estinzione del rapporto con i dati riepilogati?",
+      "effect": "PURE",
+      "inputFields": [
+        "customerName",
+        "relationshipId",
+        "closureDate",
+        "closureReasonText",
+        "documentRef"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "ask-confirm",
+        "completionCriteria": "L'utente ha verificato l'anteprima e confermato o annullato.",
+        "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+        "diagnosticOnly": false,
+        "phaseId": "preview-confirmation",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "ask-confirm",
+      "outputFields": [
+        "confirmationGiven"
+      ],
+      "settings": {
+        "actionName": "chat-ask",
+        "input": {
+          "barriers": [
+            "PRE_SUBMIT_CONFIRMATION"
+          ],
+          "component": "banking.confirmation",
+          "fieldName": "confirmationGiven",
+          "promptHint": "Confermi l'estinzione del rapporto con i dati riepilogati?",
+          "promptText": "Confermi l'estinzione del rapporto con i dati riepilogati?"
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "ask-confirm",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-confirm",
+      "description": "Valuta il prossimo ramo del workflow.",
+      "displayName": "Confirmation guard",
+      "effect": "PURE",
+      "inputFields": [
+        "confirmationGiven"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "confirmation-guard",
+        "completionCriteria": "L'utente ha verificato l'anteprima e confermato o annullato.",
+        "description": "Valuta il prossimo ramo del workflow.",
+        "diagnosticOnly": true,
+        "phaseId": "preview-confirmation",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": false
+      },
+      "name": "confirmation-guard",
+      "outputFields": [],
+      "settings": {
+        "actionName": "checkpoint",
+        "input": {
+          "barriers": [],
+          "branches": [
+            {
+              "condition": "confirmationGiven == 'true'",
+              "next": "submit-closure"
+            },
+            {
+              "default": true,
+              "next": "cancelled"
+            }
+          ],
+          "checkpointId": "confirmation-guard",
+          "revisionable": false
+        },
+        "pieceName": "@activepieces/piece-platform-workflow",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "confirmation-guard",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-confirm",
+      "description": "Mostra una risposta o uno stato pubblico all'utente.",
+      "displayName": "Cancelled",
+      "effect": "PURE",
+      "inputFields": [],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "cancelled",
+        "completionCriteria": "L'utente ha verificato l'anteprima e confermato o annullato.",
+        "description": "Mostra una risposta o uno stato pubblico all'utente.",
+        "diagnosticOnly": false,
+        "phaseId": "preview-confirmation",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "cancelled",
+      "outputFields": [],
+      "settings": {
+        "actionName": "chat-render",
+        "input": {
+          "barriers": [
+            "PRE_SUBMIT_CONFIRMATION"
+          ],
+          "body": "",
+          "component": "core.progressPanel",
+          "renderType": "answerInfo",
+          "sourceFields": [],
+          "terminal": true
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "cancelled",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-submit",
+      "description": "Esegue il servizio Invio estinzione tramite ToolGateway.",
+      "displayName": "Invio estinzione",
+      "effect": "IRREVERSIBLE",
+      "inputFields": [
+        "customerId",
+        "relationshipId",
+        "closureDate",
+        "closureReasonText"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "submit-closure",
+        "completionCriteria": "La richiesta e' stata inviata e registrata.",
+        "description": "Esegue il servizio Invio estinzione tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "submit-closure",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "submit-closure",
+      "outputFields": [
+        "submissionRef",
+        "submissionStatus"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "barriers": [
+            "PRE_SUBMIT_CONFIRMATION",
+            "IRREVERSIBLE_SIDE_EFFECT",
+            "SUBMIT_COMPLETED"
+          ],
+          "effect": "IRREVERSIBLE",
+          "mcpGatewayId": "banking-core-mcp",
+          "payload": {},
+          "toolRef": "banking-operations/submit_closure",
+          "version": "2026.04"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "submit-closure",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "checkpointId": "cp-submit",
+      "description": "Mostra una risposta o uno stato pubblico all'utente.",
+      "displayName": "Completed",
+      "effect": "PURE",
+      "inputFields": [
+        "submissionRef",
+        "submissionStatus"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "completed",
+        "completionCriteria": "La richiesta e' stata inviata e registrata.",
+        "description": "Mostra una risposta o uno stato pubblico all'utente.",
+        "diagnosticOnly": false,
+        "phaseId": "submit-closure",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "completed",
+      "outputFields": [],
+      "settings": {
+        "actionName": "chat-render",
+        "input": {
+          "barriers": [
+            "PRE_SUBMIT_CONFIRMATION",
+            "IRREVERSIBLE_SIDE_EFFECT",
+            "SUBMIT_COMPLETED"
+          ],
+          "body": "",
+          "component": "core.progressPanel",
+          "renderType": "answerInfo",
+          "sourceFields": [
+            "submissionRef",
+            "submissionStatus"
+          ],
+          "terminal": true
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "completed",
+      "type": "PIECE",
+      "valid": true
+    }
+  ],
+  "displayName": "banking.accountClosure.flow@2026.04",
+  "externalId": "banking.accountClosure.flow",
+  "metadata": {
+    "canonicalHash": "4258d54061cffe9e2cab976a97580520f2a417902f3433f9c4f5bfa4d755e4f5",
+    "designerContractVersion": "2026.05.phase1",
+    "designerFlowKind": "banking-account-closure",
+    "designerSource": "canonical-compiler",
+    "platformCapabilityId": "banking.accountClosure",
+    "platformDefinitionId": "banking.accountClosure.flow",
+    "platformVersion": "2026.04",
+    "runtimeProviderId": "activepieces",
+    "sourceOfTruth": "workflow.canonical"
+  },
+  "trigger": {
+    "displayName": "Manual trigger",
+    "name": "trigger",
+    "settings": {},
+    "type": "EMPTY",
+    "valid": true
+  }
+}

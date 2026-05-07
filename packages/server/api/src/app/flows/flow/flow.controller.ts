@@ -42,6 +42,7 @@ export const flowController: FastifyPluginAsyncZod = async (app) => {
         const newFlow = await flowService(request.log).create({
             projectId: request.projectId,
             request: request.body,
+            externalId: request.body.externalId,
             ownerId: request.principal.type === PrincipalType.SERVICE ? undefined : request.principal.id,
             templateId: request.body.templateId,
         })
@@ -342,5 +343,4 @@ const DeleteFlowRequestOptions = {
         },
     },
 }
-
 

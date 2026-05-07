@@ -3,6 +3,7 @@ import { Metadata } from '../../../core/common/metadata'
 
 export const CreateFlowRequest = z.object({
     displayName: z.string(),
+    externalId: z.string().optional(),
     /**If folderId is provided, folderName is ignored */
     folderId: z.string().optional(),
     folderName: z.string().optional(),

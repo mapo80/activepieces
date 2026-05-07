@@ -1,0 +1,604 @@
+{
+  "actions": [
+    {
+      "description": "Esegue il servizio Classificazione richiesta tramite ToolGateway.",
+      "displayName": "Classificazione richiesta",
+      "effect": "READ",
+      "inputFields": [],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "classify-question",
+        "completionCriteria": "La richiesta e' classificata come informazione pubblica.",
+        "description": "Esegue il servizio Classificazione richiesta tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "classify",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "classify-question",
+      "outputFields": [
+        "gaiaIntent",
+        "municipality",
+        "sourceFamily",
+        "needsAuth",
+        "needsHandover"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "READ",
+          "mcpGatewayId": "",
+          "payload": {},
+          "toolRef": "pa-knowledge/classify_question",
+          "version": "1.0"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "classify-question",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Esegue il servizio Normalizzazione periodo temporale tramite ToolGateway.",
+      "displayName": "Normalizzazione periodo temporale",
+      "effect": "READ",
+      "inputFields": [
+        "gaiaIntent",
+        "municipality"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "normalize-time",
+        "completionCriteria": "La fonte documentale e il perimetro temporale sono definiti.",
+        "description": "Esegue il servizio Normalizzazione periodo temporale tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "route",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "normalize-time",
+      "outputFields": [
+        "timeScope",
+        "referenceDate"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "READ",
+          "mcpGatewayId": "",
+          "payload": {},
+          "toolRef": "pa-knowledge/normalize_time_scope",
+          "version": "1.0"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "normalize-time",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Esegue il servizio Ricerca documenti tramite ToolGateway.",
+      "displayName": "Ricerca documenti",
+      "effect": "READ",
+      "inputFields": [
+        "gaiaIntent",
+        "municipality",
+        "sourceFamily",
+        "timeScope"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "retrieve-knowledge",
+        "completionCriteria": "Sono state trovate fonti pertinenti e citabili.",
+        "description": "Esegue il servizio Ricerca documenti tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "retrieve",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "retrieve-knowledge",
+      "outputFields": [
+        "retrievedDocuments",
+        "ragConfidence"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "READ",
+          "mcpGatewayId": "",
+          "payload": {},
+          "toolRef": "pa-knowledge/search_documents",
+          "version": "1.0"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "retrieve-knowledge",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Esegue il servizio Grounding check tramite ToolGateway.",
+      "displayName": "Grounding check",
+      "effect": "READ",
+      "inputFields": [
+        "retrievedDocuments",
+        "ragConfidence"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "grounding-check",
+        "completionCriteria": "La risposta e' coerente con le fonti selezionate.",
+        "description": "Esegue il servizio Grounding check tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "check",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "grounding-check",
+      "outputFields": [
+        "grounded",
+        "answerReady",
+        "answerText",
+        "sourceTitles"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "READ",
+          "mcpGatewayId": "",
+          "payload": {},
+          "toolRef": "pa-knowledge/grounding_check",
+          "version": "1.0"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "grounding-check",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Mostra una risposta o uno stato pubblico all'utente.",
+      "displayName": "Render answer",
+      "effect": "PURE",
+      "inputFields": [
+        "answerText",
+        "sourceTitles"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "render-answer",
+        "completionCriteria": "L'utente riceve una risposta citabile.",
+        "description": "Mostra una risposta o uno stato pubblico all'utente.",
+        "diagnosticOnly": false,
+        "phaseId": "answer",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "render-answer",
+      "outputFields": [],
+      "settings": {
+        "actionName": "chat-render",
+        "input": {
+          "body": "",
+          "next": "ask-documents-follow-up",
+          "renderType": "answerInfo",
+          "sourceFields": [
+            "answerText",
+            "sourceTitles"
+          ]
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "render-answer",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+      "displayName": "Puoi chiedere un dettaglio sui documenti da allegare.",
+      "effect": "PURE",
+      "inputFields": [
+        "answerText",
+        "sourceTitles"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "ask-documents-follow-up",
+        "completionCriteria": "L'utente ha ricevuto il dettaglio sui documenti da allegare.",
+        "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+        "diagnosticOnly": false,
+        "phaseId": "documents",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "ask-documents-follow-up",
+      "outputFields": [
+        "documentsQuestion"
+      ],
+      "settings": {
+        "actionName": "chat-ask",
+        "input": {
+          "component": "core.textPrompt",
+          "fieldName": "documentsQuestion",
+          "promptHint": "Puoi chiedere un dettaglio sui documenti da allegare.",
+          "promptText": "Puoi chiedere un dettaglio sui documenti da allegare."
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "ask-documents-follow-up",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Esegue il servizio Ricerca documenti tramite ToolGateway.",
+      "displayName": "Ricerca documenti",
+      "effect": "READ",
+      "inputFields": [
+        "documentsQuestion",
+        "retrievedDocuments"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "resolve-documents-follow-up",
+        "completionCriteria": "L'utente ha ricevuto il dettaglio sui documenti da allegare.",
+        "description": "Esegue il servizio Ricerca documenti tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "documents",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "resolve-documents-follow-up",
+      "outputFields": [
+        "documentsAnswer",
+        "documentsEvidence"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "READ",
+          "mcpGatewayId": "",
+          "payload": {},
+          "toolRef": "pa-knowledge/search_documents",
+          "version": "1.0"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "resolve-documents-follow-up",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Mostra una risposta o uno stato pubblico all'utente.",
+      "displayName": "Render documents follow up",
+      "effect": "PURE",
+      "inputFields": [
+        "documentsAnswer",
+        "documentsEvidence"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "render-documents-follow-up",
+        "completionCriteria": "L'utente ha ricevuto il dettaglio sui documenti da allegare.",
+        "description": "Mostra una risposta o uno stato pubblico all'utente.",
+        "diagnosticOnly": false,
+        "phaseId": "documents",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "render-documents-follow-up",
+      "outputFields": [],
+      "settings": {
+        "actionName": "chat-render",
+        "input": {
+          "body": "",
+          "next": "ask-channel-follow-up",
+          "renderType": "answerInfo",
+          "sourceFields": [
+            "documentsAnswer",
+            "documentsEvidence"
+          ]
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "render-documents-follow-up",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+      "displayName": "Puoi chiedere un dettaglio su canale, PEC o presentazione allo sportello.",
+      "effect": "PURE",
+      "inputFields": [
+        "documentsAnswer"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "ask-channel-follow-up",
+        "completionCriteria": "L'utente conosce il canale di presentazione previsto.",
+        "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+        "diagnosticOnly": false,
+        "phaseId": "channel",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "ask-channel-follow-up",
+      "outputFields": [
+        "channelQuestion"
+      ],
+      "settings": {
+        "actionName": "chat-ask",
+        "input": {
+          "component": "core.textPrompt",
+          "fieldName": "channelQuestion",
+          "promptHint": "Puoi chiedere un dettaglio su canale, PEC o presentazione allo sportello.",
+          "promptText": "Puoi chiedere un dettaglio su canale, PEC o presentazione allo sportello."
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "ask-channel-follow-up",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Esegue il servizio Ricerca documenti tramite ToolGateway.",
+      "displayName": "Ricerca documenti",
+      "effect": "READ",
+      "inputFields": [
+        "channelQuestion",
+        "retrievedDocuments"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "resolve-channel-follow-up",
+        "completionCriteria": "L'utente conosce il canale di presentazione previsto.",
+        "description": "Esegue il servizio Ricerca documenti tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "channel",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "resolve-channel-follow-up",
+      "outputFields": [
+        "channelAnswer",
+        "channelEvidence"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "READ",
+          "mcpGatewayId": "",
+          "payload": {},
+          "toolRef": "pa-knowledge/search_documents",
+          "version": "1.0"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "resolve-channel-follow-up",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Mostra una risposta o uno stato pubblico all'utente.",
+      "displayName": "Render channel follow up",
+      "effect": "PURE",
+      "inputFields": [
+        "channelAnswer",
+        "channelEvidence"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "render-channel-follow-up",
+        "completionCriteria": "L'utente conosce il canale di presentazione previsto.",
+        "description": "Mostra una risposta o uno stato pubblico all'utente.",
+        "diagnosticOnly": false,
+        "phaseId": "channel",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "render-channel-follow-up",
+      "outputFields": [],
+      "settings": {
+        "actionName": "chat-render",
+        "input": {
+          "body": "",
+          "next": "ask-private-follow-up",
+          "renderType": "answerInfo",
+          "sourceFields": [
+            "channelAnswer",
+            "channelEvidence"
+          ]
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "render-channel-follow-up",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+      "displayName": "Puoi chiedere cosa succede se la richiesta riguarda una pratica personale.",
+      "effect": "PURE",
+      "inputFields": [
+        "channelAnswer"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "ask-private-follow-up",
+        "completionCriteria": "La richiesta personale e' governata senza esporre dati riservati.",
+        "description": "Raccoglie dati dall'utente per proseguire nel workflow.",
+        "diagnosticOnly": false,
+        "phaseId": "personal-data",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "ask-private-follow-up",
+      "outputFields": [
+        "privateQuestion"
+      ],
+      "settings": {
+        "actionName": "chat-ask",
+        "input": {
+          "component": "core.textPrompt",
+          "fieldName": "privateQuestion",
+          "promptHint": "Puoi chiedere cosa succede se la richiesta riguarda una pratica personale.",
+          "promptText": "Puoi chiedere cosa succede se la richiesta riguarda una pratica personale."
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "ask-private-follow-up",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Esegue il servizio Classificazione richiesta tramite ToolGateway.",
+      "displayName": "Classificazione richiesta",
+      "effect": "READ",
+      "inputFields": [
+        "privateQuestion"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "resolve-private-follow-up",
+        "completionCriteria": "La richiesta personale e' governata senza esporre dati riservati.",
+        "description": "Esegue il servizio Classificazione richiesta tramite ToolGateway.",
+        "diagnosticOnly": false,
+        "phaseId": "personal-data",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "resolve-private-follow-up",
+      "outputFields": [
+        "privateDataPolicy",
+        "authRequired",
+        "privateAnswer"
+      ],
+      "settings": {
+        "actionName": "tool-call",
+        "input": {
+          "effect": "READ",
+          "mcpGatewayId": "",
+          "payload": {},
+          "toolRef": "pa-knowledge/classify_question",
+          "version": "1.0"
+        },
+        "pieceName": "@activepieces/piece-platform-tool-gateway",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "resolve-private-follow-up",
+      "type": "PIECE",
+      "valid": true
+    },
+    {
+      "description": "Mostra una risposta o uno stato pubblico all'utente.",
+      "displayName": "Render private follow up",
+      "effect": "PURE",
+      "inputFields": [
+        "privateAnswer",
+        "privateDataPolicy"
+      ],
+      "metadata": {
+        "businessOwner": "platform-operations",
+        "canonicalStepId": "render-private-follow-up",
+        "completionCriteria": "La richiesta personale e' governata senza esporre dati riservati.",
+        "description": "Mostra una risposta o uno stato pubblico all'utente.",
+        "diagnosticOnly": false,
+        "phaseId": "personal-data",
+        "technicalOwner": "agentic-workflow-platform",
+        "visibleToOperator": true,
+        "visibleToUser": true
+      },
+      "name": "render-private-follow-up",
+      "outputFields": [],
+      "settings": {
+        "actionName": "chat-render",
+        "input": {
+          "body": "",
+          "renderType": "answerInfo",
+          "sourceFields": [
+            "privateAnswer",
+            "privateDataPolicy"
+          ],
+          "terminal": true
+        },
+        "pieceName": "@activepieces/piece-platform-chat",
+        "pieceVersion": "0.1.0",
+        "propertySettings": {}
+      },
+      "skip": false,
+      "stepId": "render-private-follow-up",
+      "type": "PIECE",
+      "valid": true
+    }
+  ],
+  "displayName": "pa.gaiaCommons.flow@2026.05",
+  "externalId": "pa.gaiaCommons.flow",
+  "metadata": {
+    "canonicalHash": "e7420ec1d18ebea73c3be2053ab8da960a22f22b4dcbd926808fcee7d709c21b",
+    "designerContractVersion": "2026.05.phase1",
+    "designerFlowKind": "pa-gaia-commons",
+    "designerSource": "canonical-compiler",
+    "platformCapabilityId": "pa.gaiaCommonsAssistant",
+    "platformDefinitionId": "pa.gaiaCommons.flow",
+    "platformVersion": "2026.05",
+    "runtimeProviderId": "activepieces",
+    "sourceOfTruth": "workflow.canonical"
+  },
+  "trigger": {
+    "displayName": "Manual trigger",
+    "name": "trigger",
+    "settings": {},
+    "type": "EMPTY",
+    "valid": true
+  }
+}
