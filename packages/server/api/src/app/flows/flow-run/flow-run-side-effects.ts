@@ -159,8 +159,11 @@ function readNestedValue(source: unknown, path: string[]): unknown {
 function extractAgenticData(flowRun: FlowRun): Record<string, unknown> | undefined {
     const data: Record<string, unknown> = {}
     if (flowRun.failedStep?.name !== undefined) data.failedStepName = flowRun.failedStep.name
-    if (flowRun.duration !== undefined) data.durationMs = flowRun.duration
-    if (flowRun.tasks !== undefined) data.tasksExecuted = flowRun.tasks
+    const durationMs = flowRun.startTime && flowRun.finishTime
+        ? new Date(flowRun.finishTime).getTime() - new Date(flowRun.startTime).getTime()
+        : undefined
+    if (durationMs !== undefined) data.durationMs = durationMs
+    if (flowRun.stepsCount !== undefined) data.tasksExecuted = flowRun.stepsCount
     return Object.keys(data).length === 0 ? undefined : data
 }
 
