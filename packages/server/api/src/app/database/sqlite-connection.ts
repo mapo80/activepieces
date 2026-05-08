@@ -166,10 +166,10 @@ import { RemoveFlowRunDurationSqlite1763417279729 } from './migration/sqlite/176
 import { AddProjectTypeSqlite1763896147042 } from './migration/sqlite/1763896147042-AddProjectTypeSqlite'
 import { AddFlowOperationStatusFieldSqlite1764239872251 } from './migration/sqlite/1764239872251-AddFlowOperationStatusFieldSqlite'
 import { AddMcpServerSqlite1764524983756 } from './migration/sqlite/1764524983756-AddMcpServerSqlite'
-import { AddMcpGatewaySqlite1777000000000 } from './migration/sqlite/1777000000000-AddMcpGatewaySqlite'
 import { AddPieceVersionToAppConnection1764856239445 } from './migration/sqlite/1764856239445-addPieceVersionToAppConnection'
 import { FixFlowRunIndexes1764871079154 } from './migration/sqlite/1764871079154-FixFlowRunIndexesSqlite'
 import { RemovePlatformSMTP1765264096034 } from './migration/sqlite/1765264096034-RemovePlatformSMTP'
+import { AddMcpGatewaySqlite1777000000000 } from './migration/sqlite/1777000000000-AddMcpGatewaySqlite'
 
 const getSqliteDatabaseFilePath = (): string => {
     const apConfigDirectoryPath = system.getOrThrow(AppSystemProp.CONFIG_PATH)

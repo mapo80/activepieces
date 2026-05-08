@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto'
 
-import { tryCatch } from '@activepieces/shared'
 import { safeHttp } from '@activepieces/server-utils'
+import { tryCatch } from '@activepieces/shared'
 import { FastifyBaseLogger } from 'fastify'
 
 async function postOnce({
@@ -27,7 +27,7 @@ async function postOnce({
     return { status: response.status }
 }
 
-function signPayload({ body, secret }: { body: string; secret: string }): string {
+function signPayload({ body, secret }: { body: string, secret: string }): string {
     const hex = createHmac('sha256', secret).update(body).digest('hex')
     return `sha256=${hex}`
 }
