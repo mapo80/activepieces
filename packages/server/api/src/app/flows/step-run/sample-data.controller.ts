@@ -22,6 +22,7 @@ export const sampleDataController: FastifyPluginAsyncZod = async (fastify) => {
         return flowRunService(request.log).test({
             projectId: request.projectId,
             flowVersionId: request.body.flowVersionId,
+            payload: request.body.payload,
             triggeredBy: request.principal.id,
         })
     })
@@ -85,6 +86,7 @@ const TestFlowDataRequestBody = {
         body: z.object({
             projectId: z.string(),
             flowVersionId: z.string(),
+            payload: z.unknown().optional(),
         }),
         security: [SERVICE_KEY_SECURITY_OPENAPI],
     },

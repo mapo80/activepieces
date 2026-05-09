@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/index', () => ({
   platformToolGatewayAuth: { type: 'NONE' },
@@ -7,6 +7,12 @@ vi.mock('../src/index', () => ({
 import { toolCallAction } from '../src/lib/actions/tool-call';
 
 describe('@platform/tool-gateway · tool-call action', () => {
+  beforeEach(() => {
+    process.env['AP_AGENTIC_ALLOW_DETERMINISTIC_FALLBACK'] = 'true';
+    delete process.env['AP_AGENTIC_PROVIDER_URL'];
+    delete process.env['AP_AGENTIC_WEBHOOK_SECRET'];
+  });
+
   it('emits a deterministic invocation envelope shaped for the Java provider', async () => {
     const result = await toolCallAction.run({
       auth: undefined,

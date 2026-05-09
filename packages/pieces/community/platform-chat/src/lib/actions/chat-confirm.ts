@@ -9,6 +9,23 @@ export const chatConfirmAction = createAction({
   description:
     'Block the run with a confirm/reject dialog. Used to satisfy the pre_submit_confirmation barrier before any IRREVERSIBLE tool.call. The waitpoint resumes once the operator clicks confirm or reject.',
   props: {
+    platformCanonicalStepId: Property.ShortText({
+      displayName: 'Platform canonical step id',
+      description:
+        'Stable canonical workflow step id used by the Java provider to translate AP runtime state back to the provider-agnostic RunState contract.',
+      required: false,
+    }),
+    platformNextStep: Property.ShortText({
+      displayName: 'Platform next step',
+      description: 'Optional generated runtime jump target after this action completes.',
+      required: false,
+    }),
+    platformTerminal: Property.Checkbox({
+      displayName: 'Platform terminal step',
+      description: 'When true, the generated platform runtime stops after this action.',
+      required: false,
+      defaultValue: false,
+    }),
     summary: Property.LongText({
       displayName: 'Operation summary',
       description: 'Human-readable description of what is about to be submitted.',
@@ -38,9 +55,15 @@ export const chatConfirmAction = createAction({
       required: false,
       defaultValue: 'confirmed',
     }),
+    existingValue: Property.LongText({
+      displayName: 'Existing value',
+      description:
+        'Optional resolved confirmation value from previous AP steps or trigger payload. When present, the confirmation waitpoint is skipped.',
+      required: false,
+    }),
   },
   async run(context) {
-    const { summary, barrierName, confirmLabel, rejectLabel, fieldName } = context.propsValue;
+    const { summary, barrierName, confirmLabel, rejectLabel, fieldName, existingValue } = context.propsValue;
     const outputField = fieldName ?? 'confirmed';
     if (context.executionType === ExecutionType.RESUME) {
       const confirmed = readConfirmation(context.resumePayload, outputField);
@@ -50,8 +73,23 @@ export const chatConfirmAction = createAction({
         outputField,
         confirmed,
         [outputField]: confirmed,
+        platformSourceTurnId: readSourceTurnId(context.resumePayload),
         barriersReached: confirmed ? [barrierName ?? 'pre_submit_confirmation'] : [],
         resumedAt: new Date().toISOString(),
+      };
+    }
+
+    const resolved = normalizeExistingConfirmation(existingValue);
+    if (resolved !== undefined) {
+      return {
+        action: 'chat.confirm.completed',
+        barrierName: barrierName ?? 'pre_submit_confirmation',
+        outputField,
+        confirmed: resolved,
+        [outputField]: resolved,
+        barriersReached: resolved ? [barrierName ?? 'pre_submit_confirmation'] : [],
+        skippedWaitpoint: true,
+        completedAt: new Date().toISOString(),
       };
     }
 
@@ -109,8 +147,51 @@ function readConfirmation(resumePayload: unknown, outputField: string): boolean 
   return ['true', 'yes', 'y', 'si', 'sì', 'ok', 'confirm', 'confirmed', 'approve', 'approved'].includes(normalized);
 }
 
+function readSourceTurnId(resumePayload: unknown): string | undefined {
+  const payload = asRecord(resumePayload);
+  const body = asRecord(payload.body);
+  const nestedPayload = asRecord(body.payload);
+  const queryParams = asRecord(payload.queryParams);
+  return stringOrUndefined(firstDefined(
+    body.sourceTurnId,
+    nestedPayload.sourceTurnId,
+    body.turnId,
+    nestedPayload.turnId,
+    queryParams.sourceTurnId,
+    queryParams.turnId,
+  ));
+}
+
 function firstDefined(...values: unknown[]): unknown {
   return values.find((value) => value !== undefined);
+}
+
+function normalizeExistingConfirmation(value: unknown): boolean | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized.length === 0 || ['null', 'undefined'].includes(normalized)) {
+    return undefined;
+  }
+  if (['true', 'yes', 'y', 'si', 'sì', 'ok', 'confirm', 'confirmed', 'approve', 'approved'].includes(normalized)) {
+    return true;
+  }
+  if (['false', 'no', 'n', 'cancel', 'cancelled', 'reject', 'rejected'].includes(normalized)) {
+    return false;
+  }
+  return undefined;
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const text = String(value).trim();
+  return text.length === 0 ? undefined : text;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

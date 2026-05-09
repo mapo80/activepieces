@@ -8,6 +8,23 @@ export const callWorkflowAction = createAction({
   description:
     'Invoke a child agentic workflow synchronously. The Java agentic provider starts the sub-flow run, propagates the parent platformRunId for revision lineage, and waits for completion before continuing the parent run. Distinct from saga compensation (which runs on rollback).',
   props: {
+    platformCanonicalStepId: Property.ShortText({
+      displayName: 'Platform canonical step id',
+      description:
+        'Stable canonical workflow step id used by the Java provider to translate AP runtime state back to the provider-agnostic RunState contract.',
+      required: false,
+    }),
+    platformNextStep: Property.ShortText({
+      displayName: 'Platform next step',
+      description: 'Optional generated runtime jump target after this action completes.',
+      required: false,
+    }),
+    platformTerminal: Property.Checkbox({
+      displayName: 'Platform terminal step',
+      description: 'When true, the generated platform runtime stops after this action.',
+      required: false,
+      defaultValue: false,
+    }),
     childDefinitionId: Property.ShortText({
       displayName: 'Child workflow id',
       description:
@@ -33,9 +50,11 @@ export const callWorkflowAction = createAction({
     }),
   },
   async run(context) {
-    const { childDefinitionId, childVersion, inputFields, outputFields } = context.propsValue;
+    const { childDefinitionId, childVersion, inputFields, outputFields, platformNextStep, platformTerminal } = context.propsValue;
     return {
       action: 'workflow.callWorkflow',
+      platformNextStep,
+      platformTerminal: platformTerminal === true,
       childDefinitionId,
       childVersion: childVersion ?? '1.0',
       inputFields: inputFields ?? [],

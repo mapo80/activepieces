@@ -75,6 +75,7 @@ export const flowExecutor = {
         let flowExecutionContext = executionState
         let previousAction: FlowAction | null | undefined = action
         let currentAction: FlowAction | null | undefined = action
+        const platformActionIndex = buildActionIndex(action)
         const testSingleStepMode = !isNil(constants.stepNameToTest)
 
         while (!isNil(currentAction)) {
@@ -103,7 +104,11 @@ export const flowExecutor = {
 
             const shouldBreakExecution = flowExecutionContext.verdict.status !== FlowRunStatus.RUNNING || testSingleStepMode
             previousAction = currentAction
-            currentAction = currentAction.nextAction
+            currentAction = nextPlatformAction({
+                currentAction,
+                executionState: flowExecutionContext,
+                actionIndex: platformActionIndex,
+            }) ?? currentAction.nextAction
 
             if (shouldBreakExecution) {
                 break
@@ -122,6 +127,73 @@ export const flowExecutor = {
         const flowEndTime = performance.now()
         return flowExecutionContext.setDuration(flowEndTime - flowStartTime)
     },
+}
+
+function buildActionIndex(action: FlowAction | null | undefined): Map<string, FlowAction> {
+    const index = new Map<string, FlowAction>()
+    const visit = (candidate: FlowAction | null | undefined): void => {
+        if (isNil(candidate) || index.has(candidate.name)) {
+            return
+        }
+        index.set(candidate.name, candidate)
+        switch (candidate.type) {
+            case FlowActionType.ROUTER:
+                for (const child of candidate.children ?? []) {
+                    visit(child ?? undefined)
+                }
+                break
+            case FlowActionType.LOOP_ON_ITEMS:
+                visit(candidate.firstLoopAction)
+                break
+            default:
+                break
+        }
+        visit(candidate.nextAction)
+    }
+    visit(action)
+    return index
+}
+
+function nextPlatformAction({ currentAction, executionState, actionIndex }: {
+    currentAction: FlowAction
+    executionState: FlowExecutorContext
+    actionIndex: Map<string, FlowAction>
+}): FlowAction | null | undefined {
+    const output = asRecord(executionState.getStepOutput(currentAction.name)?.output)
+    const staticInput = asRecord(
+        currentAction.type === FlowActionType.PIECE ? currentAction.settings.input : undefined,
+    )
+    const terminal = output.platformTerminal === true || staticInput.platformTerminal === true
+    if (terminal) {
+        return null
+    }
+
+    const next = stringOrUndefined(output.platformNextStep) ?? stringOrUndefined(staticInput.platformNextStep)
+    if (isNil(next)) {
+        return undefined
+    }
+    const target = actionIndex.get(next)
+    if (isNil(target)) {
+        throw new EngineGenericError(
+            'PlatformNextStepNotFound',
+            `platformNextStep target not found: ${next}`,
+        )
+    }
+    return target
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+    return value !== null && typeof value === 'object'
+        ? value as Record<string, unknown>
+        : {}
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+    if (isNil(value)) {
+        return undefined
+    }
+    const text = String(value).trim()
+    return text.length === 0 ? undefined : text
 }
 
 const applyLogSizeLimitIfExceeded = (

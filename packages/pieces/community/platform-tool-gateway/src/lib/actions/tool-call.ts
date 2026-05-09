@@ -1,4 +1,6 @@
+import { httpClient, HttpMethod } from '@activepieces/pieces-common';
 import { createAction, Property } from '@activepieces/pieces-framework';
+import { createHmac } from 'node:crypto';
 import { platformToolGatewayAuth } from '../../index';
 
 export const toolCallAction = createAction({
@@ -8,6 +10,23 @@ export const toolCallAction = createAction({
   description:
     'Invoke a tool registered in the platform Tool Gateway. The Java provider performs the full 10-step governance orchestration (lifecycle check, 3-level allowlist, JSON Schema validation, PEP, idempotency, MCP invoke, audit, cost) before reaching the MCP server resolved from the chosen MCP gateway.',
   props: {
+    platformCanonicalStepId: Property.ShortText({
+      displayName: 'Platform canonical step id',
+      description:
+        'Stable canonical workflow step id used by the Java provider to translate AP runtime state back to the provider-agnostic RunState contract.',
+      required: false,
+    }),
+    platformNextStep: Property.ShortText({
+      displayName: 'Platform next step',
+      description: 'Optional generated runtime jump target after this action completes.',
+      required: false,
+    }),
+    platformTerminal: Property.Checkbox({
+      displayName: 'Platform terminal step',
+      description: 'When true, the generated platform runtime stops after this action.',
+      required: false,
+      defaultValue: false,
+    }),
     mcpGatewayId: Property.ShortText({
       displayName: 'MCP gateway id',
       description:
@@ -31,6 +50,73 @@ export const toolCallAction = createAction({
       description:
         'Arguments passed to the tool. Validated against ToolSnapshot.inputSchema before invocation.',
       required: true,
+    }),
+    bindingData: Property.Object({
+      displayName: 'Canonical binding data',
+      description:
+        'Current canonical workflow data used by the Java provider to evaluate output bindings consistently across runtime providers.',
+      required: false,
+    }),
+    outputBinding: Property.Object({
+      displayName: 'Output binding',
+      description:
+        'Provider-agnostic output mapping from raw tool output to the canonical workflow data contract. Keys can use dotted paths such as _meta.componentProps.relationships.',
+      required: false,
+    }),
+    errorPolicy: Property.Object({
+      displayName: 'Error policy',
+      description:
+        'Provider-agnostic failure policy for this tool step. Example: { "onToolFailure": "ignore" } lets the workflow branch on an empty result instead of failing the run.',
+      required: false,
+    }),
+    omitNulls: Property.Checkbox({
+      displayName: 'Omit null mapped outputs',
+      description:
+        'When enabled, null or empty values produced by output binding are not returned.',
+      required: false,
+      defaultValue: false,
+    }),
+    inheritFromRaw: Property.Checkbox({
+      displayName: 'Inherit raw tool output',
+      description:
+        'When enabled, raw tool outputs are returned before applying explicit output bindings.',
+      required: false,
+      defaultValue: false,
+    }),
+    platformRunId: Property.ShortText({
+      displayName: 'Platform run id',
+      description: 'Agentic platform run id used for audit and trace correlation.',
+      required: false,
+    }),
+    capabilityId: Property.ShortText({
+      displayName: 'Capability id',
+      description: 'Capability id used for policy and audit correlation.',
+      required: false,
+    }),
+    tenantId: Property.ShortText({
+      displayName: 'Tenant id',
+      description: 'Tenant id used by the Java ToolGateway policy context.',
+      required: false,
+    }),
+    conversationId: Property.ShortText({
+      displayName: 'Conversation id',
+      description: 'Conversation id used by the Java provider to correlate tool trace events.',
+      required: false,
+    }),
+    turnId: Property.ShortText({
+      displayName: 'Turn id',
+      description: 'Conversation turn id used by the Java provider to attach tool trace to the right message.',
+      required: false,
+    }),
+    workflowDefinitionId: Property.ShortText({
+      displayName: 'Workflow definition id',
+      description: 'Canonical workflow definition id used for provider-agnostic trace attribution.',
+      required: false,
+    }),
+    workflowDefinitionVersion: Property.ShortText({
+      displayName: 'Workflow definition version',
+      description: 'Canonical workflow definition version used for provider-agnostic trace attribution.',
+      required: false,
     }),
     idempotencyKeyPrefix: Property.ShortText({
       displayName: 'Idempotency key prefix',
@@ -56,11 +142,55 @@ export const toolCallAction = createAction({
     }),
   },
   async run(context) {
-    const { mcpGatewayId, toolRef, version, payload, idempotencyKeyPrefix, effect } =
-      context.propsValue;
-    const output = deterministicBankingOutput(toolRef, payload ?? {});
+    const {
+      platformCanonicalStepId,
+      platformNextStep,
+      platformTerminal,
+      mcpGatewayId,
+      toolRef,
+      version,
+      payload,
+      bindingData,
+      outputBinding,
+      errorPolicy,
+      omitNulls,
+      inheritFromRaw,
+      platformRunId,
+      capabilityId,
+      tenantId,
+      conversationId,
+      turnId,
+      workflowDefinitionId,
+      workflowDefinitionVersion,
+      idempotencyKeyPrefix,
+      effect,
+    } = context.propsValue;
+    const output = await invokePlatformToolGateway({
+      platformCanonicalStepId,
+      mcpGatewayId,
+      toolRef,
+      version: version ?? '1.0',
+      payload: asRecord(payload),
+      bindingData: asRecord(bindingData),
+      outputBinding: asRecord(outputBinding),
+      errorPolicy: asRecord(errorPolicy),
+      omitNulls: omitNulls === true,
+      inheritFromRaw: inheritFromRaw === true,
+      platformRunId,
+      capabilityId,
+      tenantId,
+      conversationId,
+      turnId,
+      workflowDefinitionId,
+      workflowDefinitionVersion,
+      idempotencyKeyPrefix,
+      effect,
+      apRunId: context.run?.id ?? 'test-run',
+    });
     return {
       action: 'tool.call',
+      platformNextStep,
+      platformTerminal: platformTerminal === true,
       mcpGatewayId,
       toolRef,
       version: version ?? '1.0',
@@ -72,6 +202,114 @@ export const toolCallAction = createAction({
     };
   },
 });
+
+async function invokePlatformToolGateway(params: {
+  platformCanonicalStepId?: string;
+  mcpGatewayId: string;
+  toolRef: string;
+  version: string;
+  payload: Record<string, unknown>;
+  bindingData: Record<string, unknown>;
+  outputBinding: Record<string, unknown>;
+  errorPolicy: Record<string, unknown>;
+  omitNulls: boolean;
+  inheritFromRaw: boolean;
+  platformRunId?: string;
+  capabilityId?: string;
+  tenantId?: string;
+  conversationId?: string;
+  turnId?: string;
+  workflowDefinitionId?: string;
+  workflowDefinitionVersion?: string;
+  idempotencyKeyPrefix?: string;
+  effect: string;
+  apRunId: string;
+}): Promise<Record<string, unknown>> {
+  const providerUrl = stringOrUndefined(process.env['AP_AGENTIC_PROVIDER_URL']);
+  const webhookSecret = stringOrUndefined(process.env['AP_AGENTIC_WEBHOOK_SECRET']);
+  if (!providerUrl || !webhookSecret) {
+    if (process.env['AP_AGENTIC_ALLOW_DETERMINISTIC_FALLBACK'] === 'true') {
+      return deterministicBankingOutput(params.toolRef, params.payload);
+    }
+    throw new Error(
+      'Agentic provider is not configured for platform-tool-gateway. Set AP_AGENTIC_PROVIDER_URL, AP_AGENTIC_WEBHOOK_SECRET and propagate them to the AP worker/sandbox.',
+    );
+  }
+
+  const body = {
+    platformCanonicalStepId: params.platformCanonicalStepId,
+    mcpGatewayId: params.mcpGatewayId,
+    toolRef: params.toolRef,
+    version: params.version,
+    payload: params.payload,
+    bindingData: params.bindingData,
+    outputBinding: params.outputBinding,
+    errorPolicy: params.errorPolicy,
+    omitNulls: params.omitNulls,
+    inheritFromRaw: params.inheritFromRaw,
+    idempotencyKey: `${params.idempotencyKeyPrefix ?? `ap:${params.toolRef}`}:${params.apRunId}`,
+    effect: params.effect,
+    runContext: {
+      platformRunId: nonBlank(params.platformRunId, params.apRunId),
+      capabilityId: nonBlank(params.capabilityId, 'unknown'),
+      tenantId: nonBlank(params.tenantId, 'default'),
+      conversationId: nonBlank(params.conversationId, ''),
+      turnId: nonBlank(params.turnId, ''),
+      workflowDefinitionId: nonBlank(params.workflowDefinitionId, ''),
+      workflowDefinitionVersion: nonBlank(params.workflowDefinitionVersion, ''),
+    },
+  };
+  const rawBody = JSON.stringify(body);
+  const response = await httpClient.sendRequest<ToolInvokeResponse>({
+    method: HttpMethod.POST,
+    url: `${providerUrl.replace(/\/+$/, '')}/agentic/v1/tools/invoke`,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-AP-Signature': signHmac(rawBody, webhookSecret),
+    },
+    body: rawBody,
+    timeout: 60_000,
+  });
+  const responseBody = response.body ?? {};
+  if (responseBody.outcome === 'ERROR') {
+    throw new Error(responseBody.errorMessage ?? responseBody.errorCode ?? 'ToolGateway returned ERROR');
+  }
+  return responseBody.outputs ?? {};
+}
+
+function signHmac(payload: string, secret: string): string {
+  const mac = createHmac('sha256', secret);
+  mac.update(payload, 'utf8');
+  return `sha256=${mac.digest('hex')}`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const text = String(value).trim();
+  return text.length === 0 ? undefined : text;
+}
+
+function nonBlank(value: unknown, fallback: string): string {
+  const text = stringOrUndefined(value);
+  return text ?? fallback;
+}
+
+type ToolInvokeResponse = {
+  outcome?: 'SUCCESS' | 'ERROR' | 'IDEMPOTENT_REPLAY';
+  outputs?: Record<string, unknown>;
+  latencyMs?: number;
+  retries?: number;
+  errorCode?: string;
+  errorMessage?: string;
+};
 
 function deterministicBankingOutput(toolRef: string, payload: Record<string, unknown>): Record<string, unknown> {
   switch (toolRef) {
