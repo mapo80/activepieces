@@ -185,6 +185,50 @@ describe('flowRunSideEffects agentic emission', () => {
         expect(call.data?.failedStepName).toBe('submit_application')
     })
 
+    it('derives canonical run metadata from step outputs when AP run metadata is empty', async () => {
+        const log = buildLogger()
+        await flowRunSideEffects(log as never).onFinish(buildFlowRun({
+            status: FlowRunStatus.SUCCEEDED,
+            steps: {
+                trigger: {
+                    status: 'SUCCEEDED',
+                    output: {
+                        platformRunId: 'run-platform-42',
+                        providerEpoch: 12,
+                        workflowDefinitionId: 'definition-gaia',
+                        workflowDefinitionVersion: '1',
+                    },
+                },
+                render_answer: {
+                    status: 'SUCCEEDED',
+                    output: {
+                        answerText: 'Risposta pubblica prodotta dal flow AP.',
+                    },
+                },
+            },
+        } as Partial<FlowRun>))
+
+        const call = emitMock.mock.calls[0][0]
+        expect(call.platformRunId).toBe('run-platform-42')
+        expect(call.externalRunId).toBe('ap-run-1')
+        expect(call.providerEpoch).toBe(12)
+        expect(call.runVersion).toBe(12)
+        expect(call.data?.answerText).toBe('Risposta pubblica prodotta dal flow AP.')
+        expect(call.data?.workflowDefinitionId).toBe('definition-gaia')
+        expect(call.data?.steps).toMatchObject({
+            trigger: {
+                output: {
+                    platformRunId: 'run-platform-42',
+                },
+            },
+            render_answer: {
+                output: {
+                    answerText: 'Risposta pubblica prodotta dal flow AP.',
+                },
+            },
+        })
+    })
+
     it('payload preserves projectId for tenant scoping', async () => {
         const log = buildLogger()
         await flowRunSideEffects(log as never).onFinish(buildFlowRun({

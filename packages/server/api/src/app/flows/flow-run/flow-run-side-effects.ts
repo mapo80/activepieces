@@ -121,6 +121,7 @@ function derivePlatformRunId(flowRun: FlowRun): string {
         ?? readNestedString(flowRun, ['agentic', 'platformRunId'])
         ?? readNestedString(flowRun, ['input', 'platformRunId'])
         ?? readNestedString(flowRun, ['payload', 'platformRunId'])
+        ?? readStepOutputString(flowRun, 'platformRunId')
         ?? flowRun.id
 }
 
@@ -129,6 +130,7 @@ function deriveProviderEpoch(flowRun: FlowRun): number | undefined {
         ?? readNestedNumber(flowRun, ['agentic', 'providerEpoch'])
         ?? readNestedNumber(flowRun, ['input', 'providerEpoch'])
         ?? readNestedNumber(flowRun, ['payload', 'providerEpoch'])
+        ?? readStepOutputNumber(flowRun, 'providerEpoch')
     return value !== undefined && Number.isFinite(value) ? value : undefined
 }
 
@@ -158,11 +160,87 @@ function readNestedValue(source: unknown, path: string[]): unknown {
 
 function extractAgenticData(flowRun: FlowRun): Record<string, unknown> | undefined {
     const data: Record<string, unknown> = {}
+    const steps = extractStepStates(flowRun)
+    if (steps !== undefined) {
+        data.steps = steps
+        mergeStepOutputs(data, steps)
+    }
     if (flowRun.failedStep?.name !== undefined) data.failedStepName = flowRun.failedStep.name
     const durationMs = calculateDurationMs(flowRun)
     if (durationMs !== undefined) data.durationMs = durationMs
     if (flowRun.stepsCount !== undefined) data.tasksExecuted = flowRun.stepsCount
     return Object.keys(data).length === 0 ? undefined : data
+}
+
+function readStepOutputString(flowRun: FlowRun, key: string): string | undefined {
+    const value = readStepOutputValue(flowRun, key)
+    return typeof value === 'string' && value.trim() !== '' ? value : undefined
+}
+
+function readStepOutputNumber(flowRun: FlowRun, key: string): number | undefined {
+    const value = readStepOutputValue(flowRun, key)
+    if (typeof value === 'number') return value
+    if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value)
+        return Number.isFinite(parsed) ? parsed : undefined
+    }
+    return undefined
+}
+
+function readStepOutputValue(flowRun: FlowRun, key: string): unknown {
+    const steps = readNestedValue(flowRun, ['steps'])
+    if (steps === null || typeof steps !== 'object') return undefined
+    for (const step of Object.values(steps as Record<string, unknown>)) {
+        const value = readNestedValue(step, ['output', key])
+        if (value !== undefined && value !== null && String(value).trim() !== '') {
+            return value
+        }
+    }
+    return undefined
+}
+
+function extractStepStates(flowRun: FlowRun): Record<string, unknown> | undefined {
+    const rawSteps = readNestedValue(flowRun, ['steps'])
+    if (rawSteps === null || typeof rawSteps !== 'object') return undefined
+    const out: Record<string, unknown> = {}
+    for (const [stepName, rawStep] of Object.entries(rawSteps as Record<string, unknown>)) {
+        if (rawStep === null || typeof rawStep !== 'object') continue
+        const step = compactJsonObject(rawStep as Record<string, unknown>)
+        if (Object.keys(step).length > 0) out[stepName] = step
+    }
+    return Object.keys(out).length === 0 ? undefined : out
+}
+
+function mergeStepOutputs(target: Record<string, unknown>, steps: Record<string, unknown>): void {
+    for (const step of Object.values(steps)) {
+        const output = readNestedValue(step, ['output'])
+        if (output === null || typeof output !== 'object') continue
+        for (const [key, value] of Object.entries(output as Record<string, unknown>)) {
+            if (value !== undefined && value !== null && target[key] === undefined) {
+                target[key] = value
+            }
+        }
+    }
+}
+
+function compactJsonObject(input: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(input)) {
+        const compacted = compactJsonValue(value)
+        if (compacted !== undefined) out[key] = compacted
+    }
+    return out
+}
+
+function compactJsonValue(value: unknown): unknown {
+    if (value === undefined) return undefined
+    if (Array.isArray(value)) {
+        return value.map(compactJsonValue).filter(item => item !== undefined)
+    }
+    if (value !== null && typeof value === 'object') {
+        return compactJsonObject(value as Record<string, unknown>)
+    }
+    return value
 }
 
 function calculateDurationMs(flowRun: FlowRun): number | undefined {
